@@ -167,10 +167,9 @@ QProgram depends only on NumPy and xarray, with Matplotlib as an optional extra 
 
 ## Presenters
 
-### Vyron Vasileiadis — Lead Presenter
+### Vyron Vasileiadis
 
-*Technical Lead, Qilimanjaro Quantum Tech — Barcelona, Spain*
-📧 [vyron@qilimanjaro.tech](mailto:vyron@qilimanjaro.tech)
+*Technical Lead, Qilimanjaro Quantum Tech* — [vyron@qilimanjaro.tech](mailto:vyron@qilimanjaro.tech)
 
 Vyron leads the design and development of core quantum software infrastructure for Qilimanjaro's quantum processors. His work spans SDKs, simulators, runtimes, and execution pipelines, with a focus on connecting digital circuits, Hamiltonian-based models, pulse-level programming, and backend execution within coherent, usable abstractions. He is a key contributor to QProgram, QiliSDK, and Qilimanjaro's broader quantum computing stack.
 
@@ -178,8 +177,7 @@ Vyron holds an MSc in Quantum Computing and is currently pursuing a PhD in quant
 
 ### Flavie Le Bars
 
-*Quantum Software Engineer, Quantum Hardware Control team, Qilimanjaro Quantum Tech — Barcelona, Spain*
-📧 [flavie.lebars@qilimanjaro.tech](mailto:flavie.lebars@qilimanjaro.tech)
+*Quantum Software Engineer, Qilimanjaro Quantum Tech* — [flavie.lebars@qilimanjaro.tech](mailto:flavie.lebars@qilimanjaro.tech)
 
 Flavie holds an MEng in Aerospace Engineering from the University of Bristol. She works on the quantum hardware control stack, focusing on compilers that translate QProgram (pulse-level quantum programs) into low-level Q1ASM instructions for Qblox control hardware. She contributes to Qilimanjaro's hardware control library, and QPySequence, a Pythonic abstraction layer over Q1ASM assembly. Her interests span the full stack, from the physics of superconducting qubits to the software that controls them, and she enjoys solving problems that require bridging multiple disciplines.
 
