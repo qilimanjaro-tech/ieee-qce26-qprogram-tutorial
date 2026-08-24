@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
 """Check the tutorial text against the house style.
 
-Two rules, both mechanical:
+Three rules, all mechanical:
 
-1. No em dashes or en dashes. Use a comma, a colon, parentheses, or two sentences.
+1. No em dashes or en dashes. Use a comma, parentheses, or two sentences.
 2. No filler vocabulary from the banned list below.
+3. No sentence shape over its per-file budget (see BUDGETS).
+
+Rules 1 and 2 are line based and apply to every text file. Rule 3 counts sentence shapes in
+prose only, per file, and applies to the globs in BUDGETED. Markdown cells are the prose of a
+source file, so code, tables, fenced blocks, and inline code are all excluded before counting.
+
+The budgets exist because the vocabulary list cannot catch rhythm. One `That is` opener reads
+well and eight in a file read like a machine. Each budget is seeded from the file that was
+already doing best, so the caps describe prose this repo has written rather than an ideal.
+
+There is no per-file escape hatch, by design. If a budget is wrong, change the number here once
+and say why in a comment, so the decision is visible instead of scattered through the sources.
+
+Two conventions this file does not enforce, recorded so they are decisions and not drift:
+
+- The register is formal. No contractions in prose: `it is`, not `it's`.
+- `we` is the room during the session, `you` is your hands on the keyboard. Both are correct in
+  their place, so a `we` heading above a `you` body is deliberate.
 
 Usage:
 
@@ -70,6 +88,65 @@ BANNED = [
 
 PATTERNS = [(word, re.compile(rf"(?<![\w-]){re.escape(word)}(?![\w-])", re.IGNORECASE)) for word in BANNED]
 
+# Sentence shapes with a per-file budget, and the cap for each. The first three are the
+# append-a-meaning-clause habit: state the fact, then add a clause explaining what it meant.
+# The fourth is the colon that the em dash ban keeps redirecting traffic into.
+BUDGETS = (
+    ("'That is' sentence opener", re.compile(r"(?:^|\.\s+)That is\b", re.MULTILINE), 3),
+    ("', which is' tail", re.compile(r",\s+which is\b"), 3),
+    ("'is what' construction", re.compile(r"\bis what\b"), 2),
+    ("mid-sentence colon", re.compile(r"[a-z]:\s+[a-z]"), 12),
+)
+
+# Files the budgets apply to. The deck and the top-level markdown join this list in the final
+# pass over them; until then the budgets would fail on prose that has not been revised yet.
+BUDGETED = ("sources/*.py",)
+
+CELL = re.compile(r"^# %%(?P<rest>.*)$")
+FENCE = re.compile(r"```.*?```", re.DOTALL)
+INLINE_CODE = re.compile(r"`[^`]*`")
+DELIMITER = {'r"""', '"""'}
+
+
+def prose(path: Path) -> str:
+    """The prose of a file: its markdown cells if it is a source, its whole text otherwise.
+
+    Tables, fenced blocks, and inline code carry punctuation that is not prose punctuation, so
+    they come out before anything is counted.
+    """
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".py":
+        cells: list[str] = []
+        current: list[str] | None = None
+        kind: str | None = None
+        for raw in text.splitlines():
+            match = CELL.match(raw)
+            if match is not None:
+                if kind == "markdown" and current:
+                    cells.append("\n".join(current))
+                kind = "markdown" if match.group("rest").strip() == "[markdown]" else "code"
+                current = []
+                continue
+            if current is not None and raw.strip() not in DELIMITER:
+                current.append(raw)
+        if kind == "markdown" and current:
+            cells.append("\n".join(current))
+        text = "\n\n".join(cells)
+    text = FENCE.sub(" ", text)
+    text = "\n".join(line for line in text.splitlines() if not line.strip().startswith("|"))
+    return INLINE_CODE.sub("X", text)
+
+
+def budgets(path: Path) -> list[str]:
+    """Report every sentence shape over its cap in one file."""
+    text = prose(path)
+    problems: list[str] = []
+    for name, pattern, cap in BUDGETS:
+        count = len(pattern.findall(text))
+        if count > cap:
+            problems.append(f"{path.relative_to(ROOT)}: {name}: {count}, over the cap of {cap}")
+    return problems
+
 
 def check(path: Path) -> list[str]:
     problems: list[str] = []
@@ -90,7 +167,14 @@ def main(argv: list[str]) -> int:
         paths = sorted(p for pattern in DEFAULT_GLOBS for p in ROOT.glob(pattern))
     # This file quotes every banned word, so checking it would always fail.
     paths = [path for path in paths if path.resolve() != SELF]
-    problems = [problem for path in paths if path.is_file() for problem in check(path)]
+    budgeted = {p.resolve() for pattern in BUDGETED for p in ROOT.glob(pattern)}
+    problems: list[str] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        problems.extend(check(path))
+        if path.resolve() in budgeted:
+            problems.extend(budgets(path))
     for problem in problems:
         print(problem)
     print(f"checked {len(paths)} files, {len(problems)} problems")

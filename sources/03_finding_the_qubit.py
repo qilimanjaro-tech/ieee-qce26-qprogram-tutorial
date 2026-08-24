@@ -58,8 +58,8 @@ r"""
 `DEVICE` holds the truth about the simulated chip. The measurement models read it, because they
 play the part of the fridge, and the print statements read it to grade the fits. The programs use
 exactly one number from it, `q0_fr`, and only because Part 2 measured that one already. Everything
-else they have to find out, which is the point: a real experiment does not know these numbers, so
-neither does the code that would run on hardware.
+else they have to find out. A real experiment does not know these numbers, so neither does the code
+that would run on hardware.
 
 Part 2 also left two waveforms behind: the readout pulse and the integration weights. The programs
 below ask for them by name, as the strings `"readout"` and `"weights"`, and the library in 3.3 is
@@ -94,8 +94,8 @@ r"""
 ## 3.1 Two-tone spectroscopy
 
 The resonator is coupled to the qubit, so the qubit's state pulls the resonator frequency by the
-dispersive shift $\chi$. That is the whole trick behind dispersive readout, and it is also how you
-find the qubit in the first place:
+dispersive shift $\chi$. Dispersive readout is built on that pull, and so is finding the qubit in
+the first place:
 
 1. Park the readout tone at the resonator, where Part 2 put it.
 2. Send a second tone down the **drive** line and sweep its frequency.
@@ -104,13 +104,13 @@ find the qubit in the first place:
 
 The drive pulse for this scan is long and weak: 4 microseconds at 2% of full scale. You do not yet
 know the amplitude of a pi pulse, so you cannot ask for a clean flip. Instead you saturate the
-transition and settle at a population somewhere below 0.5, which is what the model below returns.
+transition and settle at a population somewhere below 0.5, the value the model below returns.
 
-The window is 20 MHz wide, so this scan assumes you already know `f01` to roughly that much: from
+The window is 20 MHz wide, so this scan assumes you already know `f01` to roughly that much, from
 the chip design, from a cooldown last month, or from a wide survey scan like the flux arc in 3.4.
-Drive a survey scan hard and the line broadens, which is what keeps the peak findable on a coarse
-grid. This tone is weak, so the line stays near its 2 MHz low-power width and the 250 kHz step puts
-eight points across it.
+Drive a survey scan hard and the line broadens, which keeps the peak findable on a coarse grid.
+This tone is weak, so the line stays near its 2 MHz low-power width and the 250 kHz step puts eight
+points across it.
 
 The drive bus is an IQ channel, so the saturation tone is an `IQPair`. A bare `Square` on that bus
 raises a `ValidationError` at build time.
@@ -268,7 +268,7 @@ population follows $\sin^2$ of the rotation angle, and the first maximum is the 
 
 Two things in the program are new.
 
-The pulse is an `IQDrag`, the standard single-qubit envelope on a transmon: a Gaussian on I and its
+The pulse is an `IQDrag`, the standard single-qubit envelope on a transmon. A Gaussian on I and its
 scaled derivative on Q, which suppresses leakage to the second excited state. Part 1 plotted it.
 
 The swept variable goes **inside the waveform**:
@@ -328,8 +328,8 @@ $$P(a) = P_0 + C \sin^2\!\left(\frac{\pi a}{2 a_\pi}\right)$$
 
 so $a_\pi$ is the amplitude at the first maximum. Fitting for it directly, rather than fitting a
 generic sinusoid and converting afterwards, means `curve_fit` reports the uncertainty on the number
-you actually want. That is worth doing deliberately every time: write the model in terms of the
-calibration parameter.
+you actually want. Do that deliberately every time. Write the model in terms of the calibration
+parameter.
 
 $C$ is the readout contrast and $P_0$ the floor. On a real device neither is 1 and 0, and watching
 them drift is one of the cheapest health checks you have.
@@ -377,8 +377,8 @@ A calibrated gate, in this stack, is a waveform object with numbers in it. Nothi
 
 `PI_PULSE` flips the qubit. `X90_PULSE` takes it to the equator and is the workhorse of Part 4:
 Ramsey needs two of them, and the echo needs two with a pi pulse in between. Both are plain
-`IQDrag` instances, so they compare by structure: two pulses are equal when every parameter
-matches. That is what makes a calibration set diffable, and it is why an amplitude gets rounded
+`IQDrag` instances, so they compare by structure. Two pulses are equal when every parameter
+matches. A calibration set is diffable for that reason, and it is why an amplitude gets rounded
 before it goes in a file. The fit above knows this amplitude to about 0.003, so four decimals is
 already finer than the measurement, and it keeps the text readable.
 
@@ -475,10 +475,9 @@ The alias survives serialization, so the `.qp` file says `play q[0].drive "pi"`.
 a separate step, `program.with_waveforms(...)`, which returns a new program with the names resolved.
 The original is untouched.
 
-One thing to know before you lean on it: the reference platform never looks at a waveform, so an
-unbound alias costs nothing there. That is why every `measure` in this notebook can name `"readout"`
-and `"weights"` and still run. A real platform has to turn the name into samples, so off the
-simulator the binding step is not optional.
+The reference platform never looks at a waveform, so an unbound alias costs nothing there. Every
+`measure` in this notebook can name `"readout"` and `"weights"` and still run because of it. A real
+platform has to turn the name into samples, so off the simulator the binding step is not optional.
 """
 
 # %%
@@ -559,8 +558,8 @@ $$f_{01}(V) = f_{\max} \sqrt{\left| \cos \frac{\pi (V - V_0)}{V_\Phi} \right|}$$
 
 with $V_0$ the bias where the loop sees zero flux (the **sweet spot**, where $f_{01}$ is flattest
 against bias noise) and $V_\Phi$ the bias interval that threads one flux quantum. You want $V_0$,
-and you find it by repeating the spectroscopy of 3.1 at a series of biases. That is a 2D scan: bias
-on the outer loop, drive frequency on the inner one.
+and you find it by repeating the spectroscopy of 3.1 at a series of biases. The scan is two
+dimensional. Bias on the outer loop, drive frequency on the inner one.
 
 Two changes to the program.
 
@@ -568,8 +567,8 @@ Two changes to the program.
 channel means single-channel waveforms: `Square`, not `IQPair`. Try it the other way and the builder
 raises before you get near an instrument.
 
-`set_offset(bus, value)` writes a DC level rather than playing a pulse, which is what a bias line
-wants. The value is the swept variable, so the outer loop is a sequence of DC writes.
+`set_offset(bus, value)` writes a DC level rather than playing a pulse. A bias line wants exactly
+that. The value is the swept variable, so the outer loop is a sequence of DC writes.
 """
 
 # %%

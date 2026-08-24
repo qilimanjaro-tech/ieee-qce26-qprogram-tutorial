@@ -5,13 +5,11 @@ r"""
 **Run this notebook before the tutorial.** It is a pass/fail check. If the last cell draws a curve
 with a sharp dip near 7.2 GHz, you are ready.
 
-Any Jupyter environment works: JupyterLab, VS Code, or Google Colab.
+Nothing here talks to hardware. QProgram ships a pure-Python reference platform, so every experiment
+in this tutorial runs on your laptop. JupyterLab, VS Code, and Google Colab all work.
 
 - **Local:** `pip install "qprogram[viz]" scipy` (Python 3.11 to 3.14), then run the cells below.
 - **Colab:** run the cells top to bottom. The second one installs what is missing.
-
-Nothing here talks to hardware. QProgram ships a pure-Python reference platform, so every
-experiment in this tutorial runs on your laptop.
 """
 
 # %% [markdown]
@@ -21,8 +19,8 @@ r"""
 The tutorial follows the order a real qubit gets brought up, and each experiment introduces the
 QProgram feature it needs:
 
-- Find the **readout resonator** with a frequency sweep, then find the **qubit** with a second
-  tone. That gets you buses, waveforms, sweeps, averaging, and results.
+- Find the **readout resonator** with a frequency sweep, then the **qubit** with a second tone,
+  picking up buses, waveforms, sweeps, averaging, and results along the way.
 - Drive the qubit and calibrate a **pi pulse** from a Rabi curve.
 - Measure **T1**, **T2\***, and **T2** with echo, using reusable pulse fragments.
 - Read out **single shots**, set a threshold, and do **active reset** with real feedback.
@@ -37,9 +35,9 @@ it, in files you could hand to someone else.
 
 # %% [markdown]
 r"""
-### Check 1: Python version
+## Check 1: Python version
 
-QProgram is pure Python and needs 3.11 or newer. It is tested on 3.11 through 3.14.
+QProgram is pure Python and needs 3.11 or newer. Versions through 3.14 are tested.
 """
 
 # %%
@@ -55,11 +53,11 @@ else:
 
 # %% [markdown]
 r"""
-### Check 2: install QProgram
+## Check 2: install QProgram
 
 The cell below does nothing if QProgram is already installed, and installs it otherwise (a fresh
-Colab runtime, for example). The `viz` extra pulls in matplotlib, which the notebooks use for
-plots. `scipy` is not a QProgram dependency: the tutorial uses it to fit the curves you measure.
+Colab runtime, for example). The `viz` extra pulls in matplotlib for the plots. `scipy` is not a
+QProgram dependency. The tutorial uses it to fit the curves you measure.
 """
 
 # %%
@@ -83,10 +81,10 @@ print("qprogram", version("qprogram"))
 
 # %% [markdown]
 r"""
-### Check 3: build a program
+## Check 3: build a program
 
-This is the smallest experiment that does something useful: sweep the readout frequency and record
-what comes back. It is resonator spectroscopy, the first measurement on a new chip.
+This is the smallest experiment that does something useful. Sweep the readout frequency, record what
+comes back. It is resonator spectroscopy, the first measurement on a new chip.
 
 Five names, one line each:
 
@@ -118,9 +116,9 @@ print("measurement handle:", m0.name)
 
 # %% [markdown]
 r"""
-### Check 4: read the program back as text
+## Check 4: read the program back as text
 
-A QProgram is data, not a script, so it serializes. `qp.dumps` writes the `.qp` text format: one
+A QProgram is data, not a script, so it serializes. `qp.dumps` writes the `.qp` text format. One
 statement per line, indentation for nesting, no hidden state. This is the file you commit next to
 your results.
 """
@@ -130,15 +128,15 @@ print(qp.dumps(program))
 
 # %% [markdown]
 r"""
-### Check 5: run it
+## Check 5: run it
 
 `qp.simulate` runs the program on the reference platform, a pure-Python interpreter that ships
-inside QProgram. It does not model pulses or timing. What it does model is the shape of the
-experiment: the loops, the averaging, and one measurement record per `measure` call.
+inside QProgram. It does not model pulses or timing. It models the shape of the experiment: the
+loops, the averaging, and one measurement record per `measure` call.
 
-Where the numbers come from is up to you. A `MeasurementModel` is asked for one sample per shot,
-and it receives `env`, a dict of the loop variables currently bound. Here the response is a
-resonator dip: a Lorentzian centered at 7.2 GHz, 1.5 MHz wide, with a little noise on top.
+Where the numbers come from is up to you. A `MeasurementModel` is asked for one sample per shot, and
+it receives `env`, a dict of the loop variables currently bound. Here the response is a resonator
+dip. A Lorentzian centered at 7.2 GHz, 1.5 MHz wide, with a little noise on top.
 """
 
 # %%
@@ -175,10 +173,10 @@ print("expected:", F_RESONATOR / 1e9, "GHz")
 
 # %% [markdown]
 r"""
-### Check 6: plotting
+## Check 6: plotting
 
-Several parts of the tutorial draw figures, so the last check is matplotlib. If you see a curve
-with a dip in it, plotting works.
+Several parts of the tutorial draw figures, so the last check is matplotlib. If you see a curve with
+a dip in it, plotting works.
 """
 
 # %%
@@ -194,7 +192,7 @@ plt.show()
 
 # %% [markdown]
 r"""
-A curve with a dip near 7.2 GHz means the whole stack works: build, serialize, run, plot. ✅
+A curve with a dip near 7.2 GHz means the whole stack works. Build, serialize, run, plot. ✅
 See you at the tutorial.
 
 Curious already? Change `shots=100` to `shots=2` in Check 3 and rerun the last four cells. The dip

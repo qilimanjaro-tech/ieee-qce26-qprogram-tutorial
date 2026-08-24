@@ -10,11 +10,11 @@ the three pieces that turn a sequence into an experiment.
 - **Sweep sources** say how a variable moves, in a form a compiler can read.
 - **`average(shots)`** repeats the whole thing and hands you a mean instead of one sample.
 
-Then the other half: what `qp.simulate` gives back, why it is an `xarray.DataArray`, and how the
+Then the other half. What `qp.simulate` gives back, why it is an `xarray.DataArray`, and how the
 dimension names come from the variables you declared.
 
-Two experiments carry it. **Resonator spectroscopy** finds the readout resonator, which is the
-first measurement anyone makes on a new chip. **Punchout** is the 2D scan that shows the resonator
+Two experiments carry it. **Resonator spectroscopy** finds the readout resonator, the first
+measurement anyone makes on a new chip. **Punchout** is the 2D scan that shows the resonator
 sliding as you push more power at it, and it tells you what power to read out at. About 35 minutes.
 """
 
@@ -57,9 +57,9 @@ r"""
 ## The device under test
 
 Every notebook in this tutorial talks to the same simulated chip, and every notebook writes its
-true parameters down in one place. That is the deal: the numbers are in plain sight, and the job of
-each experiment is to recover them from data. If your fit disagrees with `DEVICE`, either the fit
-is wrong or you learned something about the analysis.
+true parameters down in one place. The numbers are in plain sight, and the job of each experiment
+is to recover them from data. If your fit disagrees with `DEVICE`, either the fit is wrong or you
+learned something about the analysis.
 
 Part 2 needs three of these numbers: where the readout resonator sits, how wide it is, and how far
 the qubit pulls it.
@@ -94,11 +94,11 @@ r"""
 
 You do not know where the resonator is. You know it is somewhere near 7.2 GHz, because that is
 where the designer put it and the chip came back within a percent or two. So you cannot write
-`set_frequency(readout, 7.2e9)` and be done: you have to write the program once with a hole in it,
+`set_frequency(readout, 7.2e9)` and be done. You have to write the program once with a hole in it,
 and let something else decide what goes in the hole.
 
 `program.variable(id, label=..., units=...)` declares that hole. The id is the only part that
-matters to the machine: it becomes the identifier in the `.qp` file and the dimension name in the
+matters to the machine. It becomes the identifier in the `.qp` file and the dimension name in the
 result. `label` and `units` are for humans.
 
 Arithmetic on a variable builds an expression tree. Nothing is computed at that point.
@@ -122,15 +122,15 @@ print("value of freq:   ", freq.value)
 r"""
 ### Where the value comes from
 
-A variable holds one value at a time, and it starts out as `UNASSIGNED`. The loop that binds it is
-what sets it: on each iteration the runtime calls `set_value`, every expression built on that
+A variable holds one value at a time, and it starts out as `UNASSIGNED`. The loop that binds it
+decides the value. On each iteration the runtime calls `set_value`, every expression built on that
 variable re-evaluates, and the operations inside the loop see the new number. Nothing is passed as
 an argument anywhere.
 
 Two ways to read a tree. `evaluate()` returns `UNASSIGNED` if anything in it is unbound, so code
 that inspects a program before it has run never has to guard. `evaluate_or_raise()` insists on a
-number and raises `UnassignedVariableError` naming what is missing. That is the one the interpreter
-calls on every operation as it executes, because by then there is no value it is allowed to skip.
+number and raises `UnassignedVariableError` naming what is missing. The interpreter calls that one
+on every operation as it executes, because by then there is no value it is allowed to skip.
 """
 
 # %%
@@ -189,16 +189,16 @@ r"""
 
 Every source declares a `KIND`, either `"linear"` or `"arbitrary"`, and a capability `TOKEN`.
 
-`"linear"` is a promise about the values: point $i$ is exactly `start + step * i`. That is what
-lets a sequencer run the loop from a hardware register, incrementing a frequency word per
-iteration, with nothing uploaded and no host in the loop. `Range` and `Linspace` make that promise.
+`"linear"` is a promise about the values. Point $i$ is exactly `start + step * i`. A sequencer can
+therefore run the loop from a hardware register, incrementing a frequency word per iteration, with
+nothing uploaded and no host in the loop. `Range` and `Linspace` make that promise.
 
 `"arbitrary"` means the values are a list. The platform either uploads them as a table, which costs
-sequencer memory, or steps them from the host, which costs a round trip per point. That is a real
-difference in how long your experiment takes.
+sequencer memory, or steps them from the host, which costs a round trip per point. The difference
+shows up directly in how long your experiment takes.
 
-`Values` is arbitrary **even when the numbers you pass are evenly spaced**. The source is what
-carries the claim, and a list of floats proves nothing about its own regularity. If your sweep
+`Values` is arbitrary **even when the numbers you pass are evenly spaced**. The source carries the
+claim, and a list of floats proves nothing about its own regularity. If your sweep
 really is a ramp, say `Range` or `Linspace` and let the compiler use it.
 
 The tokens are how a platform declines: a rack whose sequencer cannot do log sweeps refuses
@@ -240,15 +240,15 @@ r"""
 ## 2.3 `average(shots)` adds no dimension
 
 A single measurement of a superconducting qubit is a handful of photons hitting an amplifier chain.
-It is noisy. The fix is repetition: run the identical sequence a few hundred times and average.
+It is noisy. The fix is repetition. Run the identical sequence a few hundred times and average.
 
 `with program.average(shots=N)` is that repetition, and it is the one block that does **not** show
 up as a dimension in the result. `iq` and `raw` come back as means over the shots; `state` comes
-back as the excited-state population. That is what you want almost always, and when you do want the
+back as the excited-state population. You almost always want that, and when you do want the
 individual shots there is a trick for it in Part 4.
 
-Here is the shot loop doing its only job. Same program, same 64 sweep points, one flat response with
-a lot of noise on it, four different shot counts.
+The shot loop has one job. Same program, same 64 sweep points, one flat response with a lot of
+noise on it, four different shot counts.
 """
 
 # %%
@@ -311,16 +311,15 @@ bound loop variables, keyed by variable id, plus any platform parameters keyed a
 `"bus.parameter"`.
 
 Now the honest part, and it will be repeated. **The simulator is not physics.** The pulses you play,
-the waits, the syncs, the gains you set: all of them are recorded in the AST, validated against the
+the waits, the syncs, the gains you set are all recorded in the AST, validated against the
 platform, and then ignored by the interpreter. There is no timing model and no waveform model. When
 you sweep an amplitude and watch a dip move, it moved because your `response` function read
-`env["ro_amp"]` and did the arithmetic itself. That is deliberate. What this tutorial puts under
-test is the program and the analysis, which are the parts you would carry to a real fridge
-unchanged.
+`env["ro_amp"]` and did the arithmetic itself. That is deliberate. This tutorial puts the program
+and the analysis under test, and those are the parts you would carry to a real fridge unchanged.
 
 One consequence of that, and every cell below leans on it. Every `measure` here passes the string
 aliases `"readout"` and `"weights"` and never binds them to real waveforms, and the run works
-anyway, because the interpreter never looks at a pulse. A real platform does look: it needs samples
+anyway, because the interpreter never looks at a pulse. A real platform does look. It needs samples
 to upload, so `program.with_waveforms(library)` has to come first. Part 3 does that binding for
 real.
 """
@@ -408,11 +407,11 @@ print("first three points:", np.round(s21_data[:3], 3))
 
 # %% [markdown]
 r"""
-Two plots, because they fail in different ways. Magnitude shows the dip and is what you look at
-first. Phase turns by about a radian either side of the resonance, and it stays readable when the
-dip is shallow, which is how an over-coupled resonator often looks. The size of the turn is set by
-the coupling: a perfectly matched notch swings through $\pi$, and this one, 90% deep, gets about
-60% of the way there.
+Two plots, because they fail in different ways. Magnitude shows the dip, and you look at it first.
+Phase turns by about a radian either side of the resonance, and it stays readable when the dip is
+shallow, which is how an over-coupled resonator often looks. The size of the turn is set by the
+coupling. A perfectly matched notch swings through $\pi$, and this one, 90% deep, gets about 60% of
+the way there.
 """
 
 # %%
@@ -468,8 +467,9 @@ r"""
 outermost first, named after your **variable ids**, with the swept values as coordinates. Integrated
 measurements carry one extra `IQ` axis of length two.
 
-That is why the ids have to be identifiers: they are the dimension names you will type in `.sel()`
-six months from now, and the identifiers in the `.qp` file. Pick them like you pick column names.
+The ids have to be identifiers for that reason. They are the dimension names you will type in
+`.sel()` six months from now, and the identifiers in the `.qp` file. Pick them like you pick column
+names.
 
 `label` and `units` do not travel into the coordinate attributes. Axis labels on your plots are
 still your job.
@@ -505,7 +505,7 @@ You have the resonator frequency at one particular readout power. That is not en
 readout, because the resonator moves with power. At low power it sits at $f_r + \chi$, pulled by the
 qubit it is coupled to. Drive it harder and the qubit saturates, the pull goes away, and the
 resonator lands on its bare frequency $f_r$. The crossover is called punchout, and the map of it is
-how you choose a readout power: low enough that the pull is still there, high enough to get signal.
+how you choose a readout power. Low enough that the pull is still there, high enough to get signal.
 
 Two nested `with` statements, two variables, and the outer one becomes the outer dimension. That is
 the whole change to the program.
@@ -581,10 +581,10 @@ amplitude, 25 measurements instead of 1025.
 
 `sweep(a, src) | sweep(b, src)` is that lockstep pair. Both loops advance on the same tick, so they
 must have the same length. Every source can report its length without running, so the check happens
-in `Parallel`'s constructor: mismatched lengths raise `ValidationError` on the `|` line itself, not
+in `Parallel`'s constructor. Mismatched lengths raise `ValidationError` on the `|` line itself, not
 at run time. In the result the pair shares one dimension named `"ro_amp|ro_freq"`, carrying both
-coordinate arrays.
-Point $k$ of one is always paired with point $k$ of the other, and there is no grid.
+coordinate arrays. Point $k$ of one is always paired with point $k$ of the other, and there is no
+grid.
 
 The frequency list here comes from the map measured in the cell above, so it is a `Values`
 source: arbitrary by construction, and honestly so. A diagonal is what you want whenever the
@@ -629,7 +629,7 @@ Redo the punchout with a log-spaced amplitude axis and pull out the punchout cur
 4. Print `qp.Logspace(0.02, 1.0, 20).KIND` and write one comment line saying what that kind costs a
    platform.
 
-The dip depth, by the way, does not move in this model: the response is always 90% deep, only the
+The dip depth, by the way, does not move in this model. The response is always 90% deep, only the
 centre slides. The position is what carries the information.
 """
 

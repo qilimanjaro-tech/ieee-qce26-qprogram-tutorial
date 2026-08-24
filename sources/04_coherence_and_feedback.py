@@ -2,8 +2,8 @@
 r"""
 # 04 · Coherence, single shots, and feedback
 
-Part 3 fitted a pi pulse from a Rabi scan. That is the tool everything here needs: once you can
-put the qubit in $|1\rangle$ on demand, you can ask how long it stays there.
+Part 3 fitted a pi pulse from a Rabi scan. Everything here needs that one tool. Once you can put
+the qubit in $|1\rangle$ on demand, you can ask how long it stays there.
 
 This part measures the three numbers that go on every device datasheet, then stops averaging and
 looks at individual shots, then uses one shot to decide what the program does next:
@@ -48,7 +48,7 @@ they stand in for the fridge.
 The programs read two of its entries, and both are numbers a real experiment would already have on
 hand: `q0_f01`, which Part 3's two-tone scan measured, and `q0_a_pi`, which its Rabi fit recovered
 to about 0.2 percent. Taking the device values rather than carrying the fitted ones across notebooks
-keeps this one runnable on its own. `DETUNING` is a deliberate mistake: the drive sits 400 kHz above
+keeps this one runnable on its own. `DETUNING` is a deliberate mistake. The drive sits 400 kHz above
 the qubit, so the Ramsey fringe has something to show.
 """
 
@@ -92,7 +92,7 @@ the middle changes.
 
 Copy-pasting the pulse lines into three programs is how calibration code rots. Someone fixes the
 DRAG `beta` in two of them and forgets the third, and a week later two experiments disagree for a
-reason nobody can find. A `Fragment` is a named, parameterized sub-program: write the pulse once,
+reason nobody can find. A `Fragment` is a named, parameterized sub-program. Write the pulse once,
 call it everywhere.
 
 Three rules for the `@fragment` decorator:
@@ -137,8 +137,8 @@ expression survives too, as `IQDrag(amplitude=(amp / 2), ...)`.
 holding the substituted body. Validation and execution do this for you, so you rarely call it,
 but it is the thing to print when you want to see what a compiler will get. Substitution puts the
 bound value where the parameter was and stops there, so the expanded pi/2 pulse reads
-`amplitude=(0.62 / 2)`. The arithmetic is still described rather than folded, which is what lets a
-compiler decide where to evaluate it.
+`amplitude=(0.62 / 2)`. The arithmetic is still described rather than folded, so a compiler can
+decide where to evaluate it.
 
 Measurements inside a fragment come with one catch, and the cell after next shows it. A
 measurement's auto-generated name normally embeds its bus (`q0/readout/m0`). Inside a fragment the
@@ -173,9 +173,9 @@ print("handles after expand: ", [h.name for h in read_demo.expand().measurement_
 
 # %% [markdown]
 r"""
-So: fragments for pulses, `measure` in the host program. That way the handle stays an ordinary
-Python variable and `result.get(m)` reads the way you wrote it. Every experiment below follows
-that rule.
+Fragments carry the pulses, `measure` stays in the host program. That way the handle stays an
+ordinary Python variable and `result.get(m)` reads the way you wrote it. Every experiment below
+follows that rule.
 
 ## 4.2 T1: inversion recovery
 
@@ -214,13 +214,13 @@ The model plays the part of the qubit and of the readout chain. Two callables:
   field.
 - `response` is the noiseless IQ point. A dispersive readout puts $|0\rangle$ and $|1\rangle$ at
   two places in the IQ plane, and the average over shots lands on the line between them, at the
-  fraction given by the population. That is what `blob` computes.
+  fraction given by the population. `blob` computes exactly that.
 
 `noise=0.4` is per-shot gaussian noise on each quadrature, so the averaged IQ point carries the
 shot noise you would actually fight in the lab.
 
 `average(shots=400)` adds no dimension to the result. The `state` field comes back as the fraction
-of shots classified as excited, which is exactly the population: one number per delay.
+of shots classified as excited. The population itself, one number per delay.
 """
 
 # %%
@@ -324,8 +324,8 @@ with the same time constant, so the curve relaxes to zero rather than to one hal
 you believe in, not the one you memorised.
 
 The fringe frequency is the practical output. It is the error in your drive frequency, and
-subtracting it is how a qubit gets tuned up: run Ramsey, correct, run it again with a longer sweep
-and a smaller residual detuning. One caveat a lab person will ask about: a single Ramsey gives the
+subtracting it is how a qubit gets tuned up. Run Ramsey, correct, run it again with a longer sweep
+and a smaller residual detuning. A lab person will ask about one caveat. A single Ramsey gives the
 *magnitude* of the detuning, not its sign, because $\cos$ is even. You get the sign by moving the
 drive a known amount and seeing whether the fringe speeds up or slows down.
 """
@@ -364,14 +364,14 @@ print(f"residual error {(corrected - DEVICE['q0_f01']) / 1e3:+.1f} kHz")
 r"""
 ## 4.4 Hahn echo: refocusing the slow noise
 
-$T_2^*$ mixes two things: real dephasing, and the fact that the qubit frequency wanders between
+$T_2^*$ mixes two things. Real dephasing, and the fact that the qubit frequency wanders between
 shots. A pi pulse in the middle of the delay swaps the two states, so phase picked up in the first
 half is unwound in the second. Anything slower than the sequence cancels. What is left is $T_2$,
 and it is longer:
 
 $$P_1(t) = \tfrac{1}{2} + \tfrac{1}{2} e^{-t/T_2}.$$
 
-The sequence is x90, wait $t/2$, x180, wait $t/2$, x90. You have the pieces already: the fragments
+The sequence is x90, wait $t/2$, x180, wait $t/2$, x90. You have the pieces already. The fragments
 from 4.1, and `wait` with an expression (`delay / 2` is a perfectly good duration, and it
 serializes as `wait q[0].drive (delay / 2)`).
 """
@@ -450,7 +450,7 @@ print(f"fitted T2 = {t2_fit / 1000:.2f} us   true = {DEVICE['q0_T2echo'] / 1000:
 # %% [markdown]
 r"""
 Plot it, then put the three numbers next to each other. The ordering $T_2^* < T_2 < 2T_1$ is the
-sanity check you run before believing any of it: refocusing can only help, and no dephasing time
+sanity check you run before believing any of it. Refocusing can only help, and no dephasing time
 can beat twice the relaxation time.
 """
 
@@ -495,7 +495,7 @@ picks one.
 | `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots. |
 
 `result.get(m)` defaults to `MF.IQ` and raises `KeyError` for a field the measurement never
-requested. It never quietly hands you a different array, which matters: a `state` array returned
+requested. It never quietly hands you a different array, which matters. A `state` array returned
 where the caller expected IQ would look like data all the way downstream.
 """
 
@@ -553,15 +553,15 @@ with program.sweep(shot, qp.Range(0, 599, 1)):
 
 That reads like a trick and it is not. The loop runs the sequence once per point, so every point
 holds exactly one shot, and the result array gets a `shot` dimension of length 600. Nothing reads
-the variable, which is fine: a sweep variable that no operation uses still drives its loop. This
-is what a sequencer does when you ask it to stream every acquisition instead of accumulating.
+the variable, and that is fine. A sweep variable that no operation uses still drives its loop. A
+sequencer does exactly this when you ask it to stream every acquisition instead of accumulating.
 
 The model changes too. Averaged IQ was one point on a line; single shots are two clouds. `sigma`
 is the width of each cloud, and it is the whole story of readout fidelity.
 
 Two programs, 600 single shots each. One reads out the qubit as it sits, the other puts a pi pulse
-in front. The 2 percent that come out the wrong way in each are preparation error, which is
-realistic: a real pi pulse is never perfect and a real qubit is never perfectly cold.
+in front. The 2 percent that come out the wrong way in each are preparation error, and realistic.
+A real pi pulse is never perfect and a real qubit is never perfectly cold.
 """
 
 # %%
@@ -631,7 +631,7 @@ plt.show()
 # %% [markdown]
 r"""
 To turn a shot into a bit, project onto the line joining the two cloud centres and threshold at
-the midpoint. The centres come from the data, not from the model: this is a calibration, and it is
+the midpoint. The centres come from the data, not from the model. This is a calibration, and it is
 the one you redo whenever the readout drifts.
 
 Two error numbers come out of this, and they are not the same thing:
@@ -682,7 +682,7 @@ r"""
 ## 4.7 Active reset: using a shot to decide
 
 A qubit does not start cold. Waiting for it costs several T1 per shot, which is most of your
-measurement time. Active reset does the fast thing: measure, and fire a pi pulse only if the qubit
+measurement time. Active reset does the fast thing. Measure, and fire a pi pulse only if the qubit
 came up excited.
 
 `if_` / `elif_` / `else_` are context managers, and they chain exactly like Python's. The
@@ -695,7 +695,7 @@ condition is a **measurement-state predicate**, nothing wider yet:
 | `m1.state == m2.state` | two measurements agreed |
 | `qp.eq(m.state, 0)` | the helper form, for building conditions programmatically |
 
-Three rules, enforced in two places. The condition has to be a measurement-state predicate: pass
+Three rules, enforced in two places. The condition has to be a measurement-state predicate. Pass
 anything else and the builder raises on the spot. `elif_` and `else_` have to come **immediately**
 after their arm, because anything appended in between closes the chain, and that raises too. The
 third one waits for `validate`: every measurement you reference must have asked for `MF.STATE`. A
@@ -762,9 +762,9 @@ print("shot 0, second look:", peek_model.sample("q0/readout", {"shot": 0.0}).sta
 # %% [markdown]
 r"""
 One more piece of the result contract before the exercise. **A measurement inside a conditional
-arm holds NaN wherever the arm did not run.** The averaging is count-based: no executions, no
-mean. With single shots on the sweep axis that is easy to see, and it is what tells you which
-shots took which branch.
+arm holds NaN wherever the arm did not run.** The averaging is count-based. No executions, no
+mean. With single shots on the sweep axis that is easy to see, and it tells you which shots took
+which branch.
 """
 
 # %%

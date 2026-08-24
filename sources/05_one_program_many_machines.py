@@ -50,7 +50,7 @@ Take two racks that both call themselves "a transmon control setup":
 | pulse shapes | your calibration | their calibration |
 
 The flux line is the interesting difference. On rack B it is an instrument with no sequencer at
-all: you write a voltage over the network and wait for it to settle. A loop that steps that
+all. You write a voltage over the network and wait for it to settle. A loop that steps that
 voltage cannot be a sequencer loop. It has to be driven from the lab server, one point at a time,
 with the fast part of the experiment nested inside it.
 
@@ -144,16 +144,16 @@ r"""
 
 The reference platform supports the whole language, so this is the "it works on my rack" baseline.
 The measurement model is the qubit-spectroscopy Lorentzian from Part 3 with the peak moved along
-the arc, which is the whole physical content of the experiment. This one uses the natural 2 MHz
-line rather than the broadened survey line: the bias steps are 2 mV, and near the sweet spot that
-puts nine points across the peak.
+the arc, the whole physical content of the experiment. This one uses the natural 2 MHz line rather
+than the broadened survey line. The bias steps are 2 mV, and near the sweet spot that puts nine
+points across the peak.
 
 The line shape in bias is worth a second. Near the sweet spot the arc is flat, so the detuning
 grows as the *square* of the bias offset, and a Lorentzian in detuning becomes a quartic in bias:
 
 $$p(V) = \mathrm{floor} + \frac{A}{1 + \left(\frac{V - V_0}{w}\right)^4}$$
 
-That flat top is the reason you park a qubit at its sweet spot: first-order flux noise does
+That flat top is the reason you park a qubit at its sweet spot. First-order flux noise does
 nothing there. It is also what makes $V_0$ easy to fit.
 """
 
@@ -249,7 +249,7 @@ A `PlatformCapabilities` has three parts:
 
 Each of those is a `BusCapabilities`, which splits into two halves: `rt` for what the hardware
 sequencer can do in real time, and `host` for what the lab server can do one iteration at a time.
-Either half may be `None`, and that is how rack B says what it is: the flux slot has **no `rt`
+Either half may be `None`, and that is how rack B says what it is. The flux slot has **no `rt`
 half at all**.
 
 Real vendor code builds these from registered profiles (`CompilerCapabilities.from_profile(...)`).
@@ -293,13 +293,13 @@ r"""
 ### Validate
 
 `qp.validate(program, caps)` returns a list of diagnostics and an execution plan. It never raises.
-That separation is deliberate: validation reports, and the caller decides. A platform's `execute()`
+That separation is deliberate. Validation reports, and the caller decides. A platform's `execute()`
 is the thing that turns an error into an exception.
 
 The plan maps each operation and each block to the set of domains it may run in. The root `body` is
-not an entry: there is nowhere else for it to run. Operations come first, then the loops that
-contain them: the drive and readout operations can go either way, the `set_offset` on the flux bus
-is host-side only, and both loops inherit that from it.
+not an entry, because there is nowhere else for it to run. Operations come first, then the loops
+that contain them. The drive and readout operations can go either way, the `set_offset` on the flux
+bus is host-side only, and both loops inherit that from it.
 """
 
 # %%
@@ -322,7 +322,7 @@ right, and the diagnostics annotated inline (`!!` error, `~` warning, `i` info).
 The `forced-host` warning is a *warning*, not an error. The program will run. It will run with the
 averaging loop on the host, which means 200 network round trips per bias point instead of 200
 sequencer iterations. On real hardware that is the difference between a coffee break and a lunch
-break, which is why the validator says so out loud.
+break, and the validator says so out loud.
 """
 
 # %%
@@ -344,11 +344,11 @@ average 200:                          for bias in Linspace(...):     # host, one
     measure q[0].readout ...              measure q[0].readout ...
 ```
 
-`qp.optimize(program, caps)` applies it. It is opt-in, and the reason is honest: the rewrite is not
+`qp.optimize(program, caps)` applies it. It is opt-in, and the reason is honest. The rewrite is not
 unconditionally equivalent. It groups all 200 shots of one bias point together instead of
-interleaving passes over the sweep, which is identical for a stationary system and different under
-drift. The hoisted `set_offset` also runs once per bias point instead of once per shot. That is the
-whole point for a DC bias, and it would be wrong for an operation with side effects, so the rewrite
+interleaving passes over the sweep, identical for a stationary system and different under drift.
+The hoisted `set_offset` also runs once per bias point instead of once per shot. For a DC bias that
+is the whole point, and it would be wrong for an operation with side effects, so the rewrite
 only ever hoists a leading run of host-side-only operations and refuses to move one past an
 operation it would reorder against.
 """
@@ -365,7 +365,7 @@ print("body[0] after: ", type(optimized.body.elements[0]).__name__)
 r"""
 ### The broadcast that blocks the rewrite
 
-`program.sync()` with no arguments means "align every bus in this program". That is a different
+`program.sync()` with no arguments means "align every bus in this program". It is a different
 operation from `program.sync([q[0].drive, q[0].readout])`, even though both ask for the same token
 `op.sync`. A broadcast touches every bus, so the validator intersects the domains of every bus in
 the program, and the flux bus has no real-time half. The bare `sync` therefore lands on the host,
@@ -468,8 +468,8 @@ r"""
 ### A rule about how a value is used
 
 Third case: the operation is supported, the limits are fine, and it still cannot run, because of
-how two nodes interact. The canonical example: `wait(bus, duration)` accepts a variable, but on
-many backends the wait instruction takes a fixed-step counter. A delay swept by `Range` is a
+how two nodes interact. Take `wait(bus, duration)` as the canonical example. It accepts a variable,
+but on many backends the wait instruction takes a fixed-step counter. A delay swept by `Range` is a
 register increment. The same delay swept by `Values([0, 200, 800, 3200])` is an arbitrary list,
 and there is nowhere to put it.
 
@@ -548,8 +548,8 @@ r"""
 ### 🧩 Exercise 5.1: your own rule
 
 Rack B's flux line goes through a bias tee that saturates at 0.25 V. A sweep that asks for more
-than that will not blow anything up, it will silently clip, which is worse: you get a flux arc with
-a flat section and no warning.
+than that will not blow anything up, it will silently clip, and that is worse. You get a flux arc
+with a flat section and no warning.
 
 Write a predicate that catches it. Filter for `SetOffset` nodes, find the sweep that binds the
 offset value with `ctx.binding_loop_of`, read the sweep's own numbers off `loop.source.values()`,
@@ -695,7 +695,7 @@ string. A real platform has to turn that alias into samples before it can upload
 why the port ends with `with_waveforms` and not with a hopeful `run`.
 
 Run the bound program and fit it, and the sweet spot comes back where rack A found it. That is the
-end of the port: new bus names, pulse shapes supplied from a file, the same program, the same
+end of the port. New bus names, pulse shapes supplied from a file, the same program, the same
 answer.
 """
 

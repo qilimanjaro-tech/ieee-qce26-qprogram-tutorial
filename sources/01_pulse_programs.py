@@ -4,10 +4,10 @@ r"""
 
 A gate is a promise. A pulse is what the instrument actually does.
 
-This part is about the second one. You will write the first two programs of a real bring-up: a
+This part is about the second one. You will write the first two programs of a real bring-up. A
 readout tone with an acquisition, then a pi pulse followed by a readout. After that you take them
-apart. The point is what you get back from the builder: not a string to hand to a box, but a tree
-you can inspect, transform, and save.
+apart. The builder does not hand you a string to give to a box. It hands you a tree you can
+inspect, transform, and save.
 
 Nothing here runs. Not on hardware, not even on the simulator. Part 1 is build and inspect. Part 2
 presses go.
@@ -58,7 +58,7 @@ what envelope shape, how many nanoseconds, at what amplitude, and what else must
 it happens. A gate-level program cannot say any of that, because saying it is the calibration
 engineer's job, not the algorithm's.
 
-Here is the short list of things a control stack has to express that a circuit cannot:
+A control stack has to express things a circuit cannot:
 
 | What you need to say | Why |
 |---|---|
@@ -119,15 +119,15 @@ print("handle: ", m_raw.name)  # a global counter: a raw string has no bus name 
 
 # %% [markdown]
 r"""
-That is a valid program and it will run. Two things you gave up by typing strings: no
+That is a valid program and it will run. You gave up two things by typing strings. No
 tab-completion, and no checking. Type `"raedout_q0"` by accident and you find out on hardware, at
 2 a.m., after the fridge is cold.
 
 `BusSchema` fixes both without changing what lands in the AST. A schema declares which kinds of bus
 each element of the chip has. It does not declare how many qubits exist, so any index works.
 
-What comes out of it is a `BusRef`: a real `str` subclass that also carries metadata. Everywhere
-QProgram wants a bus name, a `BusRef` works, and the extra fields are what makes checking possible.
+A schema hands back a `BusRef`, a real `str` subclass that also carries metadata. Everywhere
+QProgram wants a bus name, a `BusRef` works, and the extra fields are what make checking possible.
 """
 
 # %%
@@ -154,7 +154,7 @@ r"""
   tell you about politely.
 
 Both raise `qp.ValidationError` at build time, on the line that made the mistake. Read the two
-messages below: they name the bus, the reason, and what to do instead.
+messages below. They name the bus, the reason, and what to do instead.
 """
 
 # %%
@@ -175,7 +175,10 @@ r"""
 Raw strings skip every one of these checks, on purpose. A `.qp` file can be mostly schema-backed
 with one odd bus slotted in by name, and QProgram will not argue. You lose the checks for that bus
 only.
+"""
 
+# %% [markdown]
+r"""
 ## 1.3 Operations: the first readout pulse
 
 The first measurement on a new chip is the readout resonator, and the smallest program that does
@@ -235,7 +238,7 @@ verbs you will need all day.
 - `wait(bus, ns)` idles one bus.
 - `sync(buses)` makes the listed buses agree on where "now" is. Without it, two buses that have
   played different amounts of pulse have drifted apart. `sync()` with no argument syncs every bus in
-  the program, which is convenient and, as Part 5 shows, occasionally too broad.
+  the program. Convenient, and as Part 5 shows, occasionally too broad.
 - `with program.block():` groups statements and changes nothing about what they mean. There is no
   loop here yet. Part 2 replaces this grouping with a real sweep.
 """
@@ -290,9 +293,9 @@ plt.show()
 # %% [markdown]
 r"""
 The last two are flux shapes, not drive shapes, and nothing in the waveform says so. A `Ramp` is
-an envelope and only that. What it means is decided by the line you send it down, and a flux line is
-where these two belong. `BusSchema.transmon()` has no flux bus at all, which is why Part 3 reaches
-for `BusSchema.flux_tunable_transmon()` when it starts tuning the qubit with flux.
+an envelope and only that. The line you send it down decides what it means, and a flux line is
+where these two belong. `BusSchema.transmon()` has no flux bus at all. Part 3 reaches for
+`BusSchema.flux_tunable_transmon()` when it starts tuning the qubit with flux.
 
 ### IQ waveforms
 
@@ -332,8 +335,8 @@ r"""
 ### Structural equality
 
 Waveforms compare and hash by structure, not by identity. Two `Gaussian(0.5, 40, 8)` objects built
-in different cells are the same waveform. This is what makes whole-program comparison work after a
-file round-trip, and it is why the equality check in section 1.6 means something.
+in different cells are the same waveform. Whole-program comparison after a file round-trip depends
+on that, and so does the equality check in section 1.6.
 """
 
 # %%
@@ -394,10 +397,11 @@ then everything inside it, at any depth. One uniform API covers blocks and opera
 write the recursion yourself.
 
 That is the whole reason to keep a program as data. You can compute things about a sequence before
-anything runs. Below: how many nanoseconds this program books on the drive line, read straight off
-the AST. A compiler does a great deal more of this, and so will your own analysis scripts.
+anything runs. The cell below reads how many nanoseconds this program books on the drive line,
+straight off the AST. A compiler does a great deal more of this, and so will your own analysis
+scripts.
 
-To be clear about where that number comes from: you computed it. The reference simulator has no
+To be clear about where that number comes from, you computed it. The reference simulator has no
 timing model at all, so no run will report it back to you. What the AST gives you is the chance to
 work it out before you spend fridge time.
 """
@@ -533,8 +537,7 @@ the program moved.
    compare its `elements` pairwise too. Exactly one operation should come out different.
 
 Step 4 is the interesting one. Structural equality is not a yes/no answer about a file, it is a
-yes/no answer about any node in the tree, which is what makes it useful for finding what a
-colleague changed.
+yes/no answer about any node in the tree, and that is how you localise what a colleague changed.
 """
 
 # %% solution
@@ -574,7 +577,7 @@ r"""
 ## Recap and what is next
 
 - A **bus** is one signal path. Strings work; a `BusSchema` gives you `BusRef`s that are still
-  strings but carry `channel` and `acquires`, which is enough to reject a single-channel waveform on
+  strings but carry `channel` and `acquires`. Those two fields reject a single-channel waveform on
   an IQ line and a `measure` on a bus with no ADC, at the line that made the mistake.
 - **Operations** are the verbs: `play`, `measure`, `wait`, `sync`, `set_frequency`, `set_gain`. You
   built a readout tone with an acquisition, and a pi pulse followed by a readout.
@@ -582,7 +585,7 @@ r"""
   alias leaves the number to be filled in later. That alias is the seam between a stable sequence
   and a drifting calibration.
 - **The program is a tree.** `body.elements`, `walk()`, `buses`, `variables`. You read a pulse-time
-  budget off the AST before anything ran, which is the same move a compiler makes.
+  budget off the AST before anything ran, the same move a compiler makes.
 - **`.qp` is the artifact.** `loads(dumps(p)).body == p.body`, so the file is the experiment, and a
   diff of two files is a diff of two calibrations.
 

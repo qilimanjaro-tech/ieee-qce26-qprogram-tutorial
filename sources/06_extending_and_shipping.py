@@ -15,7 +15,7 @@ happening, and about what you do with the result:
 - watch the `require` line appear in the `.qp` text, and watch a rack that lacks the token refuse
   the program
 - treat the `.qp` file as an artifact: diff two calibration runs, run the checker from a shell
-- the capstone: the whole bring-up in one run, writing a file per step and a calibration summary
+- run the whole bring-up as one capstone, writing a file per step and a calibration summary
   against the true device values
 """
 
@@ -103,7 +103,7 @@ print(f"pi/2 pulse: IQDrag amplitude {X90.amplitude}, duration {X90.duration} ns
 # %% [markdown]
 r"""
 The response models are the ones from Parts 2 to 4, unchanged. Each is a plain function of `env`, the
-dict of loop variables currently bound. None of them is physics from first principles: they produce
+dict of loop variables currently bound. None of them is physics from first principles. They produce
 the shapes a real scan produces, so the programs and the fits are the real part.
 
 Active reset needs one that a `response` function cannot express, because the second measurement of a
@@ -365,8 +365,8 @@ The contract is three declarations, and each has a real consumer:
 
 - `length()` is static. A parallel loop checks it before anything runs, and the executor sizes the
   result array with it.
-- `KIND` is `"linear"` or `"arbitrary"`. It is a claim about compilability: a sequencer can generate a
-  linear ramp in hardware, and everything else has to be uploaded as a table.
+- `KIND` is `"linear"` or `"arbitrary"`. It is a claim about compilability. A sequencer can generate
+  a linear ramp in hardware, and everything else has to be uploaded as a table.
 - `values()` produces the numbers, for the interpreter, for the xarray coordinate, and for
   `optimize()`.
 
@@ -414,8 +414,8 @@ Four calls put it in the language anyway:
 2. `register_vendor_version` fixes the version that goes into the `require` line.
 3. `register_vendor_operation` teaches the writer and the parser about the operation. The default
    parser reads your `__init__` signature, so there is nothing else to write.
-4. `register_capability_tokens` puts the token in the registry, which is what lets a platform say yes
-   or no to it.
+4. `register_capability_tokens` puts the token in the registry, so a platform can say yes or no to
+   it.
 
 A shipped extension does all four in its package `__init__.py`. Importing the package is the
 activation step.
@@ -451,8 +451,8 @@ print("SetAttenuation asks for:", SetAttenuation(q[0].drive, 20.0).required_capa
 r"""
 ### All three in one program
 
-A chevron scan of a flux-activated swap: attenuate the drive line, then step the flux amplitude
-around the resonance point and read the qubit out. The custom waveform, the custom sweep source,
+The program is a chevron scan of a flux-activated swap. Attenuate the drive line, then step the flux
+amplitude around the resonance point and read the qubit out. The custom waveform, the custom sweep source,
 and the vendor operation all appear in the `.qp` text, and the file grew a `require fridge 0.1` line
 under the header.
 
@@ -462,7 +462,7 @@ vendor it is missing, instead of a file that loads with an operation silently dr
 The file also round-trips. The parser rebuilds `HalfSine`, `Chevron`, and `fridge.set_attenuation`
 from the text with no help from you, because each is registered under its class name and serialized
 from its constructor signature. And the reference platform accepts every token in the registry, so
-the program validates and runs: the swap probability peaks where the two qubits come into resonance,
+the program validates and runs. The swap probability peaks where the two qubits come into resonance,
 which is the number a chevron scan exists to find.
 """
 
@@ -545,7 +545,7 @@ vendor that is not registered yet, it looks up that entry-point group, imports t
 registration side effects run. A six-month-old `.qp` file loads in a fresh interpreter without the
 reader knowing which extensions it needs. If nothing claims the vendor, the error names it.
 
-Version compatibility is checked at major.minor: the file's major must equal the installed
+Version compatibility is checked at major.minor. The file's major must equal the installed
 extension's major, and the file's minor must be less than or equal to the installed minor. Patch is
 informational, and the writer truncates it.
 """
@@ -570,7 +570,7 @@ r"""
 ### 🧩 Exercise 6.1: a vendor measurement field
 
 A photon-counting readout does not return an IQ point. It returns counts. The measurement field
-vocabulary extends through the same registry: register `measure.fields.counts` and
+vocabulary extends through the same registry. Register `measure.fields.counts` and
 `fields=("counts",)` becomes legal at the call site, in the `.qp` text, and in validation.
 
 Your job:
@@ -661,7 +661,7 @@ r"""
 result against the reference platform, and prints JSON diagnostics. It exits 1 when it finds any, so
 it drops into a pre-commit hook or a CI job. No extra dependencies.
 
-Break the Friday file the way a hand edit breaks a file: misspell a bus. The message comes back with
+Break the Friday file the way a hand edit breaks a file. Misspell a bus. The message comes back with
 the line number, the path that failed to resolve, and the buses the chip does have, because the `.qp`
 file declares its own schema. A checker that knows the layout can tell a typo from a bus that
 genuinely does not exist.
@@ -669,7 +669,7 @@ genuinely does not exist.
 The same module has two more modes. `explain` prints the execution plan as a tree straight from a
 shell, which is the fastest way to answer "why is this loop running host-side". `serve` speaks LSP
 over stdio and needs the `qprogram[lsp]` extra. The VS Code extension that ships in the QProgram
-repository (`editors/vscode-qp/`) is plain JavaScript with no build step: it highlights `.qp`, runs
+repository (`editors/vscode-qp/`) is plain JavaScript with no build step. It highlights `.qp`, runs
 `check` on open, on save, and debounced while you type, and adds a `qp: Explain execution plan`
 command.
 """
@@ -699,9 +699,9 @@ checker output, then prove the repaired file is the program you started from.
 
 Your job:
 
-1. Take the `cz_chevron` program from 6.1, serialize it, and break it twice: turn `average` into
+1. Take the `cz_chevron` program from 6.1, serialize it, and break it twice, turning `average` into
    `avarage` and `q[0].flux` into `q[0].flx`.
-2. Loop: call `qprogram.lsp.check_text` on the current text, print the first diagnostic with its
+2. Loop. Call `qprogram.lsp.check_text` on the current text, print the first diagnostic with its
    1-based line number, use the reported line to decide which repair applies, and apply it.
 3. Stop when the checker returns nothing, then check that the reparsed program's `body` equals the
    original.
@@ -763,7 +763,7 @@ specify: lower the AST to its sequencer language, allocate registers and wavefor
 the triggers, start the acquisition, stream partial results back, and assemble the same xarray
 shapes. The reference executor is the oracle for that last step. It defines what the result of a
 program means, so a vendor compiler can be tested by running the same program both ways and comparing
-the arrays. It models no timing and no waveform physics, and that is deliberate: it is the semantics
+the arrays. It models no timing and no waveform physics, and that is deliberate. It is the semantics
 of the language, not a simulator of your fridge.
 """
 
@@ -858,8 +858,8 @@ print(f"excited population: {before:.3f} before reset ({P_HOT} in the model), {a
 
 # %% [markdown]
 r"""
-Now the report. The calibration table is the deliverable: what you measured next to what the device
-actually is, so you can see which numbers to trust. The fitted pulses go out beside it in a `.wfl`
+Now the report. The calibration table is the deliverable. It puts what you measured next to what the
+device actually is, so you can see which numbers to trust. The fitted pulses go out beside it in a `.wfl`
 library, so tomorrow's run loads today's numbers from a file instead of from a literal somebody
 pasted into a script.
 """
