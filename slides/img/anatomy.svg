@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>Anatomy of a Rabi program</title>
+  <desc>The Rabi program as an AST: body holds an Average, which holds a Sweep, which holds the
+  set_gain, play, sync and measure operations. Each block is annotated with what it contributes to
+  the shape of the result.</desc>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="40" y="56" font-size="32" font-weight="700" fill="#1c1c2e">Anatomy of a Rabi program</text>
+  <text x="40" y="88" font-size="22" fill="#6a6a82">one builder call, one node: the block nesting is the loop nesting</text>
+
+  <!-- tree connectors, drawn first so the boxes sit on top -->
+  <path d="M60 204 V254 H100" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M120 286 V336 H160" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M180 368 V664" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M180 418 H220" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M180 500 H220" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M180 582 H220" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <path d="M180 664 H220" fill="none" stroke="#6a6a82" stroke-width="2"/>
+
+  <!-- the AST, one row per node -->
+  <g font-size="22" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <rect x="40" y="140" width="940" height="64" rx="12" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+    <text x="60" y="181" fill="#1c1c2e">body</text>
+
+    <rect x="100" y="222" width="880" height="64" rx="12" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+    <text x="120" y="263" fill="#1c1c2e">average 200:</text>
+
+    <rect x="160" y="304" width="820" height="64" rx="12" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+    <text x="180" y="345" fill="#1c1c2e">for amp in Linspace(0.0, 1.0, 41):</text>
+
+    <rect x="220" y="386" width="760" height="64" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+    <text x="240" y="427" fill="#1c1c2e">set_gain q[0].drive amp</text>
+
+    <rect x="220" y="468" width="760" height="64" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+    <text x="240" y="509" fill="#1c1c2e">play q[0].drive IQDrag(amplitude=amp, ...)</text>
+
+    <rect x="220" y="550" width="760" height="64" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+    <text x="240" y="591" fill="#1c1c2e">sync</text>
+
+    <rect x="220" y="632" width="760" height="64" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+    <text x="240" y="673" fill="#1c1c2e">measure q[0].readout "readout" "weights"</text>
+  </g>
+
+  <!-- the class behind each line -->
+  <g font-size="22" font-weight="600" text-anchor="end">
+    <text x="960" y="181" fill="#0f766e">Block</text>
+    <text x="960" y="263" fill="#0f766e">Average</text>
+    <text x="960" y="345" fill="#0f766e">Sweep</text>
+    <text x="960" y="427" fill="#6a6a82">SetGain</text>
+    <text x="960" y="509" fill="#6a6a82">Play</text>
+    <text x="960" y="591" fill="#6a6a82">Sync</text>
+    <text x="960" y="673" fill="#6a6a82">Measure</text>
+  </g>
+
+  <!-- leader lines to the annotations -->
+  <g fill="none" stroke="#6a6a82" stroke-width="2">
+    <path d="M982 254 H1002 V215 H1018"/>
+    <path d="M982 336 H1002 V395 H1018"/>
+    <path d="M982 664 H1002 V621 H1018"/>
+  </g>
+  <g fill="#6a6a82">
+    <circle cx="982" cy="254" r="5"/>
+    <circle cx="982" cy="336" r="5"/>
+    <circle cx="982" cy="664" r="5"/>
+  </g>
+
+  <!-- what each node contributes to the result shape -->
+  <rect x="1020" y="140" width="540" height="150" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1044" y="176" font-size="22" font-weight="700" fill="#0f766e">Average · no new dimension</text>
+  <text x="1044" y="210" font-size="22" fill="#1c1c2e">200 shots at every point. iq and raw</text>
+  <text x="1044" y="240" font-size="22" fill="#1c1c2e">come back as means over the shots;</text>
+  <text x="1044" y="270" font-size="22" fill="#1c1c2e">state becomes the population.</text>
+
+  <rect x="1020" y="320" width="540" height="150" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1044" y="356" font-size="22" font-weight="700" fill="#0f766e">Sweep · one dimension each</text>
+  <text x="1044" y="390" font-size="22" fill="#1c1c2e">41 iterations, so the result gains</text>
+  <text x="1044" y="420" font-size="22" fill="#1c1c2e">a dim named after the variable id,</text>
+  <text x="1044" y="450" font-size="22" fill="#1c1c2e">amp. Nest another and it goes 2D.</text>
+
+  <rect x="1020" y="546" width="540" height="150" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1044" y="582" font-size="22" font-weight="700" fill="#0f766e">Measure · one record each</text>
+  <text x="1044" y="616" font-size="22" fill="#1c1c2e">The handle m0 is how you fetch it.</text>
+  <text x="1044" y="646" font-size="22" fill="#1c1c2e">Requested fields decide what exists:</text>
+  <text x="1044" y="676" font-size="22" fill="#1c1c2e">iq, state, raw.</text>
+
+  <!-- the result of running it -->
+  <rect x="40" y="734" width="940" height="126" rx="12" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="64" y="768" font-size="22" font-weight="700" fill="#0b5c56">what comes back</text>
+  <g font-size="22" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#1c1c2e">
+    <text x="64" y="802">result.get(m0)</text>
+    <text x="500" y="802">dims ("amp", "IQ")</text>
+    <text x="780" y="802">shape (41, 2)</text>
+    <text x="64" y="834">result.get(m0, field=MF.STATE)</text>
+    <text x="500" y="834">dims ("amp",)</text>
+    <text x="780" y="834">shape (41,)</text>
+  </g>
+
+  <rect x="1020" y="734" width="540" height="126" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1044" y="768" font-size="22" font-weight="700" fill="#0f766e">Operations are leaves</text>
+  <text x="1044" y="802" font-size="22" fill="#1c1c2e">amp is an Expression. The loop binds</text>
+  <text x="1044" y="834" font-size="22" fill="#1c1c2e">its value before each iteration.</text>
+</svg>

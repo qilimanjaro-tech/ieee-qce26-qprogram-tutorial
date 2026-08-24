@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>Which loop runs where</title>
+  <desc>The same flux arc program on a rack where the drive and readout buses have a sequencer and
+  the flux bus does not. As written, the average is dragged host-side. After qp.optimize the sweep
+  is hoisted and the averaging runs in real time.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="30" y="54" font-size="32" font-weight="700" fill="#1c1c2e">Which loop runs where</text>
+  <text x="30" y="86" font-size="22" fill="#6a6a82">the drive and readout buses have a sequencer, the flux bus does not</text>
+
+  <!-- the rack: one BusCapabilities per bus -->
+  <rect x="30" y="110" width="1540" height="120" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="54" y="158" font-size="26" font-weight="700" fill="#1c1c2e">the rack</text>
+  <text x="54" y="192" font-size="22" fill="#6a6a82">one BusCapabilities per bus</text>
+
+  <rect x="500" y="124" width="335" height="92" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="524" y="158" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].drive</text>
+  <text x="524" y="192" font-size="22" fill="#0b5c56">sequencer · [rt|host]</text>
+
+  <rect x="855" y="124" width="335" height="92" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="879" y="158" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].readout</text>
+  <text x="879" y="192" font-size="22" fill="#0b5c56">sequencer · [rt|host]</text>
+
+  <rect x="1210" y="124" width="335" height="92" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="1234" y="158" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].flux</text>
+  <text x="1234" y="192" font-size="22" fill="#6a6a82">slow DAC · [host] only</text>
+
+  <!-- left panel: the plan as written -->
+  <path d="M30 264 A14 14 0 0 1 44 250 H736 A14 14 0 0 1 750 264 V314 H30 Z" fill="#e6f4f1"/>
+  <rect x="30" y="250" width="720" height="456" rx="14" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <text x="54" y="292" font-size="26" font-weight="700" fill="#1c1c2e">as written</text>
+  <text x="726" y="292" font-size="22" fill="#0b5c56" text-anchor="end">1 warning</text>
+
+  <rect x="46" y="330" width="688" height="52" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="64" y="364" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">average 200:</text>
+  <text x="280" y="364" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">~ forced-host</text>
+  <text x="716" y="364" font-size="22" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[host]</text>
+
+  <rect x="74" y="392" width="660" height="52" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="92" y="426" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">for bias in Linspace(-0.05, 0.15, 101):</text>
+  <text x="716" y="426" font-size="22" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[host]</text>
+
+  <rect x="102" y="454" width="632" height="52" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="120" y="488" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">set_offset q[0].flux bias</text>
+  <text x="716" y="488" font-size="22" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[host]</text>
+
+  <rect x="102" y="516" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="120" y="550" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">play q[0].drive "saturation"</text>
+  <text x="716" y="550" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <rect x="102" y="578" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="120" y="612" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sync q[0].drive q[0].readout</text>
+  <text x="716" y="612" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <rect x="102" y="640" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="120" y="674" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">measure q[0].readout ...</text>
+  <text x="716" y="674" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <!-- the rewrite -->
+  <line x1="756" y1="478" x2="844" y2="478" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="462" font-size="22" font-weight="700" fill="#0b5c56" text-anchor="middle">rewrite</text>
+
+  <!-- right panel: the plan after optimize -->
+  <path d="M850 264 A14 14 0 0 1 864 250 H1556 A14 14 0 0 1 1570 264 V314 H850 Z" fill="#e6f4f1"/>
+  <rect x="850" y="250" width="720" height="456" rx="14" fill="none" stroke="#6a6a82" stroke-width="2"/>
+  <text x="874" y="292" font-size="26" font-weight="700" fill="#1c1c2e">after</text>
+  <text x="964" y="292" font-size="24" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">qp.optimize(program, caps)</text>
+  <text x="1546" y="292" font-size="22" fill="#0f766e" text-anchor="end">no warnings</text>
+
+  <rect x="866" y="330" width="688" height="52" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="884" y="364" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">for bias in Linspace(-0.05, 0.15, 101):</text>
+  <text x="1536" y="364" font-size="22" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[host]</text>
+
+  <rect x="894" y="392" width="660" height="52" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="912" y="426" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">set_offset q[0].flux bias</text>
+  <text x="1536" y="426" font-size="22" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[host]</text>
+
+  <rect x="894" y="454" width="660" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="912" y="488" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">average 200:</text>
+  <text x="1120" y="488" font-size="22" fill="#0f766e">runs in the sequencer</text>
+  <text x="1536" y="488" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <rect x="922" y="516" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="940" y="550" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">play q[0].drive "saturation"</text>
+  <text x="1536" y="550" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <rect x="922" y="578" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="940" y="612" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sync q[0].drive q[0].readout</text>
+  <text x="1536" y="612" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <rect x="922" y="640" width="632" height="52" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="940" y="674" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">measure q[0].readout ...</text>
+  <text x="1536" y="674" font-size="22" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[rt|host]</text>
+
+  <!-- the two lessons -->
+  <rect x="30" y="726" width="720" height="144" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="54" y="760" font-size="22" font-weight="700" fill="#0f766e">rt is the sequencer, host is Python</text>
+  <text x="54" y="794" font-size="22" fill="#1c1c2e">The flux bus has no sequencer, so the bias</text>
+  <text x="54" y="824" font-size="22" fill="#1c1c2e">sweep runs host-side, and the average around</text>
+  <text x="54" y="854" font-size="22" fill="#1c1c2e">it gets dragged along.</text>
+
+  <rect x="850" y="726" width="720" height="144" rx="12" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="874" y="760" font-size="22" font-weight="700" fill="#0f766e">the sync trap</text>
+  <text x="874" y="794" font-size="22" fill="#1c1c2e">A bare program.sync() broadcasts to every</text>
+  <text x="874" y="824" font-size="22" fill="#1c1c2e">bus, lands [host], and blocks the rewrite.</text>
+  <text x="874" y="854" font-size="22" fill="#1c1c2e">Name the buses you mean.</text>
+</svg>

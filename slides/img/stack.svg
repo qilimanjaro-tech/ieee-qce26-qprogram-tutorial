@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>The QProgram stack</title>
+  <desc>Layers from the experiment script through the QProgram core, capability validation and the
+  platform down to the instruments, with vendor extension packages registering into the core and
+  .qp and .wfl files falling out as artifacts.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="40" y="56" font-size="32" font-weight="700" fill="#1c1c2e">The QProgram stack</text>
+  <text x="40" y="88" font-size="22" fill="#6a6a82">the same program object, from your script down to the instruments</text>
+
+  <!-- layer 1: experiment script -->
+  <rect x="480" y="112" width="600" height="88" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="780" y="150" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Experiment script</text>
+  <text x="780" y="182" font-size="22" fill="#6a6a82" text-anchor="middle">the calibration you write</text>
+
+  <line x1="780" y1="204" x2="780" y2="234" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="227" font-size="22" fill="#0b5c56">builds the tree</text>
+
+  <!-- layer 2: the core -->
+  <rect x="480" y="238" width="600" height="186" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="780" y="278" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">QProgram core (vendor-agnostic)</text>
+
+  <rect x="560" y="294" width="94" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="607" y="323" font-size="22" fill="#1c1c2e" text-anchor="middle">Block</text>
+  <rect x="676" y="294" width="145" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="748" y="323" font-size="22" fill="#1c1c2e" text-anchor="middle">Operation</text>
+  <rect x="843" y="294" width="158" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="922" y="323" font-size="22" fill="#1c1c2e" text-anchor="middle">Expression</text>
+
+  <rect x="532" y="352" width="140" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="602" y="381" font-size="22" fill="#1c1c2e" text-anchor="middle">Waveform</text>
+  <rect x="694" y="352" width="180" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="784" y="381" font-size="22" fill="#1c1c2e" text-anchor="middle">SweepSource</text>
+  <rect x="896" y="352" width="132" height="44" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="962" y="381" font-size="22" fill="#1c1c2e" text-anchor="middle">Fragment</text>
+
+  <line x1="780" y1="428" x2="780" y2="458" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="451" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">qp.validate()</text>
+
+  <!-- layer 3: capability validation -->
+  <rect x="480" y="462" width="600" height="118" rx="14" fill="#e6f4f1" stroke="#0b5c56" stroke-width="2"/>
+  <text x="780" y="502" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Capability validation</text>
+  <text x="780" y="534" font-size="22" fill="#1c1c2e" text-anchor="middle">tokens · limits · predicates</text>
+  <text x="780" y="564" font-size="22" fill="#6a6a82" text-anchor="middle">Diagnostic + ExecutionPlan (rt / host)</text>
+
+  <line x1="780" y1="584" x2="780" y2="614" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="607" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ExecutionPlan</text>
+
+  <!-- layer 4: platform -->
+  <rect x="480" y="618" width="600" height="112" rx="14" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="780" y="656" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Platform: compile · upload · arm · run</text>
+  <rect x="534" y="672" width="247" height="44" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="657" y="701" font-size="22" fill="#1c1c2e" text-anchor="middle">ReferencePlatform</text>
+  <rect x="805" y="672" width="221" height="44" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="915" y="701" font-size="22" fill="#1c1c2e" text-anchor="middle">vendor platform</text>
+
+  <line x1="780" y1="734" x2="780" y2="764" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="757" font-size="22" fill="#0b5c56">waveforms + triggers</text>
+
+  <!-- layer 5: instruments -->
+  <rect x="480" y="768" width="600" height="86" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="780" y="806" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Instruments</text>
+  <text x="780" y="836" font-size="22" fill="#6a6a82" text-anchor="middle">AWG · digitizer · slow DAC · fridge</text>
+
+  <!-- vendor extension packages, plugging into the core from the side -->
+  <rect x="30" y="216" width="330" height="230" rx="14" fill="#ffffff" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="54" y="258" font-size="24" font-weight="700" fill="#0f766e">Vendor extensions</text>
+  <text x="54" y="302" font-size="22" fill="#1c1c2e">· vendor namespace</text>
+  <text x="54" y="336" font-size="22" fill="#1c1c2e">· operations · blocks</text>
+  <text x="54" y="370" font-size="22" fill="#1c1c2e">· capability tokens</text>
+  <text x="54" y="414" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">program.qblox.*</text>
+
+  <line x1="362" y1="331" x2="476" y2="331" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="420" y="317" font-size="22" fill="#0b5c56" text-anchor="middle">registers</text>
+
+  <!-- artifacts falling out of the core -->
+  <rect x="1200" y="216" width="370" height="230" rx="14" fill="#ffffff" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1385" y="258" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle">Artifacts</text>
+
+  <rect x="1216" y="272" width="338" height="72" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="1240" y="302" font-size="24" font-weight="700" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.qp</text>
+  <text x="1240" y="330" font-size="22" fill="#6a6a82">the program as text</text>
+
+  <rect x="1216" y="358" width="338" height="72" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="1240" y="388" font-size="24" font-weight="700" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.wfl</text>
+  <text x="1240" y="416" font-size="22" fill="#6a6a82">the waveform library</text>
+
+  <line x1="1084" y1="308" x2="1196" y2="308" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1140" y="294" font-size="22" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">dumps()</text>
+  <line x1="1196" y1="394" x2="1084" y2="394" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1140" y="380" font-size="22" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">loads()</text>
+</svg>

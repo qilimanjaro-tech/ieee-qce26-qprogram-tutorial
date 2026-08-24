@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+
+# Notebook and tutorial output
+out/
+*.qp.bak
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
