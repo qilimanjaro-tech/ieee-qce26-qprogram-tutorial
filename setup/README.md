@@ -34,11 +34,11 @@ pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 sc
 jupyter lab
 ```
 
-The `v0.1.0` tag is what the notebooks are verified against. To track the source instead, each
+The `0.1.0` tag is what the notebooks are verified against. To track the source instead, each
 distribution installs from its own repository:
 
 ```bash
-pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@v0.1.0" scipy jupyterlab
+pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.1.0" scipy jupyterlab
 ```
 
 ### A2: with uv
@@ -131,8 +131,8 @@ print(qp.loads(qp.dumps(program)).body == program.body)     # True
 Three lines of expected output. The version is read through `importlib.metadata` rather than through
 `qprogram.__version__`, because the attribute reports a `0.0.0` placeholder when the package is
 imported from a source tree with no installed metadata, while `importlib.metadata.version` raises
-there instead of quietly reporting the wrong number. `notebooks/00_setup.ipynb` does all of this plus
-the plot.
+there instead of reporting a wrong number in silence. `notebooks/00_setup.ipynb` does all of this
+plus the plot.
 
 ---
 

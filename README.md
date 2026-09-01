@@ -87,20 +87,22 @@ notebook runs end to end on it. Parts 5 and 6 install `qprogram-qblox` and `qpro
 are not drivers. They carry the operations, capability profiles, and serialization for two real
 instruments and nothing that opens a socket, so they run on a laptop like the rest. Each experiment
 supplies a small measurement model that plays the part of the fridge: it is handed the loop variables
-currently bound and returns one sample per shot. The limits are worth stating plainly. The simulator
-produces plausible numbers, not physics from first principles, and it models no pulse shapes and no
-timing at all. It is there so that the *program* you write and the *analysis* you run on the results
-are the real thing, which is where the engineering work in a control stack actually lives.
+currently bound and returns one sample per shot.
+
+The simulator has limits worth knowing before you trust anything it prints. It produces plausible
+numbers rather than physics from first principles, and it models no pulse shapes and no timing at
+all. It is there so that the *program* you write and the *analysis* you run on the results are the
+real thing, which is where the engineering work in a control stack lives.
 
 ---
 
 ## Target audience and prerequisites
 
-The tutorial is designed for quantum hardware engineers, experimentalists, calibration scientists,
-and software developers who need fine-grained control over the physical signals driving quantum
-processors. It is especially relevant for those building calibration routines, custom gates, or
-control infrastructure, as well as researchers moving from circuit-level programming to
-hardware-aware quantum computing.
+The tutorial is for quantum hardware engineers, experimentalists, calibration scientists, and
+software developers who need fine-grained control over the physical signals driving quantum
+processors. That includes anyone building calibration routines, custom gates, or control
+infrastructure, and researchers moving from circuit-level programming to hardware-aware quantum
+computing.
 
 **Attendees should have:**
 
@@ -140,15 +142,11 @@ Upon completing this tutorial, attendees will be able to:
 
 ## Format
 
-The tutorial combines structured presentations with interactive coding exercises:
-
-- **Slides.** A conceptual introduction linking circuit-level gates to physical control signals.
-- **Live coding.** Instructor-led demonstrations in Jupyter notebooks, building pulse programs step
-  by step.
-- **Hands-on exercises.** Two per part, which attendees work through on their own laptops. The
-  attendee notebooks leave them blank and `notebooks/solutions/` has the answers.
-- **Local execution.** Every example runs on QProgram's reference executor, so no hardware, GPU, or
-  network access is needed to complete any part of the tutorial.
+The slides carry the concepts and link circuit-level gates to physical control signals. The coding
+is instructor-led, in Jupyter notebooks, building pulse programs step by step, and each part carries
+two exercises that attendees work through on their own laptops. The attendee notebooks leave those
+blank and `notebooks/solutions/` has the answers. Every example runs on QProgram's reference
+executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
 
 QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform
 and result plotting. The tutorial adds SciPy for the curve fits in Parts 3, 4, and 6.

@@ -98,9 +98,9 @@ BUDGETS = (
     ("mid-sentence colon", re.compile(r"[a-z]:\s+[a-z]"), 12),
 )
 
-# Files the budgets apply to. The deck joined this list once its prose had been revised; markdown
-# needs the extra stripping in `prose` below before the counts mean anything, because a CSS block
-# is nothing but mid-sentence colons.
+# Files the budgets apply to, the sources and the deck. Markdown needs the extra stripping in
+# `prose` below before the counts mean anything, because a CSS block is nothing but mid-sentence
+# colons.
 BUDGETED = ("sources/*.py", "slides/*.md")
 
 CELL = re.compile(r"^# %%(?P<rest>.*)$")

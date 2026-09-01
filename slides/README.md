@@ -3,18 +3,18 @@
 A [Marp](https://marp.app/) deck, written in Markdown. It is a **thin framing deck**: title, why a
 chip arrives with no numbers on it, the state of control software in 2026, links and QR codes, the
 device under test, thirty seconds of vocabulary, then a divider and two or three slides per tutorial
-part. Three diagrams carry the structure. The teaching happens in
+part. Six diagrams carry the structure. The teaching happens in
 [`../notebooks/`](../notebooks/); these slides orient and recap.
 
 Every content slide carries at least one concrete thing, a number, a formula, a `.qp` excerpt, or a
 diff, and the speaker carries the rest. A slide that is five compressed claims competes with the
-person talking over it, so `tools/check_style.py` now applies its sentence-shape budgets to this
-file as well as to `sources/*.py`.
+person talking over it, so `tools/check_style.py` applies its sentence-shape budgets to this file
+as well as to `sources/*.py`.
 
 - [`qprogram_tutorial.md`](qprogram_tutorial.md): the deck source. Edit this.
 - `qprogram_tutorial.html`: the rendered deck, produced by the Marp CLI command below. It reads
   `img/` from alongside itself, so keep the two together.
-- [`img/`](img/): five diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`,
+- [`img/`](img/): six diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`,
   `qr-docs.svg`).
 
 | Diagram | Shows | Slide |
@@ -50,10 +50,10 @@ render everywhere.
 
 ## Present or edit
 
-- **Easiest:** VS Code with the **"Marp for VS Code"** extension. Live preview, presenter mode, and
-  one-click export to HTML, PDF, or PPTX.
-- **Browser:** render `qprogram_tutorial.html` (see below) and open it, with the `img/` folder next to
-  it. Arrow keys navigate, `f` goes fullscreen, `p` opens the presenter view.
+The easiest route is VS Code with the "Marp for VS Code" extension, which gives you live preview,
+presenter mode, and one-click export to HTML, PDF, or PPTX. In a browser, render
+`qprogram_tutorial.html` (see below) and open it with the `img/` folder next to it. Arrow keys
+navigate, `f` goes fullscreen, and `p` opens the presenter view.
 
 Bring the HTML on a USB stick as the fallback. It needs no network and no Node install, which is the
 right thing to have when the conference room projector is the only thing that works.
@@ -84,7 +84,7 @@ without one looking denser than the others.
 ```bash
 cd slides
 
-python -c "import segno; segno.make('https://github.com/qilimanjaro-tech/qce26-qprogram-tutorial', version=4).save('img/qr-tutorial.svg', scale=6, border=2, dark='#0f766e', light='#fff')"
+python -c "import segno; segno.make('https://github.com/qilimanjaro-tech/ieee-qce26-qprogram-tutorial', version=4).save('img/qr-tutorial.svg', scale=6, border=2, dark='#0f766e', light='#fff')"
 python -c "import segno; segno.make('https://github.com/qilimanjaro-tech/qprogram', version=4).save('img/qr-qprogram.svg', scale=6, border=2, dark='#0f766e', light='#fff')"
 python -c "import segno; segno.make('https://qilimanjaro-tech.github.io/qprogram', version=4).save('img/qr-docs.svg', scale=6, border=2, dark='#0f766e', light='#fff')"
 ```
