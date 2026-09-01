@@ -81,6 +81,7 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 ## Introduction
 
 - **Vyron Vasileiadis**, Tech Lead at **Qilimanjaro Quantum Tech** · vyron@qilimanjaro.tech
+- **Flavie Le Bars**, Quantum Software Engineer at **Qilimanjaro Quantum Tech** · flavie.lebars@qilimanjaro.tech
 - **Qilimanjaro** builds quantum computers and the software stack that drives them.
 - **QProgram** is the pulse-level layer of that stack, an open-source Python DSL for the pulses, sweeps, and measurements a calibration is made of.
 
@@ -790,4 +791,4 @@ one.
 
 <p class="sub">Questions, and the notebooks are yours to keep</p>
 
-<p class="meta">vyron@qilimanjaro.tech · QCE 2026</p>
+<p class="meta">vyron@qilimanjaro.tech · flavie.lebars@qilimanjaro.tech · QCE 2026</p>
