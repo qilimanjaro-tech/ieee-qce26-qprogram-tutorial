@@ -63,36 +63,19 @@ computing
 
 ## Schedule
 
-| | Part | Experiments | Duration |
-|---|------|-------------|----------|
-| | Setup ([`00_setup`](notebooks/00_setup.ipynb), run it before the session) | readout pulse, one resonator scan | at home |
-| 1 | The program is data ([`01_pulse_programs`](notebooks/01_pulse_programs.ipynb)) | readout pulse and acquisition | 38 min |
-| 2 | Sweeps, averaging, and what comes back ([`02_sweeps_and_results`](notebooks/02_sweeps_and_results.ipynb)) | resonator spectroscopy, punchout | 38 min |
-| 3 | Finding and driving the qubit ([`03_finding_the_qubit`](notebooks/03_finding_the_qubit.ipynb)) | qubit spectroscopy, Rabi, flux arc | 45 min |
-| | **Break** | | 15 min |
-| 4 | Coherence, single shots, and feedback ([`04_coherence_and_feedback`](notebooks/04_coherence_and_feedback.ipynb)) | T1, Ramsey, Hahn echo, single-shot readout, active reset | 40 min |
-| 5 | One program, many machines ([`05_one_program_many_machines`](notebooks/05_one_program_many_machines.ipynb)) | porting the flux arc to another rack, then rebuilding that rack from two published vendor profiles | 50 min |
-| 6 | Extending the language and shipping the work ([`06_extending_and_shipping`](notebooks/06_extending_and_shipping.ipynb)) | custom waveform, custom sweep source, vendor profile and namespace, full bring-up capstone | 30 min |
+| | Part | Experiments |
+|---|------|-------------|
+| | Setup ([`00_setup`](notebooks/00_setup.ipynb), run it before the session) | readout pulse, one resonator scan |
+| 1 | The program is data ([`01_pulse_programs`](notebooks/01_pulse_programs.ipynb)) | readout pulse and acquisition |
+| 2 | Sweeps, averaging, and what comes back ([`02_sweeps_and_results`](notebooks/02_sweeps_and_results.ipynb)) | resonator spectroscopy, punchout |
+| 3 | Finding and driving the qubit ([`03_finding_the_qubit`](notebooks/03_finding_the_qubit.ipynb)) | qubit spectroscopy, Rabi, flux arc |
+| 4 | Coherence, single shots, and feedback ([`04_coherence_and_feedback`](notebooks/04_coherence_and_feedback.ipynb)) | T1, Ramsey, Hahn echo, single-shot readout, active reset |
+| 5 | One program, many machines ([`05_one_program_many_machines`](notebooks/05_one_program_many_machines.ipynb)) | porting the flux arc to another rack, then rebuilding that rack from two published vendor profiles |
+| 6 | Extending the language and shipping the work ([`06_extending_and_shipping`](notebooks/06_extending_and_shipping.ipynb)) | custom waveform, custom sweep source, vendor profile and namespace, full bring-up capstone |
 
-Read end to end that is 4 hours 15 minutes with the break, which is more material than any slot this
-tutorial has been given. The excess is deliberate. The notebooks are also the thing attendees take
-home, so the sections a live session drops are the ones worth having in writing.
-
-Cut in this order. Each item is self-contained, and nothing after it depends on it.
-
-| Cut | Saves | Gets you to |
-|---|---|---|
-| Part 6's capstone (6.5) | 12 min | 4:03 |
-| The second exercise in Parts 2, 3, and 5 | 12 min | 3:51 |
-| Part 3's flux arc (3.4), if Part 5's flux sweep is being kept | 11 min | 3:40 |
-| Part 5's vendor profiles (5.6) | 12 min | 3:28 |
-| Part 6's `.qp` artifact material (6.3) | 10 min | 3:18 |
-| Part 1's waveform gallery (1.4), demonstrated live from the deck instead | 8 min | 3:10 |
-| Part 4's Hahn echo (4.4) | 10 min | 3:00 |
-
-Section 5.6 sits fourth on purpose. It is where the hand-built descriptors of 5.2 to 5.5 meet the
-packages a lab would actually install, so it pays for itself in a room of practitioners and is the
-first thing to restore when there is room.
+The notebooks carry more material than a live session gets through, and the excess is deliberate.
+They are also the thing attendees take home, so the sections a live session drops are the ones worth
+having in writing.
 
 ---
 
