@@ -212,14 +212,14 @@ honest form is a histogram.
 **Quasiparticles and stray radiation** account for most of the rest, and both are fought with
 shielding and filtering rather than with design.
 
-The sweep below runs to 60 microseconds, a bit over three $T_1$, and the choice is not arbitrary.
-Stop at one $T_1$ and the exponential's amplitude and time constant become degenerate, so the fit
-returns a large error bar on both. Run to five and the last third of your points are measuring the
-noise floor at some cost in fridge time. Three to four is the usual compromise.
+The sweep below runs to 60 microseconds, a bit over three $T_1$, and both ends of that range cost
+something. Stop at one $T_1$ and the exponential's amplitude and time constant become degenerate, so
+the fit returns a large error bar on both. Run to five and the last third of your points are
+measuring the noise floor at some cost in fridge time. Three to four is the usual compromise.
 
-One honest warning first, and it applies to the whole part. **The reference executor has no timing
-model.** `wait` and `sync` change nothing about the numbers that come back. The delay shows up in
-the result only because the measurement model reads `env["delay"]`, and `env` is the dict of
+One warning before any of it, and it applies to the whole part. **The reference executor has no
+timing model.** `wait` and `sync` change nothing about the numbers that come back. The delay shows
+up in the result only because the measurement model reads `env["delay"]`, and `env` is the dict of
 currently bound loop variables. The program is real, the loop is real, the physics is a lambda.
 """
 
@@ -526,12 +526,12 @@ print(f"fitted T2 = {t2_fit / 1000:.2f} us   true = {DEVICE['q0_T2echo'] / 1000:
 # %% [markdown]
 r"""
 Plot it, then put the three numbers next to each other. The ordering $T_2^* < T_2 < 2T_1$ is the
-sanity check you run before believing any of it, and it is not a convention, it is arithmetic.
-Refocusing removes noise and cannot add any, so $T_2$ can only exceed $T_2^*$. And since relaxation
-destroys phase along with energy, contributing $1/2T_1$ to the dephasing rate no matter what,
-nothing you do to the pulse sequence gets $T_2$ past $2T_1$. A measurement that violates either
-bound is a bug in your analysis, and finding out at this point costs you five minutes rather than a
-paper.
+sanity check you run before believing any of it, and it follows from arithmetic rather than from
+agreement among labs. Refocusing removes noise and cannot add any, so $T_2$ can only exceed $T_2^*$.
+And since relaxation destroys phase along with energy, contributing $1/2T_1$ to the dephasing rate
+no matter what, nothing you do to the pulse sequence gets $T_2$ past $2T_1$. A measurement that
+violates either bound is a bug in your analysis, and finding out at this point costs you five
+minutes rather than a paper.
 """
 
 # %%
@@ -583,8 +583,8 @@ recoverable, so ask for `raw` while you are commissioning a readout and stop ask
 works, because the data volume is a hundred times larger.
 
 `result.get(m)` defaults to `MF.IQ` and raises `KeyError` for a field the measurement never
-requested. It never quietly hands you a different array, which matters. A `state` array returned
-where the caller expected IQ would look like data all the way downstream.
+requested. It never substitutes a different array instead, because a `state` array returned where
+the caller expected IQ would look like data all the way downstream.
 
 The `time` axis of a `raw` array is the model's `raw_samples`, read once at the start of the run,
 which is where the 16 in the shape below comes from. A model that simulates no ADC leaves the
@@ -664,10 +664,10 @@ with program.sweep(shot, qp.Range(0, 599, 1)):
     ...
 ```
 
-That reads like a trick and it is not. The loop runs the sequence once per point, so every point
-holds exactly one shot, and the result array gets a `shot` dimension of length 600. Nothing reads
-the variable, and that is fine. A sweep variable that no operation uses still drives its loop. A
-sequencer does exactly this when you ask it to stream every acquisition instead of accumulating.
+The loop runs the sequence once per point, so every point holds exactly one shot, and the result
+array gets a `shot` dimension of length 600. Nothing reads the variable, and that is fine. A sweep
+variable that no operation uses still drives its loop. A sequencer does exactly this when you ask it
+to stream every acquisition instead of accumulating.
 
 `qp.Repeat` from Part 2 looks like the shorter way to write this and it is not. It multiplies a
 source's points rather than adding an axis. `qp.Repeat(qp.Values([0, 1]), times=4)` sweeps `0 1 0 1

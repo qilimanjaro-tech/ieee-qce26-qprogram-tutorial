@@ -243,7 +243,7 @@ plt.show()
 
 # %% [markdown]
 r"""
-A curve with a dip near 7.2 GHz means the whole stack works. Build, serialize, run, plot. ✅
+A curve with a dip near 7.2 GHz means the whole stack works. Build, serialize, run, plot.
 See you at the tutorial.
 
 Curious already? Change `shots=100` to `shots=2` in Check 3 and rerun the last four cells. Watch two

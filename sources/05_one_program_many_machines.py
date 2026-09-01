@@ -19,7 +19,7 @@ against. This part is both halves:
 - **5.1** What has to be checked before a program reaches an instrument.
 - **5.2** Capability tokens, limits, and predicates: how a platform states what it can do.
 - **5.3** Build a platform descriptor by hand and validate the flux sweep against it.
-- **5.4** `qp.optimize`, and the one broadcast operation that quietly blocks the rewrite.
+- **5.4** `qp.optimize`, and the one broadcast operation that silently blocks the rewrite.
 - **5.5** Diagnostics as a contract: a missing operation, a limit, and a data-flow rule.
 - **5.6** The same rack again, built from two published vendor profiles instead of by hand.
 - **5.7** Porting: `rebind` for bus names, `WaveformLibrary` for the numbers.
@@ -228,9 +228,8 @@ plt.show()
 r"""
 ## 5.2 What a platform has to agree to
 
-A platform declares its surface as three separate things, and the split is not bureaucracy. Each
-axis is the cheapest mechanism that can express its class of constraint, and collapsing them would
-cost something real.
+A platform declares its surface as three separate things. Each axis is the cheapest mechanism that
+can express its class of constraint, and collapsing them would cost something real.
 
 | Axis | What it holds | Example |
 |---|---|---|
@@ -397,12 +396,12 @@ The arithmetic changes completely. Before the rewrite, every one of the 20200 ex
 round trip. After it, the host does 101 DAC writes and the sequencer does 20200 iterations on its
 own. Same experiment, same data, two orders of magnitude in wall clock.
 
-`qp.optimize(program, caps)` applies it. It is opt-in, and the reason is honest. The rewrite is not
-unconditionally equivalent. It groups all 200 shots of one bias point together instead of
-interleaving passes over the sweep, identical for a stationary system and different under drift. If
-your chip wanders over ten minutes, the interleaved version spreads that drift evenly across the
-whole sweep and the reordered one concentrates it into a slope along the bias axis. Most of the time
-you want the speed. Occasionally you want the interleaving, and then you do not call `optimize`.
+`qp.optimize(program, caps)` applies it. It is opt-in, because the rewrite is not unconditionally
+equivalent. It groups all 200 shots of one bias point together instead of interleaving passes over
+the sweep, identical for a stationary system and different under drift. If your chip wanders over
+ten minutes, the interleaved version spreads that drift evenly across the whole sweep and the
+reordered one concentrates it into a slope along the bias axis. Most of the time you want the speed.
+Occasionally you want the interleaving, and then you do not call `optimize`.
 
 The hoisted `set_offset` also runs once per bias point instead of once per shot. For a DC bias that
 is the whole point, and it would be wrong for an operation with side effects, so the rewrite
@@ -521,13 +520,13 @@ does not propagate that way, so the `average` keeps the domain its own operation
 
 ### From a path to a line of the file
 
-The round trip is not decoration. `program.source_map` on a program you built in Python is empty,
-because there is no file for a node to have come from. The parser records which line produced which
-node, so the map arrives populated only on a program that came through `qp.loads`. A program already
-on disk needs none of this, since loading it fills the map and every diagnostic reports against a
-line directly. `expand()` returns a copy with an empty map for the same reason, because inlining a
-call produces nodes no line of the file ever held. `qp.resolve_path` and `qp.node_path` walk between
-a path and its node in either direction, with no file involved.
+The round trip only works when the program came from a file. `program.source_map` on a program you
+built in Python is empty, because there is no file for a node to have come from. The parser records
+which line produced which node, so the map arrives populated only on a program that came through
+`qp.loads`. A program already on disk needs none of this, since loading it fills the map and every
+diagnostic reports against a line directly. `expand()` returns a copy with an empty map for the same
+reason, because inlining a call produces nodes no line of the file ever held. `qp.resolve_path` and
+`qp.node_path` walk between a path and its node in either direction, with no file involved.
 """
 
 # %%
@@ -884,7 +883,7 @@ r"""
 Zero errors, zero warnings, and the averaging back in hardware where 200 shots cost 200 sequencer
 iterations instead of 200 network round trips.
 
-One honest caveat about the rewrite, which 5.4 stated and this is the place to see. Reordering the
+One caveat about the rewrite, which 5.4 stated and this is the place to see. Reordering the
 loops regroups the shots. Rack A interleaved passes over the bias axis; the hoisted program takes
 all 200 shots of one bias point before moving on. For a stationary device the two are the same
 experiment, and the simulator's random draws still differ point by point. The fit is what has to

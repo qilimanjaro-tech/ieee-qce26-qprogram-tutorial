@@ -211,9 +211,9 @@ nothing uploaded and no host in the loop. `Range` and `Linspace` make that promi
 `"arbitrary"` means the values are a list. The platform either uploads them as a table, which costs
 sequencer memory, or steps them from the host, which costs a round trip per point.
 
-Now the arithmetic that makes this worth caring about, because "costs a round trip" is easy to nod
-at and hard to feel. The resonator scan later in this notebook is 101 points at 200 shots, so 20200
-executions of the sequence. Price them three ways:
+"Costs a round trip" is easy to nod at and hard to feel, so do the arithmetic. The resonator scan
+later in this notebook is 101 points at 200 shots, so 20200 executions of the sequence. Price them
+three ways:
 
 - **Inside the sequencer**, one execution is the pulse plus the reset. On this chip a shot is a 2 us
   readout followed by however long you wait for the qubit to relax, and five $T_1$ is 90 us, so call
@@ -377,11 +377,11 @@ measured, so one model can answer differently for two resonators. `env` is a dic
 bound loop variables, keyed by variable id, plus any platform parameters keyed as
 `"bus.parameter"`.
 
-Now the honest part, and it will be repeated. **The simulator is not physics.** The pulses you play,
-the waits, the syncs, the gains you set are all recorded in the AST, validated against the
-platform, and then ignored by the interpreter. There is no timing model and no waveform model. When
-you sweep an amplitude and watch a dip move, it moved because your `response` function read
-`env["ro_amp"]` and did the arithmetic itself.
+**The simulator is not physics**, and this notebook will say so again. The pulses you play, the
+waits, the syncs, the gains you set are all recorded in the AST, validated against the platform, and
+then ignored by the interpreter. There is no timing model and no waveform model. When you sweep an
+amplitude and watch a dip move, it moved because your `response` function read `env["ro_amp"]` and
+did the arithmetic itself.
 
 That sounds like a limitation and it is really a choice about what is under test. A tutorial with a
 real Lindblad solver behind it would teach you to trust a simulation. This one puts the two things
@@ -455,7 +455,7 @@ over.
 
 $$ S_{21}(f) = 1 - \frac{0.9}{1 + i\,\delta}, \qquad \delta = \frac{f - f_r}{\kappa / 2} $$
 
-The 0.9 is not decoration. For a notch resonance the depth is $Q_L/Q_c$, the fraction of the total
+That 0.9 is a loss budget. For a notch resonance the depth is $Q_L/Q_c$, the fraction of the total
 loss that goes out through the coupler rather than into the material. A dip 90 percent deep means
 nine tenths of the energy leaves the way you want it to, and one tenth is lost to the substrate, the
 oxides, and whatever else. Run the numbers: $Q_L = f_r/\kappa = 4800$, so $Q_c = Q_L/0.9 = 5300$ and
@@ -539,9 +539,9 @@ plt.show()
 r"""
 ### Reading the numbers off the curve
 
-`argmin` is enough for the centre here, with one caveat worth saying out loud: it can never be
-better than your step size. A 200 kHz grid gives you the resonator to 200 kHz, full stop. Part 3
-fits a real curve and does better than the grid.
+`argmin` is enough for the centre here, with one caveat: it can never be better than your step size.
+A 200 kHz grid gives you the resonator to 200 kHz, full stop. Part 3 fits a real curve and does
+better than the grid.
 
 The width needs one step of care, and the reason is a mistake people make once. The dip in
 $|S_{21}|$ is not a Lorentzian. $S_{21}$ is one minus a complex Lorentzian, and taking the magnitude

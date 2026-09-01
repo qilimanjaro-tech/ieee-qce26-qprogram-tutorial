@@ -13,8 +13,7 @@ extension. Lab A patches in its attenuator, lab B patches in its pulse shape, an
 that was supposed to move between them now loads in one interpreter and raises in the other, or
 worse, loads in both and means different things.
 
-So the extension points are not a convenience feature. They are the thing that keeps the format
-worth having.
+So the extension points are what keep the format worth having.
 
 - register a **waveform**, a **sweep source**, and a whole **vendor namespace**, live in this
   notebook
@@ -408,8 +407,8 @@ worth the five minutes. Imagine `Callable(lambda i: ...)` as a source. It could 
 array could not be allocated before the first shot. It could not honestly declare a `KIND`, so every
 sweep would fall back to arbitrary and no loop would ever compile into a register. And it could not
 serialize, so a `.qp` file holding one would either carry a pickled closure or quietly lose the
-sweep. Three properties, all of them load-bearing, all of them gone. The rule looks like a
-limitation and it is the reason the format works.
+sweep. Three properties, all of them load-bearing, all of them gone. That rule is why the format
+works.
 """
 
 # %%

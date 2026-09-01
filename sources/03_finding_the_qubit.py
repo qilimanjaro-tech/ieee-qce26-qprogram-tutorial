@@ -791,10 +791,10 @@ r"""
 ### Fitting the arc
 
 The ridge is quantised to the 10 MHz frequency grid, so no single point is better than 10 MHz. The
-fit comes out much better than any of its inputs, and the reason is worth internalising because it
-recurs. Twenty-five noisy points constrain three parameters, and the arc's symmetry about the sweet
-spot pins $V_0$ far more tightly than the bias step suggests: the curve on the left of the maximum
-and the curve on the right both vote on where the middle is. Fit $f_{\max}$, $V_0$, and $\Phi_0$ and
+fit comes out much better than any of its inputs, and the same reason will come up again.
+Twenty-five noisy points constrain three parameters, and the arc's symmetry about the sweet spot
+pins $V_0$ far more tightly than the bias step suggests: the curve on the left of the maximum and
+the curve on the right both vote on where the middle is. Fit $f_{\max}$, $V_0$, and $\Phi_0$ and
 check all three.
 
 A word on the starting guess. The arc is flat at the top and steep at the edges, so a bad guess for

@@ -369,7 +369,7 @@ has to get the right number out of noisy data. Both are identical here and on ha
 
 <p class="kicker">Part 1 · notebooks/01_pulse_programs.ipynb</p>
 
-# The Program Is Data
+# The program is data
 
 ### A readout pulse, a drive pulse, and the tree they build
 
@@ -424,7 +424,7 @@ that mean nothing. An alias cannot claim one, because it does not carry one.
 
 <p class="kicker">Part 2 · notebooks/02_sweeps_and_results.ipynb</p>
 
-# Sweeps, Averaging, and What Comes Back
+# Sweeps, averaging, and what comes back
 
 ### Resonator spectroscopy, then a punchout map
 
@@ -499,7 +499,7 @@ Nested `with` statements are nested loops. `result.get(m0)` comes back as `xarra
 
 <p class="kicker">Part 3 · notebooks/03_finding_the_qubit.ipynb</p>
 
-# Finding and Driving the Qubit
+# Finding and driving the qubit
 
 ### Two-tone spectroscopy, Rabi, and the flux arc
 
@@ -566,7 +566,7 @@ line that settles in milliseconds, on a box with no sequencer in it.
 
 <p class="kicker">Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
 
-# Coherence, Single Shots, and Feedback
+# Coherence, single shots, and feedback
 
 ### T1, Ramsey, echo, and a reset that reads the outcome
 
@@ -615,7 +615,7 @@ run holds `NaN`, honestly, because a zero would look like a cold measurement.
 
 <p class="kicker">Part 5 · notebooks/05_one_program_many_machines.ipynb</p>
 
-# One Program, Many Machines
+# One program, many machines
 
 ### The same calibration, a different rack
 
@@ -709,7 +709,7 @@ machine too.
 
 <p class="kicker">Part 6 · notebooks/06_extending_and_shipping.ipynb</p>
 
-# Extending the Language and Shipping the Work
+# Extending the language and shipping the work
 
 ### Your own waveform, your own vendor, and the bring-up in one script
 

@@ -338,8 +338,8 @@ print("any index:   ", q[7].drive, q[7].drive.channel)
 r"""
 ### Two mistakes the schema catches for free
 
-The two extra fields are not bookkeeping. `channel` records how many DACs feed the line, and
-`acquires` records whether an ADC listens to it, and both of those are facts about copper.
+The two extra fields describe the wiring. `channel` records how many DACs feed the line, `acquires`
+records whether an ADC listens to it, and both of those are facts about copper.
 
 A drive line ends at an IQ mixer, which needs two synchronized DACs to place a tone at an arbitrary
 sideband of the local oscillator without also placing a mirror image of it somewhere you did not
@@ -529,10 +529,10 @@ verbs you will need all day.
 - `with program.block():` groups statements and changes nothing about what they mean. There is no
   loop here yet. Part 2 replaces this grouping with a real sweep.
 
-The 4 ns wait between the drive and the readout is not superstition. A mixer does not stop the
-instant its envelope reaches zero, and a readout tone that starts while the drive is still ringing
-down measures the ringdown along with the qubit. Four nanoseconds is one clock cycle on a typical
-sequencer, the smallest gap you can ask for and enough on most racks.
+A mixer does not stop the instant its envelope reaches zero, and a readout tone that starts while
+the drive is still ringing down measures the ringdown along with the qubit. Hence the 4 ns wait
+between the drive and the readout. Four nanoseconds is one clock cycle on a typical sequencer, the
+smallest gap you can ask for and enough on most racks.
 """
 
 # %%
@@ -564,8 +564,7 @@ built, compared, and plotted with no program around it.
 Two methods carry the whole contract: `envelope(resolution=1)` returns the samples as a numpy array,
 and `get_duration()` returns nanoseconds. That is enough to draw the gallery.
 
-The gallery is not a feature tour. Each of these shapes exists because a specific thing goes wrong
-without it:
+Each of these shapes exists because a specific thing goes wrong without it:
 
 - **`Square`** is the readout tone, and it is square because you want the resonator in steady state
   and the integration window at constant amplitude.
@@ -766,8 +765,8 @@ duration of a sweep is the product of its point count, its shot count, and the l
 all three of which are sitting in the tree before you press go. A scan you can price is a scan you
 can decide not to run.
 
-To be clear about where that number comes from, you computed it. The reference simulator has no
-timing model at all, so no run will report it back to you. What the AST gives you is the chance to
+That number came out of your own arithmetic rather than out of a run. The reference simulator has no
+timing model at all, so nothing will report it back to you. What the AST gives you is the chance to
 work it out before you spend fridge time.
 """
 
