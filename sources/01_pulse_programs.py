@@ -43,7 +43,7 @@ import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
 from qprogram.operations import Play, Wait
-from qprogram.waveforms import FlatTop, Gaussian, IQDrag, IQPair, Ramp, Square, SuddenNetZero
+from qprogram.waveforms import Arbitrary, FlatTop, Gaussian, IQDrag, IQPair, Ramp, Square, SuddenNetZero
 
 # What a core measurement can ask for, in the canonical order QProgram sorts fields into.
 # A vendor extension can register more names; these three are what ships in the box.
@@ -51,7 +51,111 @@ print("measurement fields:", [field.value for field in MF])
 
 # %% [markdown]
 r"""
-## 1.1 Why pulse level
+## 1.1 From a circuit to a voltage
+
+If you write circuits, you already have a working model of a quantum computer, and this part is
+going to open it up. Not because the model is wrong. Because underneath every `X(q0)` there is a
+shaped microwave burst whose amplitude somebody measured last Tuesday, and this tutorial lives at
+the layer where the measuring happens.
+
+Start with the object itself.
+
+### The chip, and the three wires that reach it
+
+A transmon is not an atom. It is a circuit: a capacitor and a Josephson junction acting as a
+nonlinear inductor, patterned in aluminium on silicon and cooled to about 10 millikelvin. Like any
+oscillator it has a ladder of energy levels, and the junction's nonlinearity makes the rungs
+unevenly spaced, so you can address the bottom two on their own and call them $|0\rangle$ and
+$|1\rangle$. The gap between them is a frequency. On the chip in this tutorial it is 4.85 GHz, which
+is the microwave band, the same neighbourhood as radar and wifi.
+
+Being a circuit, it is driven and measured the way any microwave circuit is, with voltages on
+coaxial cable. Each qubit has at most three lines reaching it, and each line does exactly one job:
+
+| line | what runs on it | what it does |
+|---|---|---|
+| **drive** | a microwave tone near $f_{01}$ | rotates the state |
+| **readout** | a microwave tone near $f_r$, the frequency of a resonator next to the qubit | interrogates the state |
+| **flux** | a slow, near-DC voltage through a coil | moves $f_{01}$, on tunable qubits only |
+
+Those three lines are the entire interface to a quantum computer at this level. Every operation in
+this tutorial either puts a voltage on one of those lines or records what comes back on one. The
+deck draws the whole chain, rack to fridge to chip and back, in `slides/img/rack.svg`.
+
+### What a gate turns into
+
+Take the three single-qubit gates a circuit person writes most.
+
+**`X(q0)`** is a shaped burst on the drive line, on resonance with $f_{01}$. Two properties of that
+burst do all the work. The **area** under the envelope sets the rotation angle, so the burst whose
+area gives a half turn is the pi pulse and half of it is an $X/2$. The **phase** of the carrier sets
+the axis in the equatorial plane, so the same burst at 0 degrees is an $X$ and at 90 degrees is a
+$Y$. One envelope, two knobs, every single-qubit rotation.
+
+**`Z(theta)`** plays nothing at all. A rotation about $Z$ is a change of reference frame, so instead
+of emitting anything you advance the phase of every subsequent pulse on that line and the qubit
+cannot tell the difference. It costs zero time and carries no error, so compilers push as many $Z$
+rotations as they can into phase bookkeeping. In the operation list below it is `set_phase`.
+
+**`CZ(q0, q1)`** is not a single-line operation at all. Either you push one qubit's frequency with a
+flux pulse until it interacts with its neighbour, or you drive a two-qubit transition with a
+microwave tone. Both take 40 to 500 ns, both are calibrated per pair, and Part 6 scans one.
+
+| circuit | what the instrument emits |
+|---|---|
+| `X(q0)` | 40 ns burst on the drive line, area $\pi$, phase 0 |
+| `Y(q0)` | the same burst, phase 90 degrees |
+| `X/2(q0)` | the same shape, half the amplitude |
+| `Z(theta)` | nothing. Advance the phase of everything after it |
+| `CZ(q0,q1)` | a flux excursion on one qubit, 40 to 500 ns, calibrated per pair |
+| `measure(q0)` | a 2 us tone on the readout line, integrated and thresholded |
+
+### What a measurement turns into
+
+This is the one that surprises people coming from circuits, so it gets its own section.
+
+`measure(q0)` returns a bit. The hardware does not return a bit.
+
+You cannot observe the qubit directly. Nothing you put on the drive line comes back, because there
+is no ADC on it. What you observe instead is a **resonator**, a short length of patterned line
+coupled to the qubit, whose own frequency depends on which state the qubit is in. The two
+frequencies differ by $2\chi$, or 3.6 MHz on this chip.
+
+So the measurement is indirect and it goes like this. Send a tone down the feedline past the
+resonator. The field that comes back out carries an amplitude and a phase that depend on the qubit's
+state. That field is a few tens of microwave photons, around $10^{-19}$ joules, so it climbs an
+amplifier chain on the way out: a near-quantum-limited parametric amplifier at 10 mK, a HEMT at 4 K,
+ordinary amplifiers at room temperature. Then it is digitized, multiplied by a set of integration
+weights, and summed into **one complex number**.
+
+One number, not a bit. Collect many shots and you get two clouds in the IQ plane, and turning a
+cloud into a bit means putting a threshold between them, and that threshold is a calibration of its
+own. Part 4 does it.
+
+Three consequences to carry forward, because they shape everything above this layer:
+
+- a measurement takes about 2 microseconds, some 50 times longer than a gate;
+- it has an error rate around 1 percent, ten to a hundred times worse than a good gate, and that
+  asymmetry is why error-correction schemes are built the way they are;
+- it is quantum non-demolition in principle, so the qubit is left in the state you just measured
+  rather than destroyed. Part 4's active reset is built on exactly that.
+
+### The rack that produces all of it
+
+Three kinds of box, sharing one clock:
+
+- an **AWG with a sequencer**: envelope memory, a numerically controlled oscillator per output to
+  make the carrier, registers holding frequency, phase, gain and offset, and a small instruction set
+  with loops in it. Typically 1 GSa/s, so instructions land on a 4 ns grid;
+- a **digitizer** on the readout return, with integration weights and usually a threshold comparator
+  on board, so a shot can be classified fast enough to branch on;
+- a **slow DC source** for the flux lines, with more bits and far more filtering than an AWG output,
+  because a flux line's job is to hold still.
+
+Section 1.3 turns that hardware into the operation list, and Part 5 is about what happens when the
+next lab wires the same three jobs onto different boxes.
+
+### Why none of this fits in a circuit
 
 A circuit says `X(q0)`. An instrument needs to know: which output port, at what carrier frequency,
 what envelope shape, how many nanoseconds, at what amplitude, and what else must stay quiet while
@@ -68,14 +172,23 @@ A control stack has to express things a circuit cannot:
 | wait 8 us, then measure again | that is a T1 point |
 | align two buses before the readout | otherwise the pulses drift apart by a clock cycle |
 
-Every one of those is a number somebody measured. Calibration is where the time goes in a lab, and
-calibration lives entirely below the gate.
+Every one of those is a number somebody measured, and the measuring is most of the work. A chip that
+runs a circuit today needed a week of scans to reach the point where the circuit means anything, and
+it will need an hour of them again tomorrow because the numbers move. Qubit frequencies wander with
+flux noise and with whatever two-level defects the amorphous oxide happens to be hosting this week.
+Readout resonators shift when the fridge warms by a millikelvin. A pi amplitude is only a pi
+amplitude until the attenuator chain drifts. Everything above the gate assumes those numbers exist;
+everything that produces them lives below it.
 
-The second problem is portability. Every vendor ships its own sequencer language, so a calibration
-routine written against one rack is welded to that rack. Move the chip to a fridge with a different
-AWG and you rewrite the experiment, not just the config. QProgram's answer is to keep the program as
-data and let the platform decide how to run it. Part 5 is about that decision. Part 1 is about the
-data.
+The second problem is portability. Every vendor ships its own sequencer language, and they are all
+assembly-shaped for good reasons. The thing running them is an FPGA that has to hit a 4 ns clock
+edge without asking anyone's permission. So the loops are register loops, the branches are counted
+in cycles, and the waveform memory is addressed by hand. Correct, fast, and welded to one box. Move
+the chip to a fridge with a different AWG and you rewrite the experiment rather than the config, and
+you spend a month re-earning trust in scans you had already trusted for a year.
+
+QProgram's answer is to keep the program as data and let the platform decide how to run it. Part 5
+is about that decision. Part 1 is about the data.
 """
 
 # %%
@@ -101,9 +214,88 @@ print("pi amplitude:   ", DEVICE["q0_a_pi"], "(DAC units)")
 
 # %% [markdown]
 r"""
+### Reading the datasheet
+
+Those eleven numbers are the whole chip, and they are not independent. Spending five minutes on how
+they hang together is worth it, because every experiment in this tutorial is an attempt to recover
+one of them, and knowing what constrains what is how you tell a bad fit from a surprising result.
+
+**The two frequencies and the gap between them.** The qubit sits at 4.85 GHz and its readout
+resonator at 7.20 GHz, so the detuning is $\Delta = f_{01} - f_r = -2.35$ GHz. That gap is the
+entire design. Put the resonator too close and it eats the qubit's lifetime through the Purcell
+channel; put it too far and it stops learning anything about the qubit's state. Between those, at a
+detuning of a couple of gigahertz, the two systems can no longer exchange energy but they can still
+shift each other, and that residual shift is the whole of dispersive readout.
+
+**The dispersive shift.** $\chi = -1.8$ MHz is how far the resonator moves when the qubit goes from
+$|0\rangle$ to $|1\rangle$, halved. For a transmon,
+
+$$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta + \alpha}$$
+
+with $g$ the qubit-resonator coupling and $\alpha \approx -300$ MHz the anharmonicity. Put the
+numbers in and this chip is claiming $g \approx 190$ MHz, a coupling at the top of what anybody
+builds. Nothing breaks, because the simulated device was specified by the numbers you can measure
+rather than derived from a Hamiltonian, but the arithmetic is worth doing on a real datasheet.
+Parameters that do not close usually mean one of them is wrong.
+
+**Why $\chi$ and $\kappa$ appear together.** The resonator is 1.5 MHz wide and the two qubit states
+pull it apart by $2\chi = 3.6$ MHz, so the ratio $2\chi/\kappa = 2.4$. That ratio is the readout.
+Too small and the two Lorentzians overlap and no amount of averaging separates them; too large and
+the tone you park between them barely enters the cavity at all. The optimum for information per
+photon sits near $2\chi \approx \kappa$, so this chip is a little over-separated, trading signal for
+cleanliness. The same 1.5 MHz also fixes the cavity's fill time at $1/\kappa \approx 106$ ns, and
+that is why the readout pulse below is 2000 ns and not 200.
+
+**The three coherence times.** They obey
+
+$$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
+
+which is the only hard constraint among them. Relaxation contributes half its rate to dephasing and
+pure dephasing $T_\varphi$ adds the rest. With $T_1 = 18$ us the relaxation floor puts $T_2$ at most
+36 us. The measured $T_2^* = 9$ us therefore implies $T_\varphi^* = 12$ us of pure dephasing, and
+the echoed $T_2 = 16$ us implies $T_\varphi = 29$ us. Refocusing removed about 60 percent of the
+dephasing rate, which tells you the noise causing it is slow compared to the sequence. Part 4
+measures all three and checks the inequality out loud.
+
+**The spectroscopy linewidth is not a coherence linewidth.** $T_2^* = 9$ us corresponds to an
+intrinsic line $1/\pi T_2^* = 35$ kHz wide. The 2 MHz in the dict is nearly sixty times that, and
+the difference is not a mistake. Two-tone spectroscopy needs a saturating drive to produce any
+population at all, and a saturating drive broadens the line it is measuring,
+
+$$\Delta f = \frac{1}{\pi T_2}\sqrt{1 + \Omega^2 T_1 T_2}$$
+
+so 2 MHz corresponds to a Rabi rate of roughly 700 kHz. Part 3 drives its survey scans harder still
+and quotes 20 MHz, on purpose, so that a coarse frequency grid cannot step over the peak. Whenever a
+linewidth in this tutorial looks too wide, it is because somebody chose to make it wide.
+"""
+
+# %% [markdown]
+r"""
 ## 1.2 Buses and schemas
 
-A bus is one signal path: a port on an instrument, wired through the fridge to one line on the chip.
+A bus is one signal path, and section 1.1 already walked it: a port on an instrument, through the
+room-temperature attenuator, into the fridge, down through cold attenuators and filters at each
+temperature stage, and out at one line on the chip. Everything QProgram calls a bus is that whole
+chain, named once.
+
+The interesting question is why the *path* is the unit of addressing rather than the qubit, which is
+what a circuit person would reach for. Two facts settle it.
+
+**One qubit owns several lines that have nothing in common.** `q[0].drive` is a pair of DACs feeding
+an IQ mixer at 4.85 GHz. `q[0].flux` is a single filtered wire holding a DC level. Different
+bandwidths, different failure modes, different waveform types, and on the rack in Part 5 they are
+different instruments in different chassis. Calling them both "qubit 0" would hide the only
+distinction that matters.
+
+**One line often serves several qubits.** Readout resonators are deliberately spread across a couple
+of gigahertz so that one feedline and one ADC can carry all of them at once, each on its own
+frequency. Eight qubits, eight resonators, one physical cable. `q[0].readout` and `q[1].readout` are
+two names for two frequencies on one wire.
+
+So `play` names a bus, never a qubit, and `q[0].drive` is a name for a signal path that happens to
+end near qubit 0. The deck draws the mapping from instrument ports through bus names to the chip in
+`slides/img/buses.svg`.
+
 Almost every operation names the bus it acts on (a bare `sync()` is the exception, later in this
 part), and the simplest spelling is a string.
 """
@@ -146,10 +338,19 @@ print("any index:   ", q[7].drive, q[7].drive.channel)
 r"""
 ### Two mistakes the schema catches for free
 
-`channel` and `acquires` are enough to reject the two errors that cost the most time in a lab:
+The two extra fields are not bookkeeping. `channel` records how many DACs feed the line, and
+`acquires` records whether an ADC listens to it, and both of those are facts about copper.
 
-- an IQ bus needs an IQ waveform, and a single-channel bus needs a real-valued one. A `Square` on a
-  drive line is missing half its data.
+A drive line ends at an IQ mixer, which needs two synchronized DACs to place a tone at an arbitrary
+sideband of the local oscillator without also placing a mirror image of it somewhere you did not
+want one. So an IQ bus needs an IQ waveform, and handing it a single-channel `Square` means half the
+data is missing. A flux line is a single DC-coupled wire and takes one channel, no mixer and no
+carrier at all. And an ADC exists on the readout line only, because that is the only line anything
+comes back on.
+
+QProgram turns both facts into build-time errors:
+
+- an IQ bus needs an IQ waveform, and a single-channel bus needs a real-valued one.
 - `measure` needs a bus with an ADC. Asking a drive line for data is not a mistake hardware will
   tell you about politely.
 
@@ -179,16 +380,77 @@ only.
 
 # %% [markdown]
 r"""
-## 1.3 Operations: the first readout pulse
+## 1.3 Operations: what the electronics offer
+
+Here is the complete list of things a sequencer can be told to do. It is short, and the shortness is
+the point.
+
+| What the hardware does | QProgram | Where it lands |
+|---|---|---|
+| write the NCO frequency on an output | `set_frequency` | a register |
+| write or zero the NCO phase | `set_phase`, `reset_phase` | a register, and how a virtual Z is spelled |
+| scale the whole output path | `set_gain` | a register |
+| hold a DC level | `set_offset` | a register, or a slow-control write |
+| emit an envelope out of waveform memory | `play` | one instruction plus an address |
+| idle a channel for N clock cycles | `wait` | a counter |
+| bring channels back to a common time reference | `sync` | a barrier the compiler resolves |
+| emit, integrate the return, optionally threshold it | `measure` | the acquisition path |
+| repeat a block N times | `average`, `sweep` | a loop over a register |
+| take a branch on a classified bit | `if_` / `else_` | a comparison and a jump |
+| change a setting the sequencer does not own | `set_parameter` | the control PC, over the network |
+
+QProgram did not invent that vocabulary. It is roughly the intersection of what commercial
+sequencers offer, given portable names. Which is why the operation list is short, why adding to it
+takes a vendor namespace instead of a patch to the core (Part 6), and why a program written in it
+has any chance of running on a rack you have never seen (Part 5).
+
+Four hardware facts explain most of the constraints you will meet later:
+
+- **Instructions land on a clock grid**, 4 ns on a typical box. Ask for a 3 ns wait and you get 4.
+- **Waveform memory is finite**, tens of thousands of samples. You play from a small library of
+  envelopes rather than streaming samples, and that is why a program refers to pulses and a separate
+  library holds them (Part 3).
+- **Loop counters are integer registers.** A sweep the hardware can generate on its own is one where
+  the next value is the previous plus a constant. Everything else has to be uploaded as a table, and
+  Part 2 is where that distinction starts costing real time.
+- **A branch has to resolve in tens of nanoseconds**, while the qubit is still coherent. That budget
+  is why the conditional in Part 4 compares one classified bit against a constant and nothing wider.
+
+### The first readout pulse
 
 The first measurement on a new chip is the readout resonator, and the smallest program that does
 anything useful is one readout tone plus one acquisition.
 
 Three arguments to `measure`: the bus, the pulse to play, and the integration weights. `measure`
-outputs the pulse itself, so there is no separate `play` on the readout line. The weights are what
-the ADC stream gets multiplied by before it is summed into a single IQ point, so a flat window of
-ones is the honest starting default. `fields=` says which data you want back; `iq` is the default,
-and `state` asks the platform to classify the point into 0 or 1.
+outputs the pulse itself, so there is no separate `play` on the readout line.
+
+Both of those arguments deserve a sentence about what the hardware does with them.
+
+**The pulse.** Two microseconds of flat tone, at a fifth of full scale. Flat because the resonator
+takes about 106 ns to fill and you want it in steady state for as much of the window as possible,
+and long because the signal you are integrating is a handful of microwave photons through an
+amplifier chain whose noise you cannot avoid. Signal-to-noise grows as the square root of the
+integration time, so a 2 us window is four times better than a 500 ns one. The upper limit comes
+from the other side. The qubit relaxes during the measurement, and integrating for a time comparable
+to $T_1$ means the state you report is not the state you had. Two microseconds against an 18 us
+$T_1$ is about a ninth, and a ninth is roughly where labs land.
+
+**The weights.** The ADC hands the platform a stream of samples, and the weights are what that
+stream is multiplied by before it is summed into the single IQ point you get back. A flat window of
+ones is the honest starting default, and this tutorial uses it throughout. It is not the best you
+can do. The optimal weights are the difference between the average trace you get from $|0\rangle$ and
+the one you get from $|1\rangle$, which downweights the beginning of the record while the resonator
+is still filling and the two states have not separated yet. Labs measure that pair of traces once
+and keep the difference as a calibrated array. It travels through the same seam as a calibrated pi
+pulse and lives in the same library.
+
+`fields=` says which data you want back; `iq` is the default, and `state` asks the platform to
+classify the point into 0 or 1.
+
+Both pulses below are `IQPair`s because a readout line is two paths, and spelling both channels out
+is what makes that visible. When the quadrature is silent,
+`IQZero(Square(amplitude=0.2, duration=2000))` names the same pulse in one constructor, and it is
+the one to reach for when a calibrated single-channel envelope has to go down an IQ line.
 """
 
 # %%
@@ -234,13 +496,43 @@ verbs you will need all day.
 
 - `set_frequency(bus, hz)` and `set_gain(bus, g)` touch hardware registers. Gain scales the whole
   output path; the `amplitude` inside a waveform shapes the envelope. Two different knobs.
+- `reset_phase(bus)` zeroes the oscillator phase on a bus and `set_phase(bus, radians)` writes it to
+  a value you choose. Both are register writes like the two above. Resetting the phase before a
+  sequence makes every shot start from the same reference, so the phase the qubit accumulates is the
+  phase you asked for rather than whatever the oscillator had been doing since the last shot.
+  Setting it is how the second pulse of a sequence gets advanced by a chosen angle, which is one of
+  the two ways a Ramsey fringe is produced and the whole of how a virtual Z gate is written.
 - `play(bus, waveform)` outputs one envelope.
 - `wait(bus, ns)` idles one bus.
-- `sync(buses)` makes the listed buses agree on where "now" is. Without it, two buses that have
-  played different amounts of pulse have drifted apart. `sync()` with no argument syncs every bus in
-  the program. Convenient, and as Part 5 shows, occasionally too broad.
+- `sync(buses)` makes the listed buses agree on where "now" is. This is the operation that catches
+  people arriving from circuits, because a circuit has one global clock and a pulse program does
+  not. Every bus keeps its **own** cursor, advanced only by the pulses and waits written to that
+  bus, so two buses that have played different amounts have drifted apart by exactly the difference:
+
+  ```text
+  without a sync
+    q[0].drive     |play pi 40 ns|4|
+    q[0].readout   |measure 2000 ns .....................................|
+                   ^ both buses start from their own cursor, and both are still at 0
+
+  with sync([q[0].drive, q[0].readout])
+    q[0].drive     |play pi 40 ns|4|
+    q[0].readout   .................|measure 2000 ns .....................................|
+                                    ^ the barrier moved the readout cursor to 44 ns
+  ```
+
+  In the first one the acquisition is running while the qubit is still being flipped, so you measure
+  the pulse rather than the state. The barrier fixes it by holding every named bus until the
+  furthest-ahead one has finished. `sync()` with no argument covers every bus in the program, which
+  is convenient here and expensive in Part 5, and `sync([])` raises rather than guess whether you
+  meant nothing or everything. The deck draws both cases in `slides/img/timing.svg`.
 - `with program.block():` groups statements and changes nothing about what they mean. There is no
   loop here yet. Part 2 replaces this grouping with a real sweep.
+
+The 4 ns wait between the drive and the readout is not superstition. A mixer does not stop the
+instant its envelope reaches zero, and a readout tone that starts while the drive is still ringing
+down measures the ringdown along with the qubit. Four nanoseconds is one clock cycle on a typical
+sequencer, the smallest gap you can ask for and enough on most racks.
 """
 
 # %%
@@ -254,6 +546,7 @@ drive_program = qp.QProgram(
 with drive_program.block():  # the preparation, as one group
     drive_program.set_frequency(q[0].drive, DEVICE["q0_f01"])
     drive_program.set_gain(q[0].drive, 1.0)
+    drive_program.reset_phase(q[0].drive)  # every shot starts from the same phase reference
     drive_program.play(q[0].drive, pi_pulse)
     drive_program.wait(q[0].drive, 4)  # ns of dead time before the readout
 drive_program.sync([q[0].drive, q[0].readout])
@@ -270,6 +563,29 @@ built, compared, and plotted with no program around it.
 
 Two methods carry the whole contract: `envelope(resolution=1)` returns the samples as a numpy array,
 and `get_duration()` returns nanoseconds. That is enough to draw the gallery.
+
+The gallery is not a feature tour. Each of these shapes exists because a specific thing goes wrong
+without it:
+
+- **`Square`** is the readout tone, and it is square because you want the resonator in steady state
+  and the integration window at constant amplitude.
+- **`Gaussian`** is the drive envelope, and it is not square because a square edge is broadband. A
+  transmon has a $|1\rangle \to |2\rangle$ transition sitting 200 to 300 MHz below the one you are
+  aiming at, and a sharp edge puts power there. It is also the shape your AWG can actually produce.
+  Ask a 1 GS/s converter for a step and you get its own ringing, not yours.
+- **`FlatTop`** is a Gaussian rise, a flat hold, and a Gaussian fall. Reach for it when the length
+  of the interaction is the parameter you want to sweep and the edges have to stay bounded. Flux
+  pulses for two-qubit gates are the usual customer.
+- **`Arbitrary`** takes samples you brought yourself. Two sources dominate, numerical optimal
+  control and predistortion. A flux line through a fridge is a filter with several time constants in
+  it, so the step you asked for arrives at the chip with a tail on it. Labs measure that response
+  once and then send the inverse. It arrives as a sample array and nothing prettier.
+- **`Ramp`** is a linear excursion, the shape a bias line takes when it moves between two DC values.
+- **`SuddenNetZero`** is the two-qubit flux pulse whose positive and negative halves cancel. The
+  cancellation is the point. Those same long time constants mean a pulse with net area leaves a
+  residual bias behind it, so the second gate in a circuit sees a chip the first gate detuned. Zero
+  net area, no accumulation. The `b` parameter is detuned slightly from 1 to null whatever the line
+  adds on top.
 """
 
 # %%
@@ -277,11 +593,12 @@ gallery = [
     Square(amplitude=0.2, duration=2000),  # the readout tone
     Gaussian(amplitude=0.5, duration=40, sigma=8),  # a short drive envelope
     FlatTop(amplitude=0.5, duration=200, smooth_duration=20),  # rise, hold, fall
+    Arbitrary(0.4 * np.hanning(120)),  # samples you brought yourself, from optimal control or a fit
     Ramp(from_amplitude=0.0, to_amplitude=0.4, duration=200),  # a flux excursion
     SuddenNetZero(amplitude=0.4, duration=100, b=0.4, t_phi=20),  # a two-qubit gate pulse
 ]
 
-fig, axes = plt.subplots(1, len(gallery), figsize=(15, 2.4))
+fig, axes = plt.subplots(1, len(gallery), figsize=(17, 2.4))
 for ax, waveform in zip(axes, gallery, strict=True):
     samples = waveform.envelope()  # one sample per ns at the default resolution
     ax.plot(np.arange(len(samples)), samples)
@@ -297,14 +614,41 @@ an envelope and only that. The line you send it down decides what it means, and 
 where these two belong. `BusSchema.transmon()` has no flux bus at all. Part 3 reaches for
 `BusSchema.flux_tunable_transmon()` when it starts tuning the qubit with flux.
 
-### IQ waveforms
+### IQ waveforms, and what DRAG is actually for
 
 A drive line is a pair of paths, I and Q, fed through an IQ mixer. An `IQWaveform` carries both, and
 `get_I()` / `get_Q()` hand back the two halves as ordinary single-channel waveforms.
 
 `IQDrag` is the standard drive shape: a Gaussian on I, plus its scaled derivative on Q. The
-derivative term (`beta`) pushes leakage to the second excited state back down, which is why almost
-every real pi pulse is a DRAG pulse and not a plain Gaussian.
+one-clause version of why is that the derivative term suppresses leakage to the second excited
+state. The clause is true and it explains nothing, so here is the mechanism.
+
+A transmon is an anharmonic oscillator, and the emphasis belongs on *oscillator*. Its levels are not
+a two-state system that happens to have neighbours; they are a ladder whose rungs are almost evenly
+spaced. The $|1\rangle \to |2\rangle$ transition sits only $|\alpha| \approx 300$ MHz below
+$|0\rangle \to |1\rangle$, and its matrix element is $\sqrt{2}$ larger. Drive the lower transition
+resonantly at Rabi rate $\Omega$ and the upper one is driven too, off resonance by $\alpha$, which
+populates $|2\rangle$ during the pulse at order $(\Omega/\alpha)^2$. Most of that population comes
+back at the end. Not all of it, and what stays behind is leakage out of the computational subspace,
+which no amount of later correction recovers.
+
+The scale is worth carrying around. A 40 ns pulse with `sigma=10` has a Gaussian area of roughly
+$\sigma\sqrt{2\pi} = 25$ ns, so a pi rotation needs a peak Rabi rate near $\pi/25\,\mathrm{ns}$, or
+20 MHz. Against a 300 MHz anharmonicity that puts $(\Omega/\alpha)^2$ at about $4\times10^{-3}$.
+Shorten the same pulse to 10 ns and the peak rate goes to 80 MHz and the ratio to 7 percent, which
+is the difference between a gate you tune and a gate that does not work. Fast gates are why DRAG
+exists.
+
+The correction itself is one term. Adding a quadrature component proportional to the derivative of
+the envelope, $Q(t) = \beta\,\dot{I}(t)$, cancels the leading-order transfer to $|2\rangle$ and the
+phase error it leaves on $|1\rangle$. The first-order value of $\beta$ is $1/|\alpha|$ expressed in
+the derivative's own units, around half a nanosecond for a 300 MHz anharmonicity. In practice
+nobody uses the first-order value. It gets calibrated per qubit by a dedicated experiment,
+because the leading order is only the leading order.
+
+Nothing in this tutorial measures `beta`, and the reference simulator has no third level to leak
+into, so the 0.15 in the cells above is a placeholder with the right shape and no provenance. Treat
+it the way you would treat any uncalibrated number in someone else's script.
 
 Note the two y-axes in the plot. The Q channel is a derivative, so it is antisymmetric and carries a
 factor of $1/\sigma$: with `beta=0.15` and `sigma=10` its peak is about a hundred times smaller than
@@ -332,6 +676,19 @@ print("peak I:", round(float(i_samples.max()), 4), "| peak |Q|:", round(float(np
 
 # %% [markdown]
 r"""
+There is a shorter route when the only goal is to look. `waveform.plot()` draws the envelope on a
+fresh figure and returns the axis, or draws onto axes you supply, `ax=` for a single-channel
+waveform and `axes=` for the I and Q pair of an `IQWaveform`. A waveform left on its own as the last
+line of a notebook cell renders the same picture through the IPython display protocol, with no
+plotting code at all. The gallery above went the long way because `envelope()` is the method your
+own analysis will call.
+"""
+
+# %%
+pi_pulse
+
+# %% [markdown]
+r"""
 ### Structural equality
 
 Waveforms compare and hash by structure, not by identity. Two `Gaussian(0.5, 40, 8)` objects built
@@ -353,9 +710,15 @@ Look again at the `.qp` text of `drive_program`. The amplitude 0.62 is welded in
 came from a Rabi fit and it will change next Tuesday, which means the program text changes every
 time the calibration changes. Every diff is noise.
 
+There is a worse version of the same problem, and it is the one that actually costs people data. A
+script with a literal amplitude in it is a script that claims a calibration. Run it six months later
+against a chip that has been thermal-cycled twice and it will run perfectly and produce numbers that
+mean nothing, because 0.62 stopped being a pi pulse in March and nothing in the file knows that.
+
 `play` and `measure` also accept a **string alias** instead of a waveform. The program then says
 *which* pulse it wants, and the numbers arrive later from `with_waveforms`. The sequence is the part
-you keep under version control; the amplitudes are the part that drifts.
+you keep under version control; the amplitudes are the part that drifts. A program with an unbound
+alias in it cannot silently claim a stale calibration, because it does not carry one.
 
 Part 3 fits a real pi pulse and binds it this way, and Part 5 replaces the plain dict below with a
 `WaveformLibrary` that resolves a name differently per bus.
@@ -396,10 +759,12 @@ r"""
 then everything inside it, at any depth. One uniform API covers blocks and operations, so you never
 write the recursion yourself.
 
-That is the whole reason to keep a program as data. You can compute things about a sequence before
-anything runs. The cell below reads how many nanoseconds this program books on the drive line,
-straight off the AST. A compiler does a great deal more of this, and so will your own analysis
-scripts.
+Keeping a program as data means you can compute things about a sequence before anything runs. The
+cell below reads how many nanoseconds this program books on the drive line, straight off the AST.
+That is a toy version of a real question. Fridge time is the scarce resource in any lab, and the
+duration of a sweep is the product of its point count, its shot count, and the length of one shot,
+all three of which are sitting in the tree before you press go. A scan you can price is a scan you
+can decide not to run.
 
 To be clear about where that number comes from, you computed it. The reference simulator has no
 timing model at all, so no run will report it back to you. What the AST gives you is the chance to
@@ -439,8 +804,14 @@ back; `qp.save` and `qp.load` are the same pair against a file.
 
 The format is deliberately boring: one statement per line, indentation for nesting, quoting as the
 type distinction (a quoted `"readout_q0"` is a plain string, a bare `q[0].readout` is a bus path).
-Nothing is truncated, so a program with 4000 arbitrary samples in it writes 4000 samples. Nothing is
-implied, so a file that loads has everything the program had.
+Nothing is truncated, so a program holding an `Arbitrary` of 4000 samples writes 4000 samples.
+Nothing is implied, so a file that loads has everything the program had.
+
+Both of those choices cost something. Writing every sample means a predistorted flux pulse turns
+into a large file, and there is no compression and no reference to an external array. The trade is
+that a `.qp` file has no dependencies. It does not need the numpy version that wrote it, or a
+sidecar, or a database. Six months from now it either parses or it does not, and there is no third
+outcome where it parses into something subtly different.
 
 The round-trip is exact, and structural equality is how you check it.
 """
@@ -469,9 +840,9 @@ Why a lab should care about a text format, in three lines:
   you exactly which ones. You will do this in Exercise 1.2.
 - **Review.** A pulse sequence that a colleague can read in a pull request is a sequence that gets
   checked before it costs fridge time.
-- **Reproduction.** The file is the experiment. Six months from now the `.qp` next to your data still
-  loads, still carries the measurement names you indexed the results by, and does not depend on the
-  notebook that happened to build it.
+- **Reproduction.** The file is the experiment. Six months from now the `.qp` next to your data
+  still loads, still carries the measurement names you indexed the results by, and does not depend
+  on the notebook that happened to build it.
 """
 
 # %% [markdown]
@@ -579,7 +950,8 @@ r"""
 - A **bus** is one signal path. Strings work; a `BusSchema` gives you `BusRef`s that are still
   strings but carry `channel` and `acquires`. Those two fields reject a single-channel waveform on
   an IQ line and a `measure` on a bus with no ADC, at the line that made the mistake.
-- **Operations** are the verbs: `play`, `measure`, `wait`, `sync`, `set_frequency`, `set_gain`. You
+- **Operations** are the verbs: `play`, `measure`, `wait`, `sync`, `set_frequency`, `set_gain`,
+  `reset_phase`. You
   built a readout tone with an acquisition, and a pi pulse followed by a readout.
 - **Waveforms are data.** `envelope()` plots them, structural equality compares them, and a string
   alias leaves the number to be filled in later. That alias is the seam between a stable sequence
@@ -588,6 +960,10 @@ r"""
   budget off the AST before anything ran, the same move a compiler makes.
 - **`.qp` is the artifact.** `loads(dumps(p)).body == p.body`, so the file is the experiment, and a
   diff of two files is a diff of two calibrations.
+- And the chip itself has a shape worth remembering. A 2.35 GHz detuning between qubit and
+  resonator, a 1.5 MHz cavity pulled 3.6 MHz apart by the qubit's state, 18 us of $T_1$ against 9 us
+  of $T_2^*$, and a spectroscopy line whose width is set by how hard you drive it. Every scan from
+  here on measures one of those.
 
 Carry this forward: nothing you wrote in Part 1 said which loop runs on the sequencer and which runs
 on the control computer, because there were no loops. Part 2 adds them, together with averaging and

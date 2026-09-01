@@ -5,34 +5,49 @@ r"""
 The flux sweep from Part 3 works. It found the sweet spot, and the numbers agreed with the device.
 Now someone in the lab next door wants to run it on their rack, and their rack is not your rack.
 
-This part is about the seam between a program and a machine:
+Here is the asymmetry this part is about. A Ramsey experiment is a Ramsey experiment in every lab on
+earth. The physics moved between institutions decades ago and moves freely today. You read a paper,
+you reproduce the measurement, and nobody has to ship you a machine. The *code* that runs it has
+never moved at all. It is written against one vendor's sequencer, in one vendor's dialect, with the
+hardware-loop and software-loop split hard-coded on line one, and porting it means rewriting an
+experiment that was already correct and then spending a month re-earning the trust you had in it.
+
+Closing that gap needs two things. The program has to stop encoding decisions that belong to the
+machine, and the machine has to be able to state what it can do in a form a program can be checked
+against. This part is both halves:
 
 - **5.1** What has to be checked before a program reaches an instrument.
 - **5.2** Capability tokens, limits, and predicates: how a platform states what it can do.
 - **5.3** Build a platform descriptor by hand and validate the flux sweep against it.
 - **5.4** `qp.optimize`, and the one broadcast operation that quietly blocks the rewrite.
 - **5.5** Diagnostics as a contract: a missing operation, a limit, and a data-flow rule.
-- **5.6** Porting: `rebind` for bus names, `WaveformLibrary` for the numbers.
+- **5.6** The same rack again, built from two published vendor profiles instead of by hand.
+- **5.7** Porting: `rebind` for bus names, `WaveformLibrary` for the numbers.
 """
 
 # %%
 # Run me first. A no-op when qprogram is already installed, an install when it is not
 # (a fresh Google Colab runtime, for example).
-try:
-    import qprogram  # noqa: F401
-except ImportError:
+# Section 5.6 needs the two vendor extension packages as well. Importing either one registers a
+# namespace, so probe for the distribution instead and leave the import to the cell that explains it.
+from importlib.util import find_spec
+
+if find_spec("qprogram") is None or find_spec("qprogram_qdac") is None:
     import subprocess
     import sys
 
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "qprogram[viz]==0.1.0", "scipy"],
+        [
+            sys.executable, "-m", "pip", "install",
+            "qprogram[viz]==0.1.0", "qprogram-qblox==0.1.0", "qprogram-qdac==0.1.0", "scipy",
+        ],
         check=True,
     )
-    import qprogram  # noqa: F401
 
 from importlib.metadata import version
 
 print("qprogram", version("qprogram"))
+print("qprogram-qblox", version("qprogram-qblox"), "· qprogram-qdac", version("qprogram-qdac"))
 
 # %% [markdown]
 r"""
@@ -49,10 +64,19 @@ Take two racks that both call themselves "a transmon control setup":
 | bus names | `q0/drive` | `drive_q0` |
 | pulse shapes | your calibration | their calibration |
 
-The flux line is the interesting difference. On rack B it is an instrument with no sequencer at
-all. You write a voltage over the network and wait for it to settle. A loop that steps that
-voltage cannot be a sequencer loop. It has to be driven from the lab server, one point at a time,
-with the fast part of the experiment nested inside it.
+The flux line is the interesting difference, and it is not a matter of taste. Part 4 established
+that $1/f$ flux noise is the main thing dephasing this qubit, and Part 3 established that the
+qubit's frequency tracks the flux bias directly. Put those together and a flux line is the one path
+into the chip where broadband noise turns straight into decoherence. An AWG output is broadband by
+construction; it has to be, or it could not make a 40 ns pulse. A purpose-built DC source has twenty
+bits, a quiet reference, and a heavily filtered output, so it is the right instrument for a line
+whose job is to hold still.
+
+The consequence is the whole of this part. Those filters have time constants in the milliseconds,
+and the instrument reaching them is on Ethernet with no FPGA behind it. A loop that steps that
+voltage cannot be a sequencer loop, and it cannot be made into one, because the same filtering that
+keeps the line quiet also keeps it slow. It has to be driven from the lab server, one point at a
+time, with the fast part of the experiment nested inside it.
 
 Notice what you did *not* write in Part 3. You never said which loop was a hardware loop and which
 was a software loop, because that is not a property of your experiment. It is a property of the
@@ -148,13 +172,16 @@ the arc, the whole physical content of the experiment. This one uses the natural
 than the broadened survey line. The bias steps are 2 mV, and near the sweet spot that puts nine
 points across the peak.
 
-The line shape in bias is worth a second. Near the sweet spot the arc is flat, so the detuning
-grows as the *square* of the bias offset, and a Lorentzian in detuning becomes a quartic in bias:
+The line shape in bias is worth a second, because it is the sweet spot showing up in the data rather
+than in an argument. Near the top of the arc the frequency is flat against bias, so the detuning
+grows as the *square* of the bias offset instead of linearly, and a Lorentzian in detuning becomes a
+quartic in bias:
 
 $$p(V) = \mathrm{floor} + \frac{A}{1 + \left(\frac{V - V_0}{w}\right)^4}$$
 
-That flat top is the reason you park a qubit at its sweet spot. First-order flux noise does
-nothing there. It is also what makes $V_0$ easy to fit.
+A quartic has flatter shoulders and steeper flanks than a Lorentzian, and the flat top is the reason
+you park a qubit here. First-order flux noise does nothing at $V_0$. It is also what makes $V_0$
+easy to fit, because the steep flanks on either side both constrain the centre.
 """
 
 # %%
@@ -178,7 +205,7 @@ def fit_sweet_spot(result, handle):
     return bias_v, pop.values, fit
 
 
-model = qp.MockMeasurementModel(p_excited=p_flux, noise=0.02, seed=11)
+model = qp.MockMeasurementModel(p_excited=p_flux, seed=11)
 result = qp.simulate(program, model=model)
 bias_v, pop, fit = fit_sweet_spot(result, m0)
 
@@ -201,14 +228,28 @@ plt.show()
 r"""
 ## 5.2 What a platform has to agree to
 
-A platform declares its surface as three separate things, and the split matters because they fail
-in three different ways.
+A platform declares its surface as three separate things, and the split is not bureaucracy. Each
+axis is the cheapest mechanism that can express its class of constraint, and collapsing them would
+cost something real.
 
 | Axis | What it holds | Example |
 |---|---|---|
 | Capabilities | flat dotted **tokens**, flags | `op.play`, `waveform.iq_drag`, `sweep.linear` |
 | Limits | numeric thresholds | `max_loop_nesting: 4`, `min_wait_duration_ns: 8` |
 | Predicates | callables that walk the AST | "no arbitrary sweep at `Wait.duration`" |
+
+A **token** is set membership. Checking one is a hash lookup, a set of them serializes into a
+profile a vendor can publish and a user can read, and two racks can be compared by subtracting one
+set from the other. All of which is worth a great deal, and none of which works for a question whose
+answer depends on anything else in the program.
+
+A **limit** is a number, so it needs a comparison rather than a lookup, and it can be tightened for
+one device without republishing the profile it came from.
+
+A **predicate** is code, and code is the only thing that can answer a question about how two nodes
+interact. Section 5.5 has the canonical example. You could express all three as predicates and the
+protocol would still work, and you would have lost the ability to publish a machine-readable
+description of a rack, giving up most of the point.
 
 Every node in the tree declares the tokens it needs through `required_capabilities()`. The set is
 **instance-aware**: it depends on the node's data, not just its class. A `play` of a `Square` asks
@@ -250,7 +291,8 @@ A `PlatformCapabilities` has three parts:
 Each of those is a `BusCapabilities`, which splits into two halves: `rt` for what the hardware
 sequencer can do in real time, and `host` for what the lab server can do one iteration at a time.
 Either half may be `None`, and that is how rack B says what it is. The flux slot has **no `rt`
-half at all**.
+half at all**, and that single missing field carries the entire story from 5.1 about filtered lines
+and slow instruments.
 
 Real vendor code builds these from registered profiles (`CompilerCapabilities.from_profile(...)`).
 Here we build them by hand from the live token registry, because seeing the set subtraction is the
@@ -271,7 +313,8 @@ def profile(name, tokens, limits=None, predicates=()):
     )
 
 
-param_ops = {"op.set_parameter", "op.get_parameter"}  # instrument settings, not sequencer opcodes
+# Instrument settings, not sequencer opcodes. Part 2 wrote one with set_parameter.
+param_ops = {"op.set_parameter", "op.get_parameter"}
 fast = qp.BusCapabilities(rt=profile("fast-awg", everything - param_ops),
                           host=profile("fast-awg", everything))
 slow = qp.BusCapabilities(rt=None, host=profile("slow-dac", everything))  # no sequencer at all
@@ -293,8 +336,10 @@ r"""
 ### Validate
 
 `qp.validate(program, caps)` returns a list of diagnostics and an execution plan. It never raises.
-That separation is deliberate. Validation reports, and the caller decides. A platform's `execute()`
-is the thing that turns an error into an exception.
+That separation is deliberate. Validation reports, and the caller decides. An editor plugin wants
+every diagnostic it can get and no exceptions; a CI job wants a non-zero exit; an interactive
+notebook wants to keep going and show you the plan. A platform's `execute()` is the one thing that
+turns an error into an exception.
 
 The plan maps each operation and each block to the set of domains it may run in. The root `body` is
 not an entry, because there is nowhere else for it to run. Operations come first, then the loops
@@ -317,12 +362,16 @@ r"""
 ### The plan, drawn
 
 `qp.explain` renders the same plan as a tree: each node as its `.qp` line, the domain column on the
-right, and the diagnostics annotated inline (`!!` error, `~` warning, `i` info).
+right (`[rt|host]`, `[rt]`, `[host]`, or `[--]` for a node with no executable domain at all), and the
+diagnostics annotated inline (`!!` error, `~` warning, `i` info).
 
-The `forced-host` warning is a *warning*, not an error. The program will run. It will run with the
-averaging loop on the host, which means 200 network round trips per bias point instead of 200
-sequencer iterations. On real hardware that is the difference between a coffee break and a lunch
-break, and the validator says so out loud.
+The `forced-host` warning is a *warning*, not an error, and the difference is worth the arithmetic.
+The program will run. It will run with the averaging loop on the host, which means 200 network round
+trips per bias point rather than 200 sequencer iterations. At a millisecond per round trip that is
+20200 milliseconds, so twenty seconds where the sequencer would have taken a fraction of one, and
+the whole thing scales with your shot count. On a real rack that is the difference between a coffee
+break and a lunch break, and the validator says so out loud rather than letting you find out from
+the clock.
 """
 
 # %%
@@ -344,9 +393,17 @@ average 200:                          for bias in Linspace(...):     # host, one
     measure q[0].readout ...              measure q[0].readout ...
 ```
 
+The arithmetic changes completely. Before the rewrite, every one of the 20200 executions is a host
+round trip. After it, the host does 101 DAC writes and the sequencer does 20200 iterations on its
+own. Same experiment, same data, two orders of magnitude in wall clock.
+
 `qp.optimize(program, caps)` applies it. It is opt-in, and the reason is honest. The rewrite is not
 unconditionally equivalent. It groups all 200 shots of one bias point together instead of
-interleaving passes over the sweep, identical for a stationary system and different under drift.
+interleaving passes over the sweep, identical for a stationary system and different under drift. If
+your chip wanders over ten minutes, the interleaved version spreads that drift evenly across the
+whole sweep and the reordered one concentrates it into a slope along the bias axis. Most of the time
+you want the speed. Occasionally you want the interleaving, and then you do not call `optimize`.
+
 The hoisted `set_offset` also runs once per bias point instead of once per shot. For a DC bias that
 is the whole point, and it would be wrong for an operation with side effects, so the rewrite
 only ever hoists a leading run of host-side-only operations and refuses to move one past an
@@ -371,8 +428,26 @@ operation from `program.sync([q[0].drive, q[0].readout])`, even though both ask 
 the program, and the flux bus has no real-time half. The bare `sync` therefore lands on the host,
 in the middle of a run of real-time operations, and the rewrite refuses to hoist across it.
 
-The same thing that made the plan correct made the rewrite impossible. Naming the two buses you
-actually want aligned costs you nothing and keeps the averaging in hardware.
+One habit, `sync()` instead of `sync([...])`, costs a factor of a hundred in run time and produces
+no error message anywhere. The same thing that made the plan correct made the rewrite impossible.
+Naming the two buses you actually want aligned costs you nothing.
+
+Leaving the flux bus out of the `sync` list is not the same as leaving it unaligned. The broadcast
+`sync` does not vanish. The plan above puts it on the host, and that placement is exactly why it
+blocks the rewrite. What no `sync` can do is hold a bus with no sequencer to a sequencer's clock.
+Instruments in that position line up through a hardware trigger line instead. The slow box arms a
+chassis trigger output at a chosen point in its own sequence, the fast box waits on that line, and
+the alignment happens in copper rather than in the AST. A real slow-DAC extension ships an arm and a
+wait on a trigger port alongside its DC write for exactly this reason. The mechanism sits outside
+what the language expresses, and it is the reason `sync` can afford to be about sequencer buses
+only.
+
+The pattern the rewrite matches is narrow, and it is worth knowing its shape rather than calling
+`optimize` hopefully. The averaging block's only child has to be one flat sweep whose body holds no
+nested block. Add a second sweep inside the first and the average is still forced host-side, but the
+`reorderable-averaging` hint is gone and `optimize` returns the program it was given. The hint and
+the rewrite are computed from the same predicate, so they cannot disagree. No hint means no rewrite,
+and reading the diagnostics is how you find out that calling `optimize` did nothing.
 """
 
 # %%
@@ -406,6 +481,11 @@ Three racks, three ways to say no. All three come back through the same channel:
 `Diagnostic` objects with a `severity`, a machine-readable `code`, a `message`, the offending
 `node`, and a structural `path` you can resolve back to a line of `.qp` text.
 
+The machine-readable half matters more than it sounds. A message is for a person reading a terminal.
+A `code` is for a script deciding whether this failure is one your CI should fail on, and a `path`
+is for an editor putting a squiggle under the right line. Part 6 runs the same diagnostics from a
+shell and gets JSON.
+
 First case: the rack does not implement the operation. Rack C has a plain DC source on the flux
 line, one that takes a voltage over a serial link and has no offset register at all. Drop
 `op.set_offset` from its token set and the program stops being runnable, at one exact node.
@@ -426,17 +506,62 @@ for diag in qp.validate(program, caps_dc)[0]:
     print("  capability:", diag.capability)
     print("  path:      ", diag.path, "->", qp.format_path(diag.path))
 
+# %%
+print(qp.explain(program, caps_dc))
+
+# %% [markdown]
+r"""
+Read that tree from the leaves up. The `set_offset` row is `[--]`, no executable domain at all, and
+it carries the diagnostic that says why. The sweep above it is also `[--]` and carries nothing of its
+own, because an operation that can run nowhere empties the loop holding it. Looking on the loop's own
+line for a reason will not find one. The `average` at the top still reads `[rt|host]`, and the
+difference from 5.3 is instructive. There the sweep was host-side rather than empty, and a host-side
+loop does pull its enclosing block host-side, which the `forced-host` warning reported. An empty child
+does not propagate that way, so the `average` keeps the domain its own operations allow.
+
+### From a path to a line of the file
+
+The round trip is not decoration. `program.source_map` on a program you built in Python is empty,
+because there is no file for a node to have come from. The parser records which line produced which
+node, so the map arrives populated only on a program that came through `qp.loads`. A program already
+on disk needs none of this, since loading it fills the map and every diagnostic reports against a
+line directly. `expand()` returns a copy with an empty map for the same reason, because inlining a
+call produces nodes no line of the file ever held. `qp.resolve_path` and `qp.node_path` walk between
+a path and its node in either direction, with no file involved.
+"""
+
+# %%
+print("built in Python, source_map entries:", len(program.source_map))
+
+text = qp.dumps(program)
+reloaded = qp.loads(text)
+for diag in qp.validate(program, caps_dc)[0]:
+    if diag.path is None:
+        continue
+    line = reloaded.source_map[diag.path]
+    print(f"{qp.format_path(diag.path)} -> line {line}: {text.splitlines()[line - 1].strip()}")
+
 # %% [markdown]
 r"""
 ### A numeric limit
 
-Second case: the program is expressible but too big. Sequencers have a finite number of loop
-registers, and `max_loop_nesting` is the limit that catches it. Below is the Part 3 flux arc on a
+Second case: the program is expressible but too big. A sequencer runs its loops out of a fixed
+number of hardware registers, and there is no spilling to memory when you run out, so
+`max_loop_nesting` is a hard wall rather than a performance cliff. Below is the Part 3 flux arc on a
 smaller grid, three repetition levels deep (average, bias, frequency), against a rack whose
 sequencer has two.
 
 The `limit` field carries the pair `(name, observed)`, so a tool can report the number without
 parsing the message.
+
+The validator reads four limit keys and passes over every other one. `max_loop_nesting`,
+`max_parallel_loops`, and `max_measurements` come off the platform slot, and `min_wait_duration_ns`
+off the bus a node routes to. A profile is free to publish a number outside that set, and
+`qdac-default-v1` does exactly that with a `min_dwell_ns` waveform floor no core check reads.
+Enforcing such a floor is the platform's job, through
+`CompilerCapabilities.from_profile(name, extra_predicates=...)`. The same call takes
+`limit_overrides=`, which tightens a published limit for one device without republishing the
+profile.
 """
 
 # %%
@@ -473,16 +598,21 @@ but on many backends the wait instruction takes a fixed-step counter. A delay sw
 register increment. The same delay swept by `Values([0, 200, 800, 3200])` is an arbitrary list,
 and there is nowhere to put it.
 
-No flat token can express that. The answer depends on the *binding loop*, which is a different
-node in the tree. This is what predicates are for. A predicate is a callable that receives each
-node and a `ValidationContext` carrying the cross-node facts:
+No flat token can express that. `op.wait` is either supported or not, and it is supported in both
+cases. The answer depends on the *binding loop*, which is a different node in the tree, several
+levels up, and possibly not even written yet when the `wait` was appended. This is what predicates
+are for. A predicate is a callable that receives each node and a `ValidationContext` carrying the
+cross-node facts, eight queries in all:
 
 | Query | Returns |
 |---|---|
 | `ctx.sweep_kind_of(var)` | `"linear"`, `"arbitrary"`, or `None` when the variable is not loop-bound |
 | `ctx.binding_loop_of(var)` | the block that binds the variable |
 | `ctx.max_loop_nesting` | deepest repetition depth in the program |
+| `ctx.max_parallel_arity` | widest lockstep composition in the program |
 | `ctx.measurement_count` | number of measurement operations |
+| `ctx.measurement_fields(name)` | the fields one measurement asked for, or `None` |
+| `ctx.known_measurement_names()` | every measurement name in the program |
 | `ctx.program_buses` | every bus the program touches |
 
 Yield a `Diagnostic` for a hard no. Yield a `DomainConstraint` instead when the answer is "not in
@@ -493,12 +623,11 @@ the flux slot simply had no real-time half to begin with.
 
 # %%
 from qprogram.operations import Wait
-from qprogram.variable import Variable
 
 
 def reject_arbitrary_wait(node, ctx):
     """Rack D's wait instruction takes a fixed-step counter, so arbitrary delay lists are out."""
-    if not isinstance(node, Wait) or not isinstance(node.duration, Variable):
+    if not isinstance(node, Wait) or not isinstance(node.duration, qp.Variable):
         return
     if ctx.sweep_kind_of(node.duration) == "arbitrary":
         yield qp.Diagnostic(
@@ -545,15 +674,24 @@ for source in (qp.Range(0, 20_000, 500), qp.Values([0, 200, 800, 3200, 12_800]))
 
 # %% [markdown]
 r"""
+Notice which of those two is the natural thing to write. A $T_1$ scan wants log-spaced delays,
+because the interesting part of an exponential is the first time constant and a linear grid spends
+most of its points in the tail. Every experimentalist reaches for `Values` or `Logspace` here, and
+on rack D every one of them gets an error at build time rather than a mystery at 3 a.m.
+
 ### 🧩 Exercise 5.1: your own rule
 
 Rack B's flux line goes through a bias tee that saturates at 0.25 V. A sweep that asks for more
 than that will not blow anything up, it will silently clip, and that is worse. You get a flux arc
-with a flat section and no warning.
+with a flat section and no warning, and the flat section looks exactly like a sweet spot.
 
 Write a predicate that catches it. Filter for `SetOffset` nodes, find the sweep that binds the
 offset value with `ctx.binding_loop_of`, read the sweep's own numbers off `loop.source.values()`,
 and yield an error when the largest magnitude exceeds `SAFE_VOLTS`.
+
+This is the shape of most rules a lab actually cares about. Not "does this rack support sweeps" but
+"does this particular sweep, on this particular line, stay inside the range where the hardware is
+linear". Nothing in the core could know that number. Your rack knows it, and now it can say so.
 
 The two programs below differ only in the range they sweep. The first must pass and the second
 must fire.
@@ -570,7 +708,7 @@ def flux_within_range(node, ctx):
     if not isinstance(node, SetOffset):
         return
     value = node.offset_path0
-    if isinstance(value, Variable):
+    if isinstance(value, qp.Variable):
         loop = ctx.binding_loop_of(value)
         reach = max(abs(v) for v in loop.source.values()) if loop is not None else 0.0
     else:
@@ -620,19 +758,204 @@ for low, high in ((-0.05, 0.15), (-0.40, 0.40)):
 # 5) Put it on the flux slot's host half with profile(..., predicates=(flux_within_range,)),
 #    build a PlatformCapabilities around it, and validate two scans: -0.05 to 0.15 V (passes)
 #    and -0.40 to 0.40 V (fires). Print the diagnostics for both.
+# %% [markdown]
+r"""
+## 5.6 The rack that already exists
+
+Rack B was invented for this notebook. The instrument on its flux line was not. A QDevil QDAC is a
+multi-channel DC source with no FPGA on it, and it sits on the flux lines of a great many
+dilution-fridge racks. Two published packages describe the two halves of rack B, and both install
+from PyPI with no dependency beyond QProgram itself.
+
+`qprogram-qdac` adds a `qdac` vendor namespace and registers `qdac-default-v1`, the bus profile for
+one QDAC channel. `qprogram-qblox` does the same for a Qblox cluster, with `qblox-default-v1`
+describing one sequencer. Importing either package runs its registration side effects, and after
+that `CompilerCapabilities.from_profile` resolves the profile by name. Neither package talks to an
+instrument. Both are description and vocabulary, so both run on a laptop next to everything else in
+this notebook.
+"""
+
+# %%
+import qprogram_qblox  # noqa: F401  registers the qblox namespace and qblox-default-v1
+import qprogram_qdac  # noqa: F401  registers the qdac namespace and qdac-default-v1
+
+qblox_seq = qp.CompilerCapabilities.from_profile("qblox-default-v1")
+qdac_chan = qp.CompilerCapabilities.from_profile("qdac-default-v1")
+core = qp.CompilerCapabilities.from_profile("qprogram-base-v1")
+
+print("qblox-default-v1", len(qblox_seq.capabilities), "tokens, limits", qblox_seq.limits)
+print("qdac-default-v1 ", len(qdac_chan.capabilities), "tokens, limits", qdac_chan.limits)
+print("declared vendor versions:", qblox_seq.vendor_versions, qdac_chan.vendor_versions)
+print()
+print("op.set_offset on a qblox sequencer:", qblox_seq.supports("op.set_offset"))
+print("op.set_offset on a qdac channel:  ", qdac_chan.supports("op.set_offset"))
+print("waveform.iq on a qdac channel:    ", qdac_chan.supports("waveform.iq"))
 
 # %% [markdown]
 r"""
-## 5.6 Porting: names, then numbers
+Two of those answers are worth a second look. `qblox-default-v1` claims `op.set_offset` because a
+sequencer output really does have an offset register behind it. `qdac-default-v1` refuses the same
+token, and the refusal is deliberate. Setting a QDAC channel is not a sequencer opcode at all, it is
+a slow-control write over the chassis link, so the package gives it a vendor operation of its own
+rather than borrowing a core name whose semantics do not fit. `waveform.iq` is absent for a blunter
+reason, a QDAC channel being one wire.
+
+Our hand-built rack B was generous. It handed the flux slot the entire token registry, which made
+`program.set_offset` legal there. A published profile lists what the instrument actually implements,
+so the first thing the real rack says about the Part 5 program is that it cannot run it at all.
+
+That gap between the descriptor you invent while learning a protocol and the one a vendor publishes
+is worth expecting. Hand-written descriptors are almost always too permissive, because you write
+down the things you thought of.
+"""
+
+# %%
+qblox_bus = qp.BusCapabilities(rt=qblox_seq, host=None)  # a sequencer, real time only
+qdac_bus = qp.BusCapabilities(rt=None, host=qdac_chan)  # a DC source, host only
+
+vendor_caps = qp.PlatformCapabilities(
+    bus={("q", "drive"): qblox_bus, ("q", "readout"): qblox_bus, ("q", "flux"): qdac_bus},
+    platform=qp.BusCapabilities(rt=core, host=core),
+    default_bus_profile=qblox_bus,
+)
+
+for diag in qp.validate(program, vendor_caps)[0]:
+    print(f"[{diag.severity}] {diag.code}: {diag.message}")
+
+# %% [markdown]
+r"""
+So a port can need a third change, beyond the bus names and the pulse shapes of 5.7. When the new
+rack drives a line with a different class of instrument, the operation itself changes. One line of
+the program moves from `program.set_offset` to `program.qdac.set_offset`, and the `.qp` file records
+the dependency in its header.
+
+The rest of the experiment is untouched. Rewrite the flux line and validate again.
+"""
+
+# %%
+def vendor_flux_sweep():
+    """The 5.1 flux sweep with the DC write spelled as the QDAC operation it really is."""
+    prog = qp.QProgram(label="flux_sweep", schema=schema)
+    bias = prog.variable("bias", label="Flux bias", units="V")
+    with prog.average(shots=200):
+        with prog.sweep(bias, qp.Linspace(-0.05, 0.15, 101)):
+            prog.qdac.set_offset(q[0].flux, bias)
+            prog.set_frequency(q[0].drive, DRIVE_FREQ)
+            prog.play(q[0].drive, "saturation")
+            prog.sync([q[0].drive, q[0].readout])
+            handle = prog.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+    return prog, handle
+
+
+vendor_program, vendor_m0 = vendor_flux_sweep()
+
+print(qp.dumps(vendor_program).split("metadata:")[0].rstrip())
+print()
+print(qp.explain(vendor_program, vendor_caps))
+
+# %% [markdown]
+r"""
+The `require qdac 0.1` line is now in the header, and `require qblox` is not, because the program
+uses a qdac operation and no qblox operation. A `require` line records what the file needs from
+whatever reads it, not the rack it happened to run on.
+
+The plan is the more interesting half. Rack B in 5.3 filled both halves of its drive and readout
+slots, so those operations could go either way and the loop settled on the host with a `forced-host`
+warning. The published profiles are stricter. A Qblox sequencer operation is real-time only and a
+QDAC write is host only, so the sweep now holds children with no domain in common and the validator
+calls it `mixed-domain`, an error rather than a warning. The `[--]` column on the sweep means no
+domain can run it.
+
+Which turns `qp.optimize` from a speed fix into the thing that makes the program legal. The rewrite
+from 5.4 hoists the DC write out of the averaging block, and every operation left inside the average
+is a Qblox operation running in the sequencer.
+
+Worth pausing on that. The same rewrite was a nice-to-have on one rack and a hard requirement on
+another, and nothing about the program changed between the two. Whether an optimization is optional
+turns out to be a property of the machine, in the same way the loop split was.
+"""
+
+# %%
+hoisted = qp.optimize(vendor_program, vendor_caps)
+print(qp.explain(hoisted, vendor_caps))
+
+# %% [markdown]
+r"""
+Zero errors, zero warnings, and the averaging back in hardware where 200 shots cost 200 sequencer
+iterations instead of 200 network round trips.
+
+One honest caveat about the rewrite, which 5.4 stated and this is the place to see. Reordering the
+loops regroups the shots. Rack A interleaved passes over the bias axis; the hoisted program takes
+all 200 shots of one bias point before moving on. For a stationary device the two are the same
+experiment, and the simulator's random draws still differ point by point. The fit is what has to
+agree, and it does.
+"""
+
+# %%
+vendor_result = qp.simulate(hoisted, model=qp.MockMeasurementModel(p_excited=p_flux, seed=11))
+_, vendor_pop, vendor_fit = fit_sweet_spot(vendor_result, vendor_m0)
+
+print("identical populations point by point:", bool(np.allclose(pop, vendor_pop)))
+print(f"rack A, hand-built descriptor: {fit[1] * 1e3:.2f} mV")
+print(f"rack B, published profiles:    {vendor_fit[1] * 1e3:.2f} mV")
+print(f"device truth:                  {DEVICE['flux_offset'] * 1e3:.2f} mV")
+
+# %% [markdown]
+r"""
+### The soft answer, in the vendor's own words
+
+Section 5.5 said a predicate may yield a `DomainConstraint` rather than a `Diagnostic` when the
+answer is "not in the sequencer, but the host can do it". Nothing in this notebook has produced one
+yet, because rack B got its host-side classification from an empty `rt` half instead.
+`qdac-default-v1` ships the predicate, and one change to the rack is enough to make it speak.
+
+Give the Qblox slots a host half as well. The package's own documentation fills only the real-time
+half, because that is the honest description of a sequencer, so the rack below is more forgiving
+than a Qblox cluster really is. It is the shape in which the constraint has something left to
+decide, and it is how any rack behaves whose fast slots can also be driven one shot at a time.
+"""
+
+# %%
+either_way = qp.BusCapabilities(rt=qblox_seq, host=qblox_seq)
+soft_caps = qp.PlatformCapabilities(
+    bus={("q", "drive"): either_way, ("q", "readout"): either_way, ("q", "flux"): qdac_bus},
+    platform=qp.BusCapabilities(rt=core, host=core),
+    default_bus_profile=either_way,
+)
+
+for diag in qp.validate(vendor_program, soft_caps)[0]:
+    print(f"[{diag.severity}] {diag.code}")
+    print("   ", diag.message)
+
+# %% [markdown]
+r"""
+The text in parentheses is not the validator's wording. It is the `reason` string the QDAC package
+attached to its `DomainConstraint`, quoted back at the node where the constraint changed the plan.
+A rack that declines part of a program, in the vendor's own sentence, at the loop the vendor cares
+about, is the whole point of the predicate machinery from 5.5.
+
+Both racks reach the same place by different roads. On the strict one the flux slot has no real-time
+half and the sweep is an error until `qp.optimize` moves the DC write. On the forgiving one the
+predicate subtracts `rt` from the binding loop and the program runs as a warning. A vendor that
+publishes both the empty half and the predicate is covered either way, which is why the QDAC package
+ships both.
+"""
+
+
+# %% [markdown]
+r"""
+## 5.7 Porting: names, then numbers
 
 Two things have to change when the program moves next door, and QProgram keeps them apart on
-purpose.
+purpose, because they change for different reasons and on different schedules.
 
 **Bus references** change with `program.rebind`. It re-resolves every `BusRef` structurally through
 a schema, so the result is still a typed `BusRef` with its element, index, kind, channel type, and
 ADC flag intact. That is why it can move an experiment onto a different qubit, or onto a rack with
-a different naming convention, and still validate. Auto-generated measurement names that embed the
-bus are re-derived; names you chose yourself are left alone.
+a different naming convention, and still validate. A textual find-and-replace would produce strings
+that look right and carry no metadata, and the first thing you would lose is the channel check that
+Part 1 spent a section on. Auto-generated measurement names that embed the bus are re-derived; names
+you chose yourself are left alone.
 """
 
 # %%
@@ -668,7 +991,8 @@ library says what that pulse is on this chip. Resolution runs in three tiers, mo
 The library is a separate artifact with its own `.wfl` text format, and it is deliberately not
 inside the `.qp` file. The program is the experiment and changes when you change the experiment.
 The library is the calibration and changes every morning. Two lifetimes, two files, and the diff
-of either one tells you something true.
+of either one tells you something true. Merge them and neither diff means anything, because a
+recalibration and a redesign look identical in the log.
 """
 
 # %%
@@ -694,9 +1018,40 @@ looks at a pulse, so every program in this notebook ran happily with `"saturatio
 string. A real platform has to turn that alias into samples before it can upload anything, which is
 why the port ends with `with_waveforms` and not with a hopeful `run`.
 
+Order matters once a program has fragments. `with_waveforms` walks the body and does not follow a
+`call` into the fragment it names, so an alias written inside a fragment body stays a string and
+nothing says so. Every fragment in Part 4 holds a concrete pulse, so those programs bind as they
+stand. The moment an alias moves into a fragment body, the binding step becomes
+`program.expand().with_waveforms(library)`. `rebind` carries no such catch, because it expands
+first whenever the program has fragments at all.
+
 Run the bound program and fit it, and the sweet spot comes back where rack A found it. That is the
 end of the port. New bus names, pulse shapes supplied from a file, the same program, the same
 answer.
+"""
+
+# %%
+def play_line(program):
+    """Pull the single `play` statement out of a program's .qp text."""
+    return next(line.strip() for line in qp.dumps(program).splitlines() if line.strip().startswith("play"))
+
+
+print("renamed, still resolves:    ", play_line(renamed.with_waveforms(library)))
+print("moved to q1, nothing to use:", play_line(moved.with_waveforms(library)))
+
+# %% [markdown]
+r"""
+The two halves are independent only when the port is a rename. Rebinding onto a different qubit
+moves the bus out from under its library entry, and the exact entry registered for `q[0].drive` does
+not follow it. The alias falls through to the family entry, or stays a bare string when there is no
+family entry either, as `"saturation"` does above. The behavior is correct, since q1 is a different
+qubit with a different saturation tone, but it does mean that moving an experiment onto another
+qubit and recalibrating it are one step rather than two.
+
+One more property of `rebind` is worth carrying out of this section. Whether a measurement name was
+auto-allocated or supplied by you is in-memory state the `.qp` format does not record, so rebinding
+a program you loaded from a file treats every name as yours and leaves it stale. Rebind before
+serializing, not after loading.
 """
 
 # %%
@@ -706,7 +1061,7 @@ for line in qp.dumps(bound).splitlines():
         print(line.strip())
 print()
 
-ported_model = qp.MockMeasurementModel(p_excited=p_flux, noise=0.02, seed=11)
+ported_model = qp.MockMeasurementModel(p_excited=p_flux, seed=11)
 ported_result = qp.simulate(bound, model=ported_model)
 _, ported_pop, ported_fit = fit_sweet_spot(ported_result, bound.measurement_handles()[0])
 
@@ -725,9 +1080,13 @@ a fast frequency scan inside it. Take it to rack B:
 1. Rebind it to the `drive_q0` naming convention with `BusNaming("{kind}_{element}{index}")`.
 2. Print the bus strings before and after, to prove the names changed.
 3. Validate the ported program against `caps` and compare the diagnostic codes to the original's.
+4. Run `qp.optimize(ported_arc, caps)` and check whether the result differs from what went in. Say
+   in a comment which diagnostic told you in advance that it would not.
 
 The point is the third step. Renaming buses must not change what a rack thinks of the program,
-because the validator routes on the schema coordinate, not on the string.
+because the validator routes on the schema coordinate, not on the string. If the two lists of codes
+ever came out different, `rebind` would be doing something to the program beyond renaming, and every
+port in this section would be suspect.
 """
 
 # %% solution
@@ -738,6 +1097,9 @@ print("after: ", sorted(ported_arc.buses))
 print()
 print("original codes:", [d.code for d in qp.validate(arc, caps)[0]])
 print("ported codes:  ", [d.code for d in qp.validate(ported_arc, caps)[0]])
+# No `reorderable-averaging` in either list, so optimize has nothing to match: the average's child
+# sweep holds a second sweep, which is outside the shape the rewrite accepts.
+print("optimize changed it:", qp.dumps(qp.optimize(ported_arc, caps)) != qp.dumps(ported_arc))
 print()
 print(qp.explain(ported_arc, caps))
 
@@ -748,24 +1110,32 @@ print(qp.explain(ported_arc, caps))
 # 3) print the diagnostic codes from qp.validate(arc, caps) and qp.validate(ported_arc, caps),
 #    and confirm they match.
 # 4) print(qp.explain(ported_arc, caps)) and find the bias sweep in the domain column.
+# 5) Compare qp.dumps(qp.optimize(ported_arc, caps)) with qp.dumps(ported_arc), and say in a
+#    comment which missing diagnostic predicted the result.
 
 # %% [markdown]
 r"""
 ## Recap and what is next
 
 - A platform declares three separate things: **tokens** for what it implements, **limits** for how
-  much of it, and **predicates** for rules that depend on how a value is used. Each token is
-  checked against the slot it belongs to (one bus, or the platform), and every slot splits into a
-  real-time half and a host half.
+  much of it, and **predicates** for rules that depend on how a value is used. Each is the cheapest
+  mechanism for its class of question, and each token is checked against the slot it belongs to
+  (one bus, or the platform), with every slot split into a real-time half and a host half.
 - `qp.validate` never raises. It returns diagnostics and an `ExecutionPlan`, and the caller decides
   what an error means. `qp.explain` draws the same plan as a tree with the domain of every node.
 - The DSL has no syntax for "hardware loop" and "software loop", because that is the rack's
   decision, not the experiment's. The `forced-host` warning is where the rack tells you what it
-  decided.
+  decided, and the cost of ignoring it is roughly a hundred times your run time.
 - `qp.optimize` applies the rewrite the plan suggests. A bare `program.sync()` broadcasts across
   every bus, which drags the operation host-side and blocks the rewrite. Name the buses you mean.
+- Rack B is a real pair of instruments, and `qprogram-qblox` and `qprogram-qdac` publish the
+  profiles that describe them. A published profile lists what a box implements rather than what the
+  language knows, so it refused `op.set_offset` on the flux line and turned the mixed loop into an
+  error. On that rack `qp.optimize` is not a speed fix, it is the step that makes the program legal.
 - Porting splits in two: `rebind` moves bus references structurally, `WaveformLibrary` supplies the
-  numbers per bus. The program stays the same file, and the calibration lives in its own `.wfl`.
+  numbers per bus. The program stays the same file, and the calibration lives in its own `.wfl`. A
+  third change joins them when the new rack drives a line with a different class of instrument, and
+  then the operation itself has to change.
 
 Part 6 goes the other way. Instead of asking what a platform supports, you add to the language:
 your own waveform, your own sweep source, and a vendor namespace with its own operation and its own

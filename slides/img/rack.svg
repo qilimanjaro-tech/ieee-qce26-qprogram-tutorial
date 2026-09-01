@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>From a gate to a voltage and back</title>
+  <desc>One qubit and the three coaxial lines that reach it. A slow DC source drives the flux line,
+  an AWG drives the qubit and sends the readout tone down a feedline, and the returning tone is
+  amplified and digitized. Attenuators sit on every line going down, amplifiers on the line coming
+  back up.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="40" y="52" font-size="32" font-weight="700" fill="#1c1c2e">From a gate to a voltage and back</text>
+  <text x="40" y="84" font-size="22" fill="#6a6a82">one qubit, three coaxial lines, and the round trip a measurement makes</text>
+
+  <!-- ============ band A: the rack ============ -->
+  <rect x="240" y="108" width="1320" height="166" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="212" y="180" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">Control rack</text>
+  <text x="212" y="210" font-size="22" fill="#6a6a82" text-anchor="end">300 K</text>
+
+  <rect x="278" y="132" width="304" height="118" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="430" y="170" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Slow DC source</text>
+  <text x="430" y="200" font-size="20" fill="#6a6a82" text-anchor="middle">20 bits, heavily filtered</text>
+  <text x="430" y="228" font-size="20" fill="#6a6a82" text-anchor="middle">settles in milliseconds</text>
+
+  <rect x="640" y="132" width="620" height="118" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="950" y="170" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">AWG + sequencer</text>
+  <text x="950" y="200" font-size="20" fill="#6a6a82" text-anchor="middle">envelope memory · NCO per output · registers · loops</text>
+  <text x="950" y="228" font-size="20" fill="#6a6a82" text-anchor="middle">1 GSa/s, instructions on a 4 ns grid</text>
+
+  <rect x="1318" y="132" width="222" height="118" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="1429" y="170" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Digitizer</text>
+  <text x="1429" y="200" font-size="20" fill="#6a6a82" text-anchor="middle">ADC · weights</text>
+  <text x="1429" y="228" font-size="20" fill="#6a6a82" text-anchor="middle">· threshold</text>
+
+  <!-- ============ band B: the fridge ============ -->
+  <rect x="240" y="300" width="1320" height="286" rx="14" fill="#f5f5fa" stroke="#6a6a82"
+        stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="212" y="428" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">Dilution</text>
+  <text x="212" y="458" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">refrigerator</text>
+  <text x="212" y="490" font-size="22" fill="#6a6a82" text-anchor="end">300 K to 10 mK</text>
+
+  <!-- flux line, going down -->
+  <line x1="430" y1="252" x2="430" y2="392" stroke="#0f766e" stroke-width="2"/>
+  <rect x="336" y="392" width="188" height="46" rx="8" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="430" y="423" font-size="20" fill="#1c1c2e" text-anchor="middle">RC + low pass</text>
+  <line x1="430" y1="438" x2="430" y2="634" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="446" y="290" font-size="21" font-weight="700" fill="#0b5c56">flux</text>
+  <text x="446" y="620" font-size="20" fill="#6a6a82">near DC</text>
+
+  <!-- drive line, going down -->
+  <line x1="800" y1="252" x2="800" y2="340" stroke="#0f766e" stroke-width="2"/>
+  <rect x="752" y="340" width="96" height="44" rx="8" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="800" y="370" font-size="20" fill="#1c1c2e" text-anchor="middle">-20 dB</text>
+  <line x1="800" y1="384" x2="800" y2="452" stroke="#0f766e" stroke-width="2"/>
+  <rect x="752" y="452" width="96" height="44" rx="8" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="800" y="482" font-size="20" fill="#1c1c2e" text-anchor="middle">-40 dB</text>
+  <line x1="800" y1="496" x2="800" y2="634" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="816" y="290" font-size="21" font-weight="700" fill="#0b5c56">drive</text>
+  <text x="816" y="620" font-size="20" fill="#6a6a82">4.85 GHz</text>
+
+  <!-- readout out, going down -->
+  <line x1="1150" y1="252" x2="1150" y2="396" stroke="#0f766e" stroke-width="2"/>
+  <rect x="1102" y="396" width="96" height="44" rx="8" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="1150" y="426" font-size="20" fill="#1c1c2e" text-anchor="middle">-50 dB</text>
+  <line x1="1150" y1="440" x2="1150" y2="806" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1166" y="290" font-size="21" font-weight="700" fill="#0b5c56">readout</text>
+  <text x="1415" y="290" font-size="21" font-weight="700" fill="#0b5c56" text-anchor="end">return</text>
+  <text x="1166" y="616" font-size="20" fill="#6a6a82">7.20 GHz</text>
+
+  <!-- readout in, coming back up -->
+  <line x1="1429" y1="806" x2="1429" y2="500" stroke="#0f766e" stroke-width="2"/>
+  <rect x="1330" y="456" width="198" height="44" rx="8" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1429" y="486" font-size="20" fill="#1c1c2e" text-anchor="middle">JPA · 10 mK</text>
+  <line x1="1429" y1="456" x2="1429" y2="392" stroke="#0f766e" stroke-width="2"/>
+  <rect x="1330" y="348" width="198" height="44" rx="8" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1429" y="378" font-size="20" fill="#1c1c2e" text-anchor="middle">HEMT · 4 K</text>
+  <line x1="1429" y1="348" x2="1429" y2="256" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1415" y="616" font-size="20" fill="#6a6a82" text-anchor="end">a few photons</text>
+
+  <!-- ============ band C: the chip ============ -->
+  <rect x="240" y="638" width="1320" height="200" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="212" y="726" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">Chip</text>
+  <text x="212" y="756" font-size="22" fill="#6a6a82" text-anchor="end">10 mK</text>
+
+  <rect x="318" y="666" width="224" height="94" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="430" y="700" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">SQUID loop</text>
+  <text x="430" y="730" font-size="20" fill="#6a6a82" text-anchor="middle">moves f01</text>
+
+  <line x1="542" y1="713" x2="648" y2="713" stroke="#0f766e" stroke-width="2"/>
+
+  <rect x="650" y="666" width="300" height="94" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="800" y="700" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">q0 transmon</text>
+  <text x="800" y="730" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f01 = 4.85 GHz</text>
+
+  <line x1="950" y1="713" x2="1226" y2="713" stroke="#0f766e" stroke-width="2"/>
+  <text x="1088" y="700" font-size="21" font-weight="700" fill="#0b5c56" text-anchor="middle">2&#967; = 3.6 MHz</text>
+
+  <rect x="1228" y="666" width="248" height="94" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="1352" y="700" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">resonator</text>
+  <text x="1352" y="730" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
+
+  <!-- feedline the readout tone runs along, with the resonator hanging off it -->
+  <line x1="1352" y1="760" x2="1352" y2="806" stroke="#0f766e" stroke-width="2"/>
+  <line x1="1150" y1="806" x2="1429" y2="806" stroke="#0f766e" stroke-width="3"/>
+  <text x="1240" y="832" font-size="20" fill="#6a6a82" text-anchor="middle">feedline</text>
+
+  <text x="40" y="878" font-size="21" fill="#6a6a82">Every operation in this tutorial is one of two things: put a voltage on a line going down, or record what comes back on the line coming up.</text>
+</svg>

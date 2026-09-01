@@ -98,14 +98,22 @@ BUDGETS = (
     ("mid-sentence colon", re.compile(r"[a-z]:\s+[a-z]"), 12),
 )
 
-# Files the budgets apply to. The deck and the top-level markdown join this list in the final
-# pass over them; until then the budgets would fail on prose that has not been revised yet.
-BUDGETED = ("sources/*.py",)
+# Files the budgets apply to. The deck joined this list once its prose had been revised; markdown
+# needs the extra stripping in `prose` below before the counts mean anything, because a CSS block
+# is nothing but mid-sentence colons.
+BUDGETED = ("sources/*.py", "slides/*.md")
 
 CELL = re.compile(r"^# %%(?P<rest>.*)$")
 FENCE = re.compile(r"```.*?```", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`]*`")
 DELIMITER = {'r"""', '"""'}
+
+# Markdown-only furniture: YAML front matter, the deck's inline stylesheet, Marp's HTML-comment
+# directives, and the raw tags around the QR grid. None of it is prose and all of it is punctuation.
+FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
+STYLE_BLOCK = re.compile(r"<style>.*?</style>", re.DOTALL)
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
 
 
 def prose(path: Path) -> str:
@@ -132,9 +140,14 @@ def prose(path: Path) -> str:
         if kind == "markdown" and current:
             cells.append("\n".join(current))
         text = "\n\n".join(cells)
+    else:
+        text = FRONT_MATTER.sub("", text)
+        text = STYLE_BLOCK.sub(" ", text)
+        text = HTML_COMMENT.sub(" ", text)
     text = FENCE.sub(" ", text)
     text = "\n".join(line for line in text.splitlines() if not line.strip().startswith("|"))
-    return INLINE_CODE.sub("X", text)
+    text = INLINE_CODE.sub("X", text)
+    return HTML_TAG.sub(" ", text)
 
 
 def budgets(path: Path) -> list[str]:

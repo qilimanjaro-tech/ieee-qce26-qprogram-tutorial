@@ -1,17 +1,52 @@
 # Slides: *Programming a Superconducting Qubit*
 
-A [Marp](https://marp.app/) deck, written in Markdown. It is a **thin framing deck**: title, why
-pulse-level control, the state of control software in 2026, links and QR codes, thirty seconds of
-vocabulary, then a divider and one or two slides per tutorial part naming the experiment and the
-feature it forces. Three diagrams carry the structure. The teaching happens in
+A [Marp](https://marp.app/) deck, written in Markdown. It is a **thin framing deck**: title, why a
+chip arrives with no numbers on it, the state of control software in 2026, links and QR codes, the
+device under test, thirty seconds of vocabulary, then a divider and two or three slides per tutorial
+part. Three diagrams carry the structure. The teaching happens in
 [`../notebooks/`](../notebooks/); these slides orient and recap.
+
+Every content slide carries at least one concrete thing, a number, a formula, a `.qp` excerpt, or a
+diff, and the speaker carries the rest. A slide that is five compressed claims competes with the
+person talking over it, so `tools/check_style.py` now applies its sentence-shape budgets to this
+file as well as to `sources/*.py`.
 
 - [`qprogram_tutorial.md`](qprogram_tutorial.md): the deck source. Edit this.
 - `qprogram_tutorial.html`: the rendered deck, produced by the Marp CLI command below. It reads
   `img/` from alongside itself, so keep the two together.
-- [`img/`](img/): the three diagrams (`stack.svg` the layer stack, `anatomy.svg` a Rabi program as a
-  tree, `plan.svg` the real-time versus host-side split) and the three QR codes
-  (`qr-tutorial.svg`, `qr-qprogram.svg`, `qr-docs.svg`).
+- [`img/`](img/): five diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`,
+  `qr-docs.svg`).
+
+| Diagram | Shows | Slide |
+|---|---|---|
+| `rack.svg` | the signal chain, rack to fridge to chip and back | From a gate to a voltage and back |
+| `buses.svg` | instrument ports to bus names to chip, and what each bus kind accepts | A bus is one signal path |
+| `timing.svg` | per-bus cursors, and what `sync` does about them | Part 1: every bus keeps its own clock |
+| `stack.svg` | the software layers, script to instruments | The architecture |
+| `anatomy.svg` | a Rabi program as a tree | Anatomy of a Rabi program |
+| `plan.svg` | the real-time versus host-side split | One program, two domains |
+
+`rack.svg` and `buses.svg` exist because most of the room writes circuits and has never seen a
+control rack. They come early, before the deck asks anyone to care about a capability token.
+
+### Diagrams worth adding
+
+Two gaps, listed so the decision is visible rather than forgotten. Neither blocks the current
+deck.
+
+- **A rotation figure**: envelope area against rotation angle, carrier phase against axis, one Bloch
+  sphere and one envelope side by side. It would firm up the "What a gate turns into" slide. Lower
+  priority, because Part 1 of the notebooks already plots a real DRAG envelope.
+- **An IQ-plane figure** for single-shot readout. Deliberately *not* drawn: Part 4 plots 1200 real
+  simulated shots with a fitted threshold, and a schematic version would be strictly worse. If the
+  measurement slide ever needs a picture, take the figure out of the notebook.
+
+## Where the diagrams live
+
+Diagrams live here rather than in the notebooks on purpose. A notebook is opened from two directory
+depths in this repo and from Colab with no repo at all, so a relative image path is broken in at
+least one of the three. The notebooks carry the same content as text figures and tables, which
+render everywhere.
 
 ## Present or edit
 

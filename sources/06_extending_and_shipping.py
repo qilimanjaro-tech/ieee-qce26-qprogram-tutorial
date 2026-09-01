@@ -7,8 +7,14 @@ QProgram. Real labs run out of those on day one. Someone has a pulse shape their
 already knows and the DSL does not. Someone drives a room-temperature attenuator that no core
 operation will ever cover. Someone scans a chevron by centre and span instead of start and stop.
 
-A control DSL that cannot be extended gets forked. This part is about the seams that stop that from
-happening, and about what you do with the result:
+What happens next decides whether any of Part 5 was true. A control DSL that cannot be extended gets
+forked, and a forked DSL is not a portable format any more, it is three dialects with the same file
+extension. Lab A patches in its attenuator, lab B patches in its pulse shape, and the `.qp` file
+that was supposed to move between them now loads in one interpreter and raises in the other, or
+worse, loads in both and means different things.
+
+So the extension points are not a convenience feature. They are the thing that keeps the format
+worth having.
 
 - register a **waveform**, a **sweep source**, and a whole **vendor namespace**, live in this
   notebook
@@ -22,21 +28,26 @@ happening, and about what you do with the result:
 # %%
 # Run me first. A no-op when qprogram is already installed, an install when it is not
 # (a fresh Google Colab runtime, for example).
-try:
-    import qprogram  # noqa: F401
-except ImportError:
+# Section 6.2 loads a file that requires the qblox vendor, and the point of that cell is the import
+# happening on demand. So probe for the distributions rather than importing them here.
+from importlib.util import find_spec
+
+if find_spec("qprogram") is None or find_spec("qprogram_qblox") is None:
     import subprocess
     import sys
 
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "qprogram[viz]==0.1.0", "scipy"],
+        [
+            sys.executable, "-m", "pip", "install",
+            "qprogram[viz]==0.1.0", "qprogram-qblox==0.1.0", "qprogram-qdac==0.1.0", "scipy",
+        ],
         check=True,
     )
-    import qprogram  # noqa: F401
 
 from importlib.metadata import version
 
 print("qprogram", version("qprogram"))
+print("qprogram-qblox", version("qprogram-qblox"), "· qprogram-qdac", version("qprogram-qdac"))
 
 # %%
 import difflib
@@ -55,8 +66,6 @@ import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
 from qprogram.operations.operation import Operation
-from qprogram.serialization import ParseError
-from qprogram.vendor import VendorNamespace
 from qprogram.waveforms import IQDrag, IQPair, Square, Waveform
 
 print("imports ready")
@@ -102,14 +111,16 @@ print(f"pi/2 pulse: IQDrag amplitude {X90.amplitude}, duration {X90.duration} ns
 
 # %% [markdown]
 r"""
-The response models are the ones from Parts 2 to 4, unchanged. Each is a plain function of `env`, the
-dict of loop variables currently bound. None of them is physics from first principles. They produce
-the shapes a real scan produces, so the programs and the fits are the real part.
+The response models are the ones from Parts 2 to 4, unchanged. Each is a plain function of `env`,
+the dict of loop variables currently bound. None of them is physics from first principles. They
+produce the shapes a real scan produces, so the programs and the fits are the real part.
 
-Active reset needs one that a `response` function cannot express, because the second measurement of a
-shot depends on what the first one saw. That is the `ResetModel` in the cell after next. A
-`MeasurementModel` is any object with a `sample(bus, env)` method and a `raw_samples` attribute, and
-`sample` is called once per shot per measurement, in program order, so a model is free to remember.
+Active reset needs one that a `response` function cannot express, because the second measurement of
+a shot depends on what the first one saw. That is the `ResetModel` in the cell after next. A
+`MeasurementModel` is any object with a `sample(bus, env)` method, and `sample` is called once per
+shot per measurement, in program order, so a model is free to remember. A model that simulates an
+ADC also declares `raw_samples` and fills in the sample's `raw` trace. One that does not, like every
+model in this notebook, leaves both out and `MeasurementSample.raw` keeps its empty default.
 
 What a model cannot do is watch the executor. It never learns which branch of a conditional ran. So
 `ResetModel` assumes the program does the obvious thing, a pi pulse when the check reads 1, and
@@ -153,7 +164,6 @@ print("p_t1 after one T1:", round(p_t1(None, {"delay": DEVICE["q0_T1"]}), 4))
 class ResetModel:
     """Two measurements per shot: the check, then the verify, which remembers the check."""
 
-    raw_samples = 1
 
     def __init__(self, p_hot, fidelity=0.97, seed=17):
         self.p_hot, self.fidelity = p_hot, fidelity
@@ -167,7 +177,7 @@ class ResetModel:
         else:  # the verify: a hot qubit got the pi pulse, a cold one was left alone
             was, self.pending = self.pending, None
             state = int(self.rng.random() > self.fidelity) if was else int(self.rng.random() < 0.01)
-        return qp.MeasurementSample(i=1.0 if state else -1.0, q=0.0, state=state, raw=np.zeros((1, 2)))
+        return qp.MeasurementSample(i=1.0 if state else -1.0, q=0.0, state=state)
 
 
 peek = ResetModel(p_hot=0.5)  # a hot qubit, so the pattern shows up in six shots
@@ -248,8 +258,8 @@ print("body:" + qp.dumps(demo).split("body:", 1)[1].rstrip())
 
 # %% [markdown]
 r"""
-The fits are one line each. `step` puts everything together: build, save the `.qp` file, run, fit, and
-keep the trace so the capstone can plot all six panels at once.
+The fits are one line each. `step` puts everything together: build, save the `.qp` file, run, fit,
+and keep the trace so the capstone can plot all six panels at once.
 """
 
 # %%
@@ -308,6 +318,12 @@ vendor's name.
 | a sweep axis the DSL lacks | a `SweepSource` subclass, `@qp.register_sweep_source` | serialization, a capability token, lockstep length checks, xarray coordinates |
 | an operation the DSL will never have | an `Operation` plus a `VendorNamespace`, four registration calls | `program.<vendor>.<op>(...)`, a `require` line, a `vendor.<name>.<op>` token |
 
+The "for free" column is where the design lives, and it is bought with one constraint you should
+know up front. Serialization is derived by reading your `__init__` signature, so the constructor
+arguments have to *be* the object's state. Store a parameter under a different attribute name, or
+compute state that the constructor cannot reproduce, and the round trip breaks in a way nothing
+warns you about until a file comes back different from the program that wrote it.
+
 There is a fourth seam this notebook does not need: `qp.register_vendor_block` adds a block keyword
 with its own indented suite, for a vendor that ships control flow of its own (a hardware infinite
 loop, say). It follows the same pattern one level up.
@@ -317,14 +333,27 @@ Re-running one raises a collision error. Restart the kernel if you edit a class.
 
 ### A custom waveform
 
-Flux-activated two-qubit gates want a pulse that starts and ends at zero, because a flux line that
-jumps leaves the coupler ringing. A half sine does that with one parameter. Your vendor's compiler
-may well emit it natively; the DSL has no name for it.
+Flux-activated two-qubit gates want a pulse that starts and ends at zero. Part 1 explained why: a
+flux line through a fridge is a filter with time constants in the microseconds and longer, so any
+step you leave at the end of a pulse comes back as a slow tail, and the next gate in the circuit
+runs on a chip the previous gate detuned. A half sine does that with one parameter.
 
-A `Waveform` owes two methods: `envelope(resolution)` returns the samples, `get_duration()` returns
-the length in nanoseconds. `@qp.register_waveform` puts the class in the serialization registry under
-its own name, and `qp.register_waveform_token` gives it a capability token, which is how a platform
-gets to say whether it supports the shape.
+Being precise about what it buys: a half sine is zero at both endpoints, so there is no step. Its
+slope at the endpoints is not zero, so it is continuous but not smooth, and labs chasing the last
+percent reach for a raised cosine instead. The half sine is the shape you write first, and your
+vendor's compiler may well emit it natively. The DSL has no name for it.
+
+A `Waveform` owes two methods. `envelope(resolution)` returns the samples and `get_duration()`
+returns the length in nanoseconds. `@qp.register_waveform` puts the class in the serialization
+registry under its own name, and `qp.register_waveform_token` gives it a capability token, so a
+platform gets to say whether it supports the shape.
+
+One rule travels with those two methods. A parameter you intend to sweep is annotated
+`float | qp.Expression` and resolved with `evaluate_or_raise()` at the point of use, because the
+program later in this section puts a swept variable in the amplitude position and a bare
+multiplication would meet a `Variable` instead of a number. Every shape the core ships is written
+this way. Skipping it costs nothing until a real platform calls `envelope()`, and then it fails
+inside numpy with a message that names neither the waveform nor the variable.
 """
 
 # %%
@@ -332,12 +361,15 @@ gets to say whether it supports the shape.
 class HalfSine(Waveform):
     """A single half period of a sine: zero at both ends, no ringing on the flux line."""
 
-    def __init__(self, amplitude: float, duration: int) -> None:
+    def __init__(self, amplitude: float | qp.Expression, duration: int) -> None:
         self.amplitude, self.duration = amplitude, duration
 
     def envelope(self, resolution: int = 1) -> np.ndarray:
+        amplitude = self.amplitude
+        if isinstance(amplitude, qp.Expression):  # bound by the sweep this pulse sits in
+            amplitude = amplitude.evaluate_or_raise()
         n = self.duration // resolution
-        return self.amplitude * np.sin(np.pi * np.arange(n) / n)
+        return amplitude * np.sin(np.pi * np.arange(n) / n)
 
     def get_duration(self) -> int:
         return self.duration
@@ -357,7 +389,7 @@ plt.show()
 r"""
 ### A custom sweep source
 
-A chevron scan is always written the same way in a lab notebook: a centre, a span, and how many
+A chevron scan is always written the same way in a lab notebook. A centre, a span, and how many
 points. `Range` and `Linspace` want endpoints, so every script grows the same two lines of
 arithmetic. A sweep source removes them.
 
@@ -370,8 +402,14 @@ The contract is three declarations, and each has a real consumer:
 - `values()` produces the numbers, for the interpreter, for the xarray coordinate, and for
   `optimize()`.
 
-A source may not wrap a callable. If it did, it could answer none of those three before the program
-runs, and it could not serialize.
+A source may not wrap a callable, and that restriction is the whole design in one line, so it is
+worth the five minutes. Imagine `Callable(lambda i: ...)` as a source. It could not answer
+`length()` without running, so a lockstep pair could not be checked at build time and the result
+array could not be allocated before the first shot. It could not honestly declare a `KIND`, so every
+sweep would fall back to arbitrary and no loop would ever compile into a register. And it could not
+serialize, so a `.qp` file holding one would either carry a pickled closure or quietly lose the
+sweep. Three properties, all of them load-bearing, all of them gone. The rule looks like a
+limitation and it is the reason the format works.
 """
 
 # %%
@@ -404,9 +442,9 @@ print("wrapped in Rotate:", sorted(qp.Rotate(scan, 5).tokens()))
 r"""
 ### A whole vendor namespace
 
-The two seams above add vocabulary the core could plausibly have shipped. The third is for things the
-core must never ship. Our fridge has a programmable room-temperature attenuator on the drive line. It
-is one box in one rack, and `op.set_attenuation` has no business in a vendor-agnostic DSL.
+The two seams above add vocabulary the core could plausibly have shipped. The third is for things
+the core must never ship. Our fridge has a programmable room-temperature attenuator on the drive
+line. It is one box in one rack, and `op.set_attenuation` has no business in a vendor-agnostic DSL.
 
 Four calls put it in the language anyway:
 
@@ -417,8 +455,12 @@ Four calls put it in the language anyway:
 4. `register_capability_tokens` puts the token in the registry, so a platform can say yes or no to
    it.
 
-A shipped extension does all four in its package `__init__.py`. Importing the package is the
-activation step.
+A shipped extension does all four in its package `__init__.py`, and one more besides. A token says
+an operation exists. A profile is the bundle a rack points at to say which tokens it has, under a
+name and a version that outlive the cell they were declared in. The subsection after next builds
+one.
+
+Importing the package is the activation step for all five.
 """
 
 # %%
@@ -432,7 +474,7 @@ class SetAttenuation(Operation):
         return {"vendor.fridge.set_attenuation"}
 
 
-class FridgeNamespace(VendorNamespace):
+class FridgeNamespace(qp.VendorNamespace):
     def set_attenuation(self, bus: str, db: float) -> None:
         self._append(SetAttenuation(bus=bus, db=db))
 
@@ -451,10 +493,24 @@ print("SetAttenuation asks for:", SetAttenuation(q[0].drive, 20.0).required_capa
 r"""
 ### All three in one program
 
-The program is a chevron scan of a flux-activated swap. Attenuate the drive line, then step the flux
-amplitude around the resonance point and read the qubit out. The custom waveform, the custom sweep source,
-and the vendor operation all appear in the `.qp` text, and the file grew a `require fridge 0.1` line
-under the header.
+The program is a chevron scan of a flux-activated swap, and it is worth knowing what that experiment
+does before reading the code. Two qubits sitting at different frequencies barely interact. Push one
+of them with a flux pulse until it lands on the other and the pair exchanges excitations at a rate
+set by their coupling $g$. Sweep the flux amplitude around the resonance point and the swap
+probability after a fixed 40 ns pulse follows the detuned Rabi formula,
+
+$$P_{\text{swap}} = \frac{(2g)^2}{\Omega^2}\sin^2(\pi \Omega t),
+\qquad \Omega = \sqrt{(2g)^2 + \Delta^2}$$
+
+with $\Delta$ the residual detuning, proportional to how far the flux amplitude sits from resonance.
+On resonance the prefactor is 1 and the pair swaps completely. Off resonance the oscillation goes
+faster and reaches less far, which is the pattern that gives a chevron its name once you add the
+duration axis. `p_swap` below is that formula, and the amplitude at the peak is the number the scan
+exists to find.
+
+The program attenuates the drive line, then steps the flux amplitude and reads the qubit out. The
+custom waveform, the custom sweep source, and the vendor operation all appear in the `.qp` text, and
+the file grew a `require fridge 0.1` line under the header.
 
 That line is the contract. A lab without the extension installed gets a `ParseError` naming the
 vendor it is missing, instead of a file that loads with an operation silently dropped.
@@ -462,8 +518,7 @@ vendor it is missing, instead of a file that loads with an operation silently dr
 The file also round-trips. The parser rebuilds `HalfSine`, `Chevron`, and `fridge.set_attenuation`
 from the text with no help from you, because each is registered under its class name and serialized
 from its constructor signature. And the reference platform accepts every token in the registry, so
-the program validates and runs. The swap probability peaks where the two qubits come into resonance,
-which is the number a chevron scan exists to find.
+the program validates and runs.
 """
 
 # %%
@@ -503,7 +558,8 @@ Registering a token does not mean every rack has the box. Build a platform descr
 everything except our attenuator, and the validator says what is missing and where.
 
 This is the difference between an extension and a fork. The program stays legal QProgram, the file
-stays loadable, and the machine that cannot run it says so before anything is uploaded.
+stays loadable, and the machine that cannot run it says so before anything is uploaded. A fork would
+have given you the same working program on your own rack and a syntax error on everybody else's.
 """
 
 # %%
@@ -524,16 +580,77 @@ print(qp.explain(program, caps))
 
 # %% [markdown]
 r"""
+### Publishing the token set instead of the tokens
+
+The descriptor above was assembled by subtracting one token from the live registry, and so was every
+rack in Part 5. That works in a notebook and is useless as a way to describe a real machine, because
+"everything the installed language knows about, minus one" is a claim that changes every time
+somebody installs a package.
+
+A shipped extension publishes a `qp.Profile` instead: a named and versioned bundle of tokens,
+limits, and predicates. From then on any rack reaches it by name through
+`CompilerCapabilities.from_profile`, which is how section 5.6 got `qblox-default-v1` and
+`qdac-default-v1` without either package being mentioned in the call.
+
+`extends` names a parent, and the child accumulates the parent's capabilities and predicates while
+overriding its limits and vendor versions. `qprogram-base-v1` ships with the core and carries the 33
+block, expression, and sweep tokens, no `op.*` among them, so a platform profile that needs one more
+sweep shape declares only the difference. Registration is idempotent for an equal `Profile`, so a
+re-executed notebook cell or a reloaded module is not an error.
+"""
+
+# %%
+FRIDGE_BUS_V1 = qp.Profile(
+    name="fridge-bus-v1",
+    version=(0, 1, 0),
+    extends=None,
+    capabilities=frozenset(t for t in CAPABILITY_REGISTRY if t.startswith(("op.", "waveform.", "measure.")))
+    | {"vendor.fridge.set_attenuation"},
+    limits={"min_wait_duration_ns": 4},
+    predicates=(),
+    vendor_versions={"fridge": (0, 1, 0)},
+)
+
+FRIDGE_PLATFORM_V1 = qp.Profile(
+    name="fridge-platform-v1",
+    version=(0, 1, 0),
+    extends="qprogram-base-v1",  # the core bundle, plus the one sweep shape we registered above
+    capabilities=frozenset({"sweep.chevron"}),
+    limits={},
+    predicates=(),
+    vendor_versions={},
+)
+
+qp.register_profile(FRIDGE_BUS_V1)
+qp.register_profile(FRIDGE_PLATFORM_V1)
+qp.register_profile(FRIDGE_BUS_V1)  # idempotent for an equal profile, so a re-run is safe
+
+bus_half = qp.CompilerCapabilities.from_profile("fridge-bus-v1")
+platform_half = qp.CompilerCapabilities.from_profile("fridge-platform-v1")
+
+print("qprogram-base-v1   ->", len(qp.CompilerCapabilities.from_profile("qprogram-base-v1").capabilities), "tokens")
+print("fridge-platform-v1 ->", len(platform_half.capabilities), "tokens, the parent plus sweep.chevron")
+print("fridge-bus-v1      ->", len(bus_half.capabilities), "tokens")
+
+fridge_rack = qp.PlatformCapabilities(
+    bus={},
+    platform=qp.BusCapabilities(rt=platform_half, host=platform_half),
+    default_bus_profile=qp.BusCapabilities(rt=bus_half, host=bus_half),
+)
+print("\ndiagnostics from the rack we just published:", qp.validate(program, fridge_rack)[0])
+
+# %% [markdown]
+r"""
 ## 6.2 Vendor packages for real
 
 Everything above lived in a notebook cell. A shipped extension is a separate Python package that
-depends on `qprogram` and makes the same registration calls at import time. Two of them live in the
-QProgram repository as worked examples: `qprogram-qblox` (six sequencer operations, `qblox.acquire`
-with its own weights among them) and `qprogram-qdac` (a slow DC source, whose profile ships a
-predicate that pushes any qdac operation reading a swept variable to host-side dispatch, one
-iteration at a time). Neither is needed for this tutorial and neither is installed here.
+depends on `qprogram` and makes the same registration calls at import time. Two of them are
+published, each in a repository of its own, and Part 5 already used both. `qprogram-qblox` adds six
+operations, four of them sequencer instructions and two host-side parameter writes that a platform
+realizes as slow-control settings. `qprogram-qdac` adds four, and is the rack B of Part 5 as a
+package rather than as a cell.
 
-A real package takes one extra step. It declares an entry point:
+A shipped package takes one step a notebook cell cannot. It declares an entry point:
 
 ```toml
 [project.entry-points."qprogram.vendors"]
@@ -542,28 +659,54 @@ qblox = "qprogram_qblox"
 
 Now `loads()` can activate the extension on demand. When it reaches a `require qblox 0.1` line for a
 vendor that is not registered yet, it looks up that entry-point group, imports the module, and the
-registration side effects run. A six-month-old `.qp` file loads in a fresh interpreter without the
-reader knowing which extensions it needs. If nothing claims the vendor, the error names it.
+registration side effects run.
 
-Version compatibility is checked at major.minor. The file's major must equal the installed
-extension's major, and the file's minor must be less than or equal to the installed minor. Patch is
-informational, and the writer truncates it.
+Which sounds like a small convenience and is the thing that makes an archived file usable. A `.qp`
+file from six months ago names the extensions it needs, in its own header, and a fresh interpreter
+finds and loads them without the reader knowing what to import. Compare the alternative, where
+opening an old file means guessing which packages the author had installed.
+
+Watch the namespace list below cross the load. Nothing in this notebook has imported
+`qprogram_qblox`, so `qblox` is absent before the call and present after it. The import happened
+because the file asked for it.
 """
 
 # %%
 installed = {ep.name: ep.value for ep in entry_points(group="qprogram.vendors")}
 print("vendor entry points installed in this environment:", installed or "none")
-print("vendor namespaces registered right now:", sorted(qp.QProgram._vendor_registry))
-print("auto-activation of a vendor nobody claims:", qp.try_activate_vendor("qblox"))
+print("vendor namespaces registered before the load:", sorted(qp.QProgram._vendor_registry))
 
 needs_qblox = '#!QProgram 1.0\n\nrequire qblox 0.1\n\nbody:\n  qblox.acquire "readout" "weights" name="m0"\n'
-try:
-    qp.loads(needs_qblox)
-except ParseError as error:
-    print("\nloading a file that requires an absent vendor:")
-    print(" ", error)
-else:
-    print("\nqprogram-qblox is installed here, so the file loaded.")
+loaded = qp.loads(needs_qblox)
+
+print("vendor namespaces registered after the load: ", sorted(qp.QProgram._vendor_registry))
+print("the operation it rebuilt:", type(loaded.body.elements[0]).__name__,
+      "from", version("qprogram-qblox"))
+
+# %% [markdown]
+r"""
+Two ways for that to fail, and both name the problem rather than dropping an operation on the floor.
+
+A vendor nobody claims has no entry point to find. Version compatibility is checked at major.minor,
+where the file's major must equal the installed extension's major and the file's minor must be less
+than or equal to the installed minor. Patch is informational, and the writer truncates it. The
+asymmetry is deliberate. A file written against an older minor loads under a newer extension,
+because a minor bump adds vocabulary rather than removing it, and a file written against a newer one
+does not, because the operation it needs may not exist yet.
+"""
+
+# %%
+print("auto-activation of a vendor nobody claims:", qp.try_activate_vendor("acme_rack"))
+
+for label, text in (
+    ("a vendor nobody claims", 'require acme_rack 0.1\n\nbody:\n  wait "drive" 100\n'),
+    ("a version this install cannot satisfy", 'require qdac 9.9\n\nbody:\n  wait "drive" 100\n'),
+):
+    try:
+        qp.loads("#!QProgram 1.0\n\n" + text)
+    except qp.ParseError as error:
+        print(f"\n{label}:")
+        print(" ", error)
 
 # %% [markdown]
 r"""
@@ -621,13 +764,18 @@ print("state: ", counted.get(clicks, field=MF.STATE).values)
 r"""
 ## 6.3 The `.qp` file is the artifact
 
-A calibration is not a plot. It is the program that produced the plot, and the numbers that came out.
-QProgram writes the program as line-oriented text, so the ordinary tools work on it: `diff`, code
-review, `git blame`, and a checker you can run in CI.
+A calibration is not a plot. It is the program that produced the plot, and the numbers that came
+out. QProgram writes the program as line-oriented text, so the ordinary tools work on it: `diff`,
+code review, `git blame`, and a checker you can run in CI.
 
-Here are two runs of the same Rabi experiment, a Monday and a Friday. Somebody changed three things.
-A diff of the two `.qp` files says which three, in the language of the experiment rather than in
-sequencer opcodes.
+Here are two runs of the same Rabi experiment, a Monday and a Friday. Somebody changed three things,
+and the diff names all three in the language of the experiment rather than in sequencer opcodes.
+Read the output and you can reconstruct the week: the amplitude sweep now stops at 0.8 instead of
+1.0, so the pi pulse came in lower than expected and the top of the range was wasted. The readout
+frequency moved by 400 kHz, so the resonator drifted or somebody re-ran the punchout. And the shot
+count doubled, so the contrast was worse than they wanted.
+
+None of that is in a plot, and all of it is in a text file that costs nothing to keep.
 """
 
 # %%
@@ -662,16 +810,18 @@ result against the reference platform, and prints JSON diagnostics. It exits 1 w
 it drops into a pre-commit hook or a CI job. No extra dependencies.
 
 Break the Friday file the way a hand edit breaks a file. Misspell a bus. The message comes back with
-the line number, the path that failed to resolve, and the buses the chip does have, because the `.qp`
-file declares its own schema. A checker that knows the layout can tell a typo from a bus that
-genuinely does not exist.
+the line number, the path that failed to resolve, and the buses the chip does have, because the
+`.qp` file declares its own schema. A checker that knows the layout can tell a typo from a bus that
+genuinely does not exist, and the difference matters: one is a five-second fix and the other means
+the file was written for a different chip.
 
 The same module has two more modes. `explain` prints the execution plan as a tree straight from a
-shell, which is the fastest way to answer "why is this loop running host-side". `serve` speaks LSP
-over stdio and needs the `qprogram[lsp]` extra. The VS Code extension that ships in the QProgram
-repository (`editors/vscode-qp/`) is plain JavaScript with no build step. It highlights `.qp`, runs
-`check` on open, on save, and debounced while you type, and adds a `qp: Explain execution plan`
-command.
+shell, the fastest way to answer "why is this loop running host-side". `serve` speaks LSP over stdio
+and needs the `qprogram[lsp]` extra. The VS Code extension lives in the `qprogram-editors`
+repository and is published as `qilimanjaro.qprogram`. It is a thin front-end over that same
+`qprogram.lsp` module, deliberately, so an editor squiggle cannot drift from what the parser accepts
+at load time. It highlights `.qp`, runs `check` on open, on save, and debounced while you type, and
+adds a `qp: Explain execution plan` command.
 """
 
 # %%
@@ -694,8 +844,8 @@ for mode, target in (("check", broken), ("explain", scratch / "rabi_friday.qp"))
 r"""
 ### 🧩 Exercise 6.2: fix a file with the checker
 
-Somebody hand-edited a `.qp` file and broke it in two places. Find and fix both using nothing but the
-checker output, then prove the repaired file is the program you started from.
+Somebody hand-edited a `.qp` file and broke it in two places. Find and fix both using nothing but
+the checker output, then prove the repaired file is the program you started from.
 
 Your job:
 
@@ -707,7 +857,7 @@ Your job:
    original.
 
 The parser stops at the first error, so it takes one round per break plus one more to see a clean
-file. That is what the loop is for.
+file. That is what the loop is for, and it is also what a CI job looks like from the inside.
 """
 
 # %% solution
@@ -758,13 +908,18 @@ with a compiler behind it. `PlatformProtocol` has six abstract members and asks 
 `validate`, `plan`, and `explain` come with default implementations that delegate to the core
 validator, so a platform gets structured diagnostics without writing any. `stream` is optional.
 
-What a real platform does between `execute` and the result is the part QProgram deliberately does not
-specify: lower the AST to its sequencer language, allocate registers and waveform memory, upload, arm
-the triggers, start the acquisition, stream partial results back, and assemble the same xarray
-shapes. The reference executor is the oracle for that last step. It defines what the result of a
-program means, so a vendor compiler can be tested by running the same program both ways and comparing
-the arrays. It models no timing and no waveform physics, and that is deliberate. It is the semantics
-of the language, not a simulator of your fridge.
+Six members is a small interface for a large job, and the size is the claim. What a real platform
+does between `execute` and the result is deliberately unspecified: lower the AST to its sequencer
+language, allocate registers and waveform memory, upload, arm the triggers, start the acquisition,
+stream partial results back, and assemble the same xarray shapes. That work is where a vendor's
+expertise lives and QProgram has no business specifying it.
+
+What QProgram does specify is the last step, and the reference executor is how. It defines what the
+result of a program *means*, in code, so a vendor compiler can be tested by running the same program
+both ways and comparing the arrays. Without an oracle, "does this compiler produce the right answer"
+has no operational definition. With one, it is a test suite. The reference executor models no timing
+and no waveform physics, and that is deliberate. It is the semantics of the language, not a
+simulator of your fridge.
 """
 
 # %%
@@ -792,13 +947,21 @@ Seven steps, in the order a real chip gets brought up, each one a program saved 
 7. **Active reset.** Measure, and play a pi pulse only if the qubit came back excited.
 
 Steps 4 to 6 drive with the pi pulse step 3 just fitted, not with the seed pulse from the top of the
-notebook. Feeding each step into the next is the reason to run a bring-up as one script.
+notebook. Feeding each step into the next is the reason to run a bring-up as one script. Do it by
+hand, one notebook cell at a time, and the number in step 5 came from whichever version of step 3
+you last happened to run.
+
+Runtime is worth a number, because it explains why anybody automates this. Here the whole thing
+takes a few seconds of interpreter time. On hardware, with passive reset, the shot counts and point
+counts below come to roughly ten minutes of fridge time, and the day is spent on the scans that fail
+and get repeated rather than on the ones in this list. A bring-up that runs unattended and writes
+its own files is the difference between measuring one qubit and measuring fifty.
 
 The delays in steps 4 to 6 change the result only because the measurement model reads
 `env["delay"]`. The reference executor has no timing model. On hardware the delay is the physics;
 here it is an argument.
 
-Three cells: two to run it, one to report. Short because `step` does the repetitive part.
+Three cells, two to run it and one to report. Short because `step` does the repetitive part.
 """
 
 # %%
@@ -858,10 +1021,13 @@ print(f"excited population: {before:.3f} before reset ({P_HOT} in the model), {a
 
 # %% [markdown]
 r"""
-Now the report. The calibration table is the deliverable. It puts what you measured next to what the
-device actually is, so you can see which numbers to trust. The fitted pulses go out beside it in a `.wfl`
-library, so tomorrow's run loads today's numbers from a file instead of from a literal somebody
-pasted into a script.
+Now the report. The calibration table is the deliverable, and putting the measured column next to
+the true one is a habit worth keeping even when there is no true column to put there. On hardware
+you compare against last week instead, and a number that moved by more than its error bar is either
+physics or a bug, and either way you want to know today rather than in the paper.
+
+The fitted pulses go out beside it in a `.wfl` library, so tomorrow's run loads today's numbers from
+a file instead of from a literal somebody pasted into a script.
 """
 
 # %%
@@ -894,23 +1060,30 @@ r"""
 - Three extension seams cover new vocabulary: a `Waveform`, a `SweepSource`, and a vendor
   `Operation` behind a `VendorNamespace`. Each is a class plus a registration call, and each gets
   serialization, validation, and a capability token without any change to the core. A fourth,
-  `register_vendor_block`, does the same for a vendor's own control flow.
+  `register_vendor_block`, does the same for a vendor's own control flow. A fifth,
+  `register_profile`, publishes the token bundle a rack reaches by name.
 - The token is what makes an extension safe. A rack that lacks it refuses the program with a named
-  diagnostic and a path, before anything reaches an instrument.
+  diagnostic and a path, before anything reaches an instrument. A fork would have given you the same
+  working program locally and a syntax error everywhere else.
 - Entry points make a `.qp` file self-describing. The `require` line names the vendor, and `loads()`
-  imports the extension that claims it.
+  imports the extension that claims it, so an archived file does not depend on the reader knowing
+  what the author had installed.
 - The `.qp` file is the artifact you keep. It diffs, it reviews, and `python -m qprogram.lsp check`
   turns it into a CI job.
 - The capstone recovered f_r, f01, the pi amplitude, T1, T2\*, the detuning, and T2 from simulated
   data, wrote a file per step, and put the fitted pulses in a `.wfl` library. That directory is a
   calibration another lab could load.
 
-Where to read more, all in the QProgram repository: `.specs/qprogram-dsl.md` is the normative
-specification, `.specs/qp-file-format.md` covers the text format, `grammar/qp.lark` is the
-machine-readable grammar, and `qprogram-qblox` is the smallest complete vendor extension worth
-copying.
+Where to read more. The published documentation at qilimanjaro-tech.github.io/qprogram carries the
+normative material in its Reference section, `docs/reference/qp-format.md` covers the text format,
+and `src/qprogram/grammar/qp.lark` is the machine-readable grammar.
+`docs/developer/vendor-extensions.md` walks a vendor package end to end, and `qprogram-qdac` is the
+smallest complete one worth copying, at four operations and one profile.
 
-One idea to carry forward: the program, the plan, and the calibration are all data. Anything you can
-serialize, you can diff, review, check in CI, and hand to a different machine. That is the argument
-for a pulse-level DSL that is not a string builder.
+One idea to carry forward. The program, the plan, and the calibration are all data, and everything
+this tutorial did followed from that. A program you can serialize is a program you can diff, review,
+check in CI, and hand to a different machine. A plan you can print is a performance question you can
+answer before you spend fridge time on it. A calibration in a file is a number with a date on it
+rather than a literal somebody remembers typing. None of that is available to a string builder, and
+all of it is the reason to write the extra layer.
 """

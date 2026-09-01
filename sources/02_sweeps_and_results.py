@@ -61,8 +61,12 @@ true parameters down in one place. The numbers are in plain sight, and the job o
 is to recover them from data. If your fit disagrees with `DEVICE`, either the fit is wrong or you
 learned something about the analysis.
 
-Part 2 needs three of these numbers: where the readout resonator sits, how wide it is, and how far
-the qubit pulls it.
+Part 1 went through how these numbers constrain each other. Part 2 uses three of them. The
+resonator frequency `q0_fr` is the answer this notebook is looking for. The linewidth `q0_kappa`
+sets how finely you have to step to see it: 1.5 MHz wide means a 200 kHz grid puts seven or eight
+points across the dip, and a 2 MHz grid steps over it. And the dispersive shift `q0_chi` gives the
+second experiment its point, because it is the part of the resonator frequency that
+depends on the qubit, and therefore the part that goes away when you push too hard.
 """
 
 # %%
@@ -92,10 +96,12 @@ print(f"dispersive shift {DEVICE['q0_chi'] / 1e6:+.2f} MHz")
 r"""
 ## 2.1 A variable is a hole in the program
 
-You do not know where the resonator is. You know it is somewhere near 7.2 GHz, because that is
-where the designer put it and the chip came back within a percent or two. So you cannot write
-`set_frequency(readout, 7.2e9)` and be done. You have to write the program once with a hole in it,
-and let something else decide what goes in the hole.
+You do not know where the resonator is. You know roughly, because a designer drew it and a
+simulator predicted 7.2 GHz, but a resonator's frequency depends on the physical length of a
+patterned line and on the kinetic inductance of the film that got sputtered that day, and neither
+comes back from the fab to better than a percent or two. One percent of 7.2 GHz is 72 MHz, against a
+resonance 1.5 MHz wide. So you cannot write `set_frequency(readout, 7.2e9)` and be done. You have to
+write the program once with a hole in it and let something else decide what goes in the hole.
 
 `program.variable(id, label=..., units=...)` declares that hole. The id is the only part that
 matters to the machine. It becomes the identifier in the `.qp` file and the dimension name in the
@@ -170,18 +176,27 @@ no `while`. What changes between a frequency ramp and a table of calibrated phas
 | `qp.Rotate(src, by)` | arbitrary | the same sweep, cyclically shifted |
 | `qp.Concat([src, src])` | arbitrary | several sweeps end to end |
 
-One thing to fix in your head now, because it will bite you otherwise: **`Range` includes its stop
-value.** It is a frequency span, not a Python `range()`.
+One thing to fix in your head now, because it will bite you otherwise. **`Range` is `start + step *
+i`, and it holds `round((stop - start) / step) + 1` points.** It lands on `stop` only when the step
+divides `stop - start` evenly. Otherwise the last point falls short of `stop`, or steps past it.
+Reach for `Linspace` when the last point has to land on `stop` exactly.
 """
 
 # %%
-print("Range(0, 10, 2)   ->", qp.Range(0, 10, 2).values())    # stop included: 10 is there
-print("Range(0, 10, 3)   ->", qp.Range(0, 10, 3).values())    # ... when the step lands on it
+print("Range(0, 10, 2)   ->", qp.Range(0, 10, 2).values())    # 6 points, landing on 10
+print("Range(0, 10, 3)   ->", qp.Range(0, 10, 3).values())    # 4 points, stopping short at 9
+print("Range(0, 1, 0.6)  ->", qp.Range(0, 1, 0.6).values())   # 3 points, overshooting to 1.2
 print("Linspace(0, 10, 5)->", qp.Linspace(0, 10, 5).values())
 print("Values([...])     ->", qp.Values([7.19e9, 7.20e9, 7.21e9]).values())
 
 span = qp.Range(7.19e9, 7.21e9, 0.2e6)
 print("a 20 MHz span at 200 kHz steps:", span.length(), "points")   # 101, not 100
+
+with scratch.sweep(freq).from_range(7.19e9, 7.21e9, 0.2e6):   # no source class named
+    pass
+
+print("fluent: ", qp.dumps(scratch).splitlines()[-1].strip())
+print("object: for freq in", span)
 
 # %% [markdown]
 r"""
@@ -194,8 +209,24 @@ therefore run the loop from a hardware register, incrementing a frequency word p
 nothing uploaded and no host in the loop. `Range` and `Linspace` make that promise.
 
 `"arbitrary"` means the values are a list. The platform either uploads them as a table, which costs
-sequencer memory, or steps them from the host, which costs a round trip per point. The difference
-shows up directly in how long your experiment takes.
+sequencer memory, or steps them from the host, which costs a round trip per point.
+
+Now the arithmetic that makes this worth caring about, because "costs a round trip" is easy to nod
+at and hard to feel. The resonator scan later in this notebook is 101 points at 200 shots, so 20200
+executions of the sequence. Price them three ways:
+
+- **Inside the sequencer**, one execution is the pulse plus the reset. On this chip a shot is a 2 us
+  readout followed by however long you wait for the qubit to relax, and five $T_1$ is 90 us, so call
+  it 100 us. The scan takes 2 seconds and almost all of it is waiting for the qubit to cool.
+- **With active reset** (Part 4), the same shot drops to a few microseconds and the scan takes about
+  0.2 seconds. Reset was 90 percent of your fridge time and now it is not.
+- **From the host**, every execution costs a network round trip through a driver and a Python stack.
+  A millisecond on a good day. The same scan takes 20 seconds, and no amount of clever
+  pulse work changes that, because you are no longer measuring a qubit, you are measuring Ethernet.
+
+That factor of a hundred between the first and the third row is the reason a sweep source has to
+declare what it is instead of just handing over a list. Part 5 is where a rack takes that
+declaration and tells you which of the three rows you are in.
 
 `Values` is arbitrary **even when the numbers you pass are evenly spaced**. The source carries the
 claim, and a list of floats proves nothing about its own regularity. If your sweep
@@ -203,7 +234,7 @@ really is a ramp, say `Range` or `Linspace` and let the compiler use it.
 
 The tokens are how a platform declines: a rack whose sequencer cannot do log sweeps refuses
 `sweep.logspace`, and refuses it inside a combinator too, because combinators union their children's
-tokens. Part 5 is where those refusals get interesting.
+tokens.
 """
 
 # %%
@@ -221,9 +252,13 @@ r"""
 ### Combinators
 
 Three sources take another source and rearrange it. They exist because the patterns show up
-constantly in the lab: repeat a scan to watch it drift, rotate a phase list to move the reference
-point, glue a coarse scan to a fine one. All three are arbitrary, and all three report their child's
-tokens alongside their own.
+constantly in the lab. `Repeat` runs a scan twice back to back so you can overlay the halves and see
+whether the chip moved under you, the cheapest drift check there is. `Rotate` shifts a
+phase list so the reference point lands somewhere else without rewriting the list. `Concat` glues a
+coarse survey to a fine scan, so one program covers a wide band at low resolution and the
+interesting 5 MHz at high resolution.
+
+All three are arbitrary, and all three report their child's tokens alongside their own.
 """
 
 # %%
@@ -237,12 +272,40 @@ print("Rotate(Logspace(...)) needs:", sorted(qp.Rotate(qp.Logspace(0.01, 1.0, 4)
 
 # %% [markdown]
 r"""
+There is a second spelling for the same loop. `program.sweep(freq).from_range(...)` and its siblings
+`.from_linspace(...)`, `.from_logspace(...)`, `.from_values(...)` and `.from_file(...)` build the
+same `Sweep` node and write the same `.qp` line as passing a source object, without naming a source
+class at the call site. A bare list in the source position works too, and means `Values`.
+
+This part passes source objects throughout, for two reasons. The `KIND` and the capability tokens
+are what the rest of the section turns on, and both live on the class. And the combinators reach
+further than the fluent form does. `qp.Concat([qp.Rotate(base, by=i) for i in range(4)])` has no
+`from_*` equivalent, so a composed source is built as a value and handed in. Recognize both
+spellings, because the library's own landing page opens with the fluent one.
+"""
+
+# %% [markdown]
+r"""
 ## 2.3 `average(shots)` adds no dimension
 
-A single measurement of a superconducting qubit is a handful of photons hitting an amplifier chain.
-It is noisy. The fix is repetition. Run the identical sequence a few hundred times and average.
+A single measurement of a superconducting qubit is noisy, and it is noisy in two unrelated ways that
+are worth keeping apart in your head.
 
-`with program.average(shots=N)` is that repetition, and it is the one block that does **not** show
+The first is the amplifier chain. What comes back from the fridge is a few tens of microwave photons
+at 7 GHz, roughly $10^{-19}$ joules, and every stage between the chip and the ADC adds noise to it.
+Even a quantum-limited parametric amplifier adds half a photon of vacuum noise because it is not
+allowed to do better; a HEMT-only chain adds ten or twenty. That noise lands on the `iq` point and
+averaging beats it down.
+
+The second is the qubit. A superposition is not a dim signal, it is a coin. Measure a state that is
+half excited and you get a 1 or a 0, never a 0.5, and the spread you see across repetitions is the
+projection itself rather than anything the electronics did. That noise lands on the `state` field
+and averaging turns it into a population.
+
+Both shrink as $1/\sqrt{N}$, so the same knob fixes both. They differ in where the floor is: the
+first can be improved by buying a better amplifier, and the second cannot be improved at all.
+
+`with program.average(shots=N)` is that repetition, and it is the one loop that does **not** show
 up as a dimension in the result. `iq` and `raw` come back as means over the shots; `state` comes
 back as the excited-state population. You almost always want that, and when you do want the
 individual shots there is a trick for it in Part 4.
@@ -270,8 +333,12 @@ for shots in (1, 4, 64, 256):
 
 # %% [markdown]
 r"""
-The shape never changes. The spread falls as $1/\sqrt{N}$: half the noise costs four times the
-measurement time, and that trade is the whole reason shot counts get argued about in group meetings.
+The shape never changes. The spread falls as $1/\sqrt{N}$, so halving the noise costs four times the
+measurement time. That exchange rate is why shot counts get argued about in group meetings, and it
+is worth being blunt about which direction the argument usually goes. Doubling your shots is the
+laziest possible improvement and it buys you 1.4x. Fixing the thing that made the signal small in
+the first place, a badly placed readout frequency or a lossy cable, routinely buys you 10x. Reach
+for shots last.
 
 Averaging does something different to the `state` field. A single shot is classified 0 or 1, so one
 shot gives you a bit. Average 500 of them and the same array position holds a population, a number
@@ -314,14 +381,32 @@ Now the honest part, and it will be repeated. **The simulator is not physics.** 
 the waits, the syncs, the gains you set are all recorded in the AST, validated against the
 platform, and then ignored by the interpreter. There is no timing model and no waveform model. When
 you sweep an amplitude and watch a dip move, it moved because your `response` function read
-`env["ro_amp"]` and did the arithmetic itself. That is deliberate. This tutorial puts the program
-and the analysis under test, and those are the parts you would carry to a real fridge unchanged.
+`env["ro_amp"]` and did the arithmetic itself.
+
+That sounds like a limitation and it is really a choice about what is under test. A tutorial with a
+real Lindblad solver behind it would teach you to trust a simulation. This one puts the two things
+you actually carry to a fridge under test instead: the program, which has to say the right thing to
+a machine, and the analysis, which has to get the right number out of noisy data. Both of those are
+identical here and on hardware. The qubit is the only stand-in.
 
 One consequence of that, and every cell below leans on it. Every `measure` here passes the string
 aliases `"readout"` and `"weights"` and never binds them to real waveforms, and the run works
 anyway, because the interpreter never looks at a pulse. A real platform does look. It needs samples
 to upload, so `program.with_waveforms(library)` has to come first. Part 3 does that binding for
 real.
+
+One operation below is new. `set_frequency` and `set_gain` write registers a sequencer owns.
+`set_parameter(bus, name, value)` writes something the platform holds as configuration instead, an
+attenuator setting or a local oscillator, and platforms expose it host-side only for that reason.
+The name is a free string that nothing validates, so a typo becomes a parameter the platform has
+never heard of rather than an error at the call site. Its value reaches the measurement model under
+the key `"bus.parameter"`, and that is why `env` below carries `q0/readout.attenuation` alongside
+the loop variables. `get_parameter` is the read direction, handing back a fresh variable the runtime
+fills in.
+
+The write sits above both loops on purpose. Put it inside the sweep and the whole loop nest goes
+host-side, one network round trip per point, which is the `forced-host` story of Part 5 arriving
+three parts early.
 """
 
 # %%
@@ -337,16 +422,15 @@ def peek(bus, env):
 env_probe = qp.QProgram(label="env_probe", schema=schema)
 ro_freq = env_probe.variable("ro_freq", units="Hz")
 ro_amp = env_probe.variable("ro_amp", units="V")
+env_probe.set_parameter(q[0].readout, "attenuation", 30.0)  # above the loops, deliberately
 with env_probe.average(shots=2):
     with env_probe.sweep(ro_amp, qp.Values([0.1, 0.4])):
         with env_probe.sweep(ro_freq, qp.Linspace(7.19e9, 7.21e9, 3)):
             env_probe.measure(q[0].readout, "readout", "weights")
 
-# qp.simulate() builds one of these per call. Part 5 works with the platform object directly.
-platform = qp.ReferencePlatform(
-    model=qp.MockMeasurementModel(response=peek),
-    parameters={"q0/readout.attenuation": 30.0},
-)
+# qp.simulate() builds one of these per call and forwards model=, schema= and parameters= into it.
+# The platform is spelled out here because section 6.4 works with the object directly.
+platform = qp.ReferencePlatform(model=qp.MockMeasurementModel(response=peek))
 platform.execute(env_probe)
 
 print("samples requested:", len(seen), "= 2 shots x 2 amplitudes x 3 frequencies")
@@ -357,16 +441,34 @@ print("env:", seen[0][1])
 r"""
 ## 2.5 Resonator spectroscopy
 
-The first real measurement on a new chip. Send a weak tone down the feedline, step its frequency
-across the band where the readout resonator should be, and record what comes back. On resonance the
-resonator absorbs, so transmission drops. The dip tells you the frequency; its width tells you the
-linewidth $\kappa$.
+The first real measurement on a new chip. Send a tone down the feedline, step its frequency across
+the band where the readout resonator should be, and record what comes back.
 
-The model is the standard notch response,
+Take a second on the geometry, because it explains the shape of the curve. The resonator is not in
+line with the signal path. It hangs off the side of a feedline that runs past it and continues to
+the output port. Hence the two names it goes by, hanger and notch. Off resonance the resonator
+is invisible and the tone reaches the output untouched, so $|S_{21}| = 1$. On resonance the
+resonator absorbs power out of the feedline and dumps it, mostly back into the input and into its
+own losses, so less arrives at the output and the trace dips. The dip tells you the frequency; its
+width tells you the linewidth $\kappa$; and its **depth** tells you something people often skip
+over.
 
 $$ S_{21}(f) = 1 - \frac{0.9}{1 + i\,\delta}, \qquad \delta = \frac{f - f_r}{\kappa / 2} $$
 
-which is 90% deep on resonance and flat away from it. Everything else is the program:
+The 0.9 is not decoration. For a notch resonance the depth is $Q_L/Q_c$, the fraction of the total
+loss that goes out through the coupler rather than into the material. A dip 90 percent deep means
+nine tenths of the energy leaves the way you want it to, and one tenth is lost to the substrate, the
+oxides, and whatever else. Run the numbers: $Q_L = f_r/\kappa = 4800$, so $Q_c = Q_L/0.9 = 5300$ and
+$1/Q_i = 1/Q_L - 1/Q_c$ gives $Q_i = 48000$. Overcoupled by a factor of ten, and for readout
+that is the right direction, because a photon lost to the substrate carries its information nowhere.
+
+A shallow dip on a real chip is therefore bad news rather than a measurement problem. It means
+$Q_i$ has collapsed, and the usual culprits are a warm fridge, a stray photon population, or a
+two-level defect that has wandered into the resonator's frequency.
+
+The model carries no amplitude, so this scan has one number in it and the dip sits on the bare
+resonator frequency. How hard the feedline is driven moves that answer, and section 2.7 puts the
+power axis back. Everything else is the program:
 
 - one variable, `ro_freq`, swept with `Range` over a 20 MHz window at 200 kHz steps,
 - `set_frequency` on the readout bus, so the tone follows the variable,
@@ -409,9 +511,14 @@ print("first three points:", np.round(s21_data[:3], 3))
 r"""
 Two plots, because they fail in different ways. Magnitude shows the dip, and you look at it first.
 Phase turns by about a radian either side of the resonance, and it stays readable when the dip is
-shallow, which is how an over-coupled resonator often looks. The size of the turn is set by the
-coupling. A perfectly matched notch swings through $\pi$, and this one, 90% deep, gets about 60% of
-the way there.
+shallow, which is how an over-coupled resonator often looks.
+
+The size of the turn is set by the coupling, and you can read it off the same 0.9. In the complex
+plane the trace draws a circle of diameter 0.9 that passes through $1$ off resonance and through
+$0.1$ on it, so its centre sits at $0.55$ and the largest phase excursion is
+$\arcsin(0.45/0.55) = 55$ degrees. A total swing of 110 degrees, or about 60 percent of the $\pi$
+that a perfectly matched notch would give. If your phase swings the full $\pi$, the resonator is
+critically coupled and half your photons are going into the substrate.
 """
 
 # %%
@@ -436,11 +543,14 @@ r"""
 better than your step size. A 200 kHz grid gives you the resonator to 200 kHz, full stop. Part 3
 fits a real curve and does better than the grid.
 
-The width needs one step of care. The dip in $|S_{21}|$ is not a Lorentzian, so its half-depth
-width is not $\kappa$. Subtract the off-resonance baseline and square what is left: $|S_{21} - 1|^2$
-is a plain Lorentzian in power, and its full width at half maximum is $\kappa$ exactly. Reading the
-half-maximum crossings with `np.interp` interpolates between grid points, which is how the number
-below lands within 10 kHz on a 200 kHz grid.
+The width needs one step of care, and the reason is a mistake people make once. The dip in
+$|S_{21}|$ is not a Lorentzian. $S_{21}$ is one minus a complex Lorentzian, and taking the magnitude
+of that mixes the real and imaginary parts, so the shape you see is narrower on one side than the
+Lorentzian it came from and its half-depth width is not $\kappa$. Subtract the off-resonance
+baseline first and square what is left. $|S_{21} - 1|^2$ is a plain Lorentzian in power, and its
+full width at half maximum is $\kappa$ exactly. Reading the half-maximum crossings with `np.interp`
+interpolates between grid points, which is how the number below lands within 10 kHz on a 200 kHz
+grid.
 """
 
 # %%
@@ -477,6 +587,14 @@ still your job.
 `result.get(handle)` defaults to `field=MF.IQ`. Ask for a field the measurement never requested and
 you get a `KeyError`, including the default, so a state-only measurement needs `field=MF.STATE`
 spelled out.
+
+`get` accepts three spellings of the same question. A handle is the one to prefer, because it says
+what it means and survives a reordering of the program, and every read in this tutorial uses one. A
+plain name string selects the same record, and that is the form you reach for when the handle
+objects are gone. After a `.qp` round trip, `QProgram.measurement_handles()` hands back handles that
+compare equal to the originals, and Part 5 does exactly that. An integer is positional sugar for
+declaration order. `bus=` narrows the candidates before any of the three is matched, so `get(0,
+bus=q[1].readout)` means the first measurement on that bus rather than the first in the program.
 """
 
 # %%
@@ -501,11 +619,26 @@ plt.show()
 r"""
 ## 2.7 Punchout: nesting two sweeps
 
-You have the resonator frequency at one particular readout power. That is not enough to set up
-readout, because the resonator moves with power. At low power it sits at $f_r + \chi$, pulled by the
-qubit it is coupled to. Drive it harder and the qubit saturates, the pull goes away, and the
-resonator lands on its bare frequency $f_r$. The crossover is called punchout, and the map of it is
-how you choose a readout power. Low enough that the pull is still there, high enough to get signal.
+You have the resonator frequency at one particular readout power, and that is not enough to set up
+readout, because the frequency you measured depends on the power you measured it with.
+
+Here is why. Dispersive readout works because the qubit and the resonator are coupled but far apart
+in frequency, so they cannot swap energy and can only shift each other. The approximation behind
+that has a validity limit, and the limit is a photon number:
+
+$$ n_{\text{crit}} = \frac{\Delta^2}{4g^2} $$
+
+With this chip's 2.35 GHz detuning and the $g \approx 190$ MHz that Part 1 backed out,
+$n_{\text{crit}}$ is about 37 photons. Below that the resonator sits at $f_r + \chi$, pulled by the
+qubit it is coupled to. Drive the cavity past a few tens of photons and the dispersive description
+stops holding, the pull washes out, and the resonator lands on its bare frequency $f_r$. The
+crossover is called punchout, and it is abrupt enough to be obvious in a 2D map.
+
+That map is how you choose a readout power, and the choice is a squeeze from both sides. More
+photons means more signal, and signal-to-noise per shot grows with the square root of the photon
+number, so you want to be as high as you can. But the information lives in the $2\chi$ pull, and the
+pull is the thing punchout destroys. So you park a few decibels below the crossover: enough photons
+to separate the two states in one shot, few enough that there are still two states to separate.
 
 Two nested `with` statements, two variables, and the outer one becomes the outer dimension. That is
 the whole change to the program.
@@ -587,9 +720,14 @@ coordinate arrays. Point $k$ of one is always paired with point $k$ of the other
 grid.
 
 The frequency list here comes from the map measured in the cell above, so it is a `Values`
-source: arbitrary by construction, and honestly so. A diagonal is what you want whenever the
-interesting region is a curve rather than a rectangle, which covers ridge tracking like this,
-chevron cuts, and any scan where one parameter has to be compensated as another moves.
+source: arbitrary by construction, and honestly so.
+
+A diagonal is what you want whenever the interesting region is a curve rather than a rectangle, and
+that covers more of a lab's day than the 2D map does. Ridge tracking like this. Chevron cuts, where
+the gate duration and the flux amplitude have to move together. Any scan where one parameter has to
+be compensated as another moves, and that covers most of the second half of a bring-up. The 40x
+saving here is typical, and the reason people still take the full map first is that you cannot walk
+a ridge you have not found.
 """
 
 # %%
@@ -686,6 +824,10 @@ Qubit 1 has its own readout resonator at 7.35 GHz. Its band does not overlap qub
 them one after the other doubles your measurement time for no reason. Sweep both frequencies in
 lockstep instead and measure both buses at every point.
 
+This is the shape that scales. A 50-qubit chip has 50 resonators spread across a couple of
+gigahertz, and reading them one at a time is 50 times slower than reading them together. Frequency
+multiplexing is why they were spread out in the first place.
+
 1. Declare two variables, `f0` and `f1`, and sweep them in parallel with
    `sweep(f0, ...) | sweep(f1, ...)`. Give each a 41-point `Linspace` over its own 10 MHz band
    (`7.195` to `7.205` GHz, and `7.345` to `7.355` GHz). Use `shots=100`.
@@ -757,14 +899,18 @@ r"""
   Expressions built on top of it re-evaluate every iteration, waveform parameters included.
 - A **sweep source** says how the variable moves. `Range` and `Linspace` are `linear`, so a
   sequencer can run them from a register. `Values`, `Logspace`, `File` and the combinators are
-  `arbitrary`, and a platform pays for that in table space or host round trips. `Range` includes its
-  stop value. `Values` stays arbitrary even when its numbers are evenly spaced.
+  `arbitrary`, and a platform pays for that in table space or host round trips, the
+  difference between a two-second scan and a twenty-second one. `Range` includes its stop value.
+  `Values` stays arbitrary even when its numbers are evenly spaced.
 - **`average(shots)` adds no dimension.** It shrinks the noise on `iq` as $1/\sqrt{N}$ and turns
-  `state` from a 0/1 outcome into a population.
+  `state` from a 0/1 outcome into a population. Amplifier noise and projection noise both obey that
+  law, and only one of them can be fixed by buying something.
 - The **measurement model** is the fake fridge, and it is the only thing in the loop that produces a
   number. No timing, no pulse physics. The program and the analysis are the real parts.
 - Results are **xarray**, one dimension per enclosing sweep, outermost first, named after your
   variable ids, with one shared `"a|b"` dimension for a parallel pair.
-- You now have the resonator: 7.200 GHz, 1.5 MHz wide, and a punchout map that says what power to
-  read out at. Part 3 puts a second tone on the drive line and goes looking for the qubit itself.
+- You now have the bare resonator at 7.200 GHz, its 1.5 MHz linewidth, the loss budget hiding in the
+  90 percent dip depth, and a punchout map that says how many photons you can spend before the qubit
+  stops showing through. Part 3 puts a second tone on the drive line and goes looking for the qubit
+  itself.
 """

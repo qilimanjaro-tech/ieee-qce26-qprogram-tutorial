@@ -8,9 +8,8 @@ Nothing in this tutorial talks to hardware, so there is no lab access to arrange
 to collect.
 
 > **QProgram 0.1.0 is pre-release.** It is an alpha library and the tutorial is pinned to that exact
-> version. The install line below is the one to use. If `pip` reports that no matching distribution
-> exists, the release is not on PyPI yet: install from the source repository instead, which is the
-> fallback given in [Option A](#option-a-local-install) and in the troubleshooting table.
+> version, along with the two vendor extension packages Parts 5 and 6 read. All three are on PyPI.
+> Pinning matters more than usual here, because an alpha library is allowed to move under you.
 
 ---
 
@@ -29,19 +28,18 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 # 2. install QProgram, scipy, and a notebook UI if you do not have one
-pip install "qprogram[viz]==0.1.0" scipy jupyterlab
+pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 scipy jupyterlab
 
 # 3. launch Jupyter and open notebooks/00_setup.ipynb
 jupyter lab
 ```
 
-If the pinned version is not on PyPI yet, install from the repository instead:
+The `v0.1.0` tag is what the notebooks are verified against. To track the source instead, each
+distribution installs from its own repository:
 
 ```bash
 pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@v0.1.0" scipy jupyterlab
 ```
-
-The `v0.1.0` tag is what the notebooks are verified against. If it has not been cut yet, use `@main`.
 
 ### A2: with uv
 
@@ -51,7 +49,7 @@ interpreter if yours is too old:
 ```bash
 uv venv --python 3.13
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-uv pip install "qprogram[viz]==0.1.0" scipy jupyterlab
+uv pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 scipy jupyterlab
 jupyter lab
 ```
 
@@ -71,6 +69,13 @@ pieces this tutorial and your editor want, in brackets after the package name:
 `python -m qprogram.lsp check file.qp` and `python -m qprogram.lsp explain file.qp` need **no** extra:
 they run on the base install and print JSON diagnostics or the execution plan. Only `serve` needs
 `lsp`.
+
+**The two vendor packages are separate distributions, not extras.** `qprogram-qblox` and
+`qprogram-qdac` add operations, capability profiles, and serialization for a Qblox cluster and a
+QDevil QDAC. Neither talks to an instrument and neither pulls in a vendor SDK. Their only dependency
+is `qprogram` itself, so they cost an import and nothing else. Part 5 builds a rack out of the two
+published profiles and Part 6 reads their packaging, which is why the install lines above include
+them. Parts 0 to 4 never touch either one.
 
 **scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing,
 `scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, and the
@@ -123,9 +128,11 @@ print(result.get(m0).dims)                                 # ('ro_freq', 'IQ')
 print(qp.loads(qp.dumps(program)).body == program.body)     # True
 ```
 
-Three lines of expected output, and the version has to come from `importlib.metadata`: the package
-deliberately has no `__version__` attribute. `notebooks/00_setup.ipynb` does all of this plus the
-plot.
+Three lines of expected output. The version is read through `importlib.metadata` rather than through
+`qprogram.__version__`, because the attribute reports a `0.0.0` placeholder when the package is
+imported from a source tree with no installed metadata, while `importlib.metadata.version` raises
+there instead of quietly reporting the wrong number. `notebooks/00_setup.ipynb` does all of this plus
+the plot.
 
 ---
 
@@ -133,12 +140,12 @@ plot.
 
 | Symptom | Fix |
 |---------|-----|
-| `ERROR: Could not find a version that satisfies the requirement qprogram` | The 0.1.0 release is not on PyPI yet. Use the `git+https://` install line from A1, with `@main` if the tag is missing. |
+| `ERROR: Could not find a version that satisfies the requirement qprogram` | Almost always an unsupported interpreter: the distributions require Python 3.11 or newer. Check `python --version` first, then use the `git+https://` line from A1. |
+| `ModuleNotFoundError: No module named 'qprogram_qdac'` | Part 5 needs it: `pip install qprogram-qdac==0.1.0 qprogram-qblox==0.1.0`. Parts 0 to 4 run without both. |
 | `pip` picks an old resolver or fails on the extras syntax | Upgrade pip first: `pip install -U pip`. Keep the quotes around `"qprogram[viz]==0.1.0"`; some shells eat the brackets. |
 | `python --version` is 3.10 or older | Make a fresh environment on a supported interpreter: `uv venv --python 3.13`. On Colab: Runtime > Change runtime type. |
 | `ModuleNotFoundError: No module named 'matplotlib'` | The `viz` extra is missing: `pip install "qprogram[viz]"`. |
 | `ModuleNotFoundError: No module named 'scipy'` | `pip install scipy`. Parts 3, 4, and 6 fit curves. |
-| `AttributeError: module 'qprogram' has no attribute '__version__'` | Expected. Use `from importlib.metadata import version; version("qprogram")`. |
 | `python -m qprogram.lsp serve` fails to import | The `lsp` extra is missing: `pip install "qprogram[lsp]"`. The `check` and `explain` modes do not need it. |
 | Plots stay invisible | matplotlib is inline by default in a notebook kernel, so check you are in a kernel and not running the file as a script. The notebooks deliberately carry no `%matplotlib` magic. |
 | Colab offers to restart the session after the install | Re-run the first cell. The install is cached for the session. |
