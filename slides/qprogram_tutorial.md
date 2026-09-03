@@ -136,7 +136,7 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 | | | opening, the chip, and the language | 25 min |
 | 1 | `01_pulse_programs` | The program is data | 20 min |
 | 2 | `02_sweeps_and_results` | Sweeps, averaging, and results | 20 min |
-| 3 | `03_finding_the_qubit` | Finding and driving the qubit | 25 min |
+| 3 | `03_finding_the_qubit` | Finding the qubit | 25 min |
 | 4 | `04_coherence_and_feedback` | Coherence, single shots, feedback | 30 min |
 | 5 | `05_one_program_many_machines` | Capabilities, plans, porting | 30 min |
 | 6 | `06_extending_and_shipping` | Extending, shipping, capstone | 20 min |
@@ -526,17 +526,17 @@ m0 = program.measure(q[0].readout, readout_pulse, weights)
 
 The verbs are instrument actions, not gates.
 
-| what the hardware does | QProgram | where it lands |
-|---|---|---|
-| write the NCO frequency | `set_frequency` | a register |
-| write or zero the NCO phase | `set_phase`, `reset_phase` | a register |
-| scale the whole output path | `set_gain` | a register |
-| emit an envelope from waveform memory | `play` | one instruction plus an address |
-| hold a DC level | `set_offset` | a register, or a slow-control write |
-| idle a channel | `wait` | a counter |
-| bring channels to a common time | `sync` | a barrier the platform resolves |
-| emit, integrate, optionally threshold | `measure` | the acquisition path |
-| repeat a block | `average`, `sweep` | a loop over a register |
+| what it does | QProgram |
+|---|---|
+| set the modulation frequency of the pulses | `set_frequency` |
+| set or zero the phase reference | `set_phase`, `reset_phase` |
+| scale the whole output path | `set_gain` |
+| offset the whole output path | `set_offset` |
+| output one pulse envelope | `play` |
+| idle a bus | `wait` |
+| bring buses to a common time | `sync` |
+| output a pulse, integrate the return, optionally classify it | `measure` |
+| repeat a block | `average`, `sweep` |
 
 ---
 

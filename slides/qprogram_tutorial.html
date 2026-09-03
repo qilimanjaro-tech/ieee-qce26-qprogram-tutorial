@@ -98,7 +98,7 @@
 <tr>
 <td>3</td>
 <td><code>03_finding_the_qubit</code></td>
-<td>Finding and driving the qubit</td>
+<td>Finding the qubit</td>
 <td>25 min</td>
 </tr>
 <tr>
@@ -612,56 +612,46 @@ m0 = program.measure(q[<span class="hljs-number">0</span>].readout, readout_puls
 <table>
 <thead>
 <tr>
-<th>what the hardware does</th>
+<th>what it does</th>
 <th>QProgram</th>
-<th>where it lands</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>write the NCO frequency</td>
+<td>set the modulation frequency of the pulses</td>
 <td><code>set_frequency</code></td>
-<td>a register</td>
 </tr>
 <tr>
-<td>write or zero the NCO phase</td>
+<td>set or zero the phase reference</td>
 <td><code>set_phase</code>, <code>reset_phase</code></td>
-<td>a register</td>
 </tr>
 <tr>
 <td>scale the whole output path</td>
 <td><code>set_gain</code></td>
-<td>a register</td>
 </tr>
 <tr>
-<td>emit an envelope from waveform memory</td>
-<td><code>play</code></td>
-<td>one instruction plus an address</td>
-</tr>
-<tr>
-<td>hold a DC level</td>
+<td>offset the whole output path</td>
 <td><code>set_offset</code></td>
-<td>a register, or a slow-control write</td>
 </tr>
 <tr>
-<td>idle a channel</td>
+<td>output one pulse envelope</td>
+<td><code>play</code></td>
+</tr>
+<tr>
+<td>idle a bus</td>
 <td><code>wait</code></td>
-<td>a counter</td>
 </tr>
 <tr>
-<td>bring channels to a common time</td>
+<td>bring buses to a common time</td>
 <td><code>sync</code></td>
-<td>a barrier the platform resolves</td>
 </tr>
 <tr>
-<td>emit, integrate, optionally threshold</td>
+<td>output a pulse, integrate the return, optionally classify it</td>
 <td><code>measure</code></td>
-<td>the acquisition path</td>
 </tr>
 <tr>
 <td>repeat a block</td>
 <td><code>average</code>, <code>sweep</code></td>
-<td>a loop over a register</td>
 </tr>
 </tbody>
 </table>
