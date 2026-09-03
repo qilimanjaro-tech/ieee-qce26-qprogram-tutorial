@@ -2,20 +2,19 @@
 r"""
 # 02 · Sweeps, averaging, and what comes back
 
-Part 1 built programs that do one thing, once. Every calibration you will ever run is a loop:
-step a knob, measure, step it again, and look at the shape of what came back. This part is about
-the three pieces that turn a sequence into an experiment.
+Part 1 built programs that do one thing, once. Every calibration you will ever run is a loop: step a
+knob, measure, step it again, and look at the shape of what came back. Three pieces turn a sequence
+into an experiment. A variable is the hole in the program where the knob goes. A sweep source says
+how that variable moves, in a form a compiler can read. And `average(shots)` repeats the whole thing
+and hands you a mean instead of one sample.
 
-- **Variables and expressions** are the parametric holes in a program.
-- **Sweep sources** say how a variable moves, in a form a compiler can read.
-- **`average(shots)`** repeats the whole thing and hands you a mean instead of one sample.
+Then the other half, the data. `qp.simulate` gives back an `xarray.DataArray` whose dimensions carry
+the names you gave your variables, and whose axes, when you declared a label and a unit alongside
+those names, know how to draw themselves.
 
-Then the other half. What `qp.simulate` gives back, why it is an `xarray.DataArray`, and how the
-dimension names come from the variables you declared.
-
-Two experiments carry it. **Resonator spectroscopy** finds the readout resonator, the first
-measurement anyone makes on a new chip. **Punchout** is the 2D scan that shows the resonator
-sliding as you push more power at it, and it tells you what power to read out at. About 35 minutes.
+Two experiments carry it. Resonator spectroscopy finds the readout resonator, the first measurement
+anyone makes on a new chip. Punchout is the 2D scan that shows the resonator sliding as you push
+more power at it, and it tells you what power to read out at. About 35 minutes.
 """
 
 # %%
@@ -38,12 +37,12 @@ from importlib.metadata import version
 print("qprogram", version("qprogram"))
 
 # %%
-import matplotlib.pyplot as plt
 import numpy as np
 
 import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
+from qprogram.plotting import Quantity, Style
 from qprogram.waveforms import Square
 
 schema = BusSchema.transmon()
@@ -105,7 +104,10 @@ write the program once with a hole in it and let something else decide what goes
 
 `program.variable(id, label=..., units=...)` declares that hole. The id is the only part that
 matters to the machine. It becomes the identifier in the `.qp` file and the dimension name in the
-result. `label` and `units` are for humans.
+result. `label` and `units` are for people, and they travel further than decoration would. Both ride
+out to the coordinate in the result and label the axes of every figure drawn from it, so those two
+strings are the difference between a plot that names itself and one you annotate by hand. Section
+2.6 is where you see them arrive.
 
 Arithmetic on a variable builds an expression tree. Nothing is computed at that point.
 `freq - 7.2e9` is a `BinaryOp` node holding a variable and a constant, and you can print it, walk
@@ -115,7 +117,7 @@ it, serialize it, or hand it to any operation that takes a number.
 # %%
 scratch = qp.QProgram(label="expressions", schema=schema)
 freq = scratch.variable("freq", label="Readout frequency", units="Hz")
-amp = scratch.variable("amp", label="Readout amplitude", units="V")
+amp = scratch.variable("amp", label="Readout amplitude", units="DAC units")
 
 # Detuning from the resonator, in half-linewidths. This is data, not a number.
 detuning = (freq - DEVICE["q0_fr"]) / (DEVICE["q0_kappa"] / 2)
@@ -204,29 +206,15 @@ r"""
 
 Every source declares a `KIND`, either `"linear"` or `"arbitrary"`, and a capability `TOKEN`.
 
-`"linear"` is a promise about the values. Point $i$ is exactly `start + step * i`. A sequencer can
-therefore run the loop from a hardware register, incrementing a frequency word per iteration, with
-nothing uploaded and no host in the loop. `Range` and `Linspace` make that promise.
+`"linear"` is a promise about the values. Point $i$ is exactly `start + step * i`, so a sequencer
+can run the loop out of a hardware register, incrementing a frequency word per iteration, with
+nothing uploaded and no control computer in the loop. `Range` and `Linspace` make that promise.
 
-`"arbitrary"` means the values are a list. The platform either uploads them as a table, which costs
-sequencer memory, or steps them from the host, which costs a round trip per point.
-
-"Costs a round trip" is easy to nod at and hard to feel, so do the arithmetic. The resonator scan
-later in this notebook is 101 points at 200 shots, so 20200 executions of the sequence. Price them
-three ways:
-
-- **Inside the sequencer**, one execution is the pulse plus the reset. On this chip a shot is a 2 us
-  readout followed by however long you wait for the qubit to relax, and five $T_1$ is 90 us, so call
-  it 100 us. The scan takes 2 seconds and almost all of it is waiting for the qubit to cool.
-- **With active reset** (Part 4), the same shot drops to a few microseconds and the scan takes about
-  0.2 seconds. Reset was 90 percent of your fridge time and now it is not.
-- **From the host**, every execution costs a network round trip through a driver and a Python stack.
-  A millisecond on a good day. The same scan takes 20 seconds, and no amount of clever
-  pulse work changes that, because you are no longer measuring a qubit, you are measuring Ethernet.
-
-That factor of a hundred between the first and the third row is the reason a sweep source has to
-declare what it is instead of just handing over a list. Part 5 is where a rack takes that
-declaration and tells you which of the three rows you are in.
+`"arbitrary"` means the values are a list, and a list has to reach the instrument somehow. The
+platform either uploads it as a table, which costs sequencer memory, or steps it from the host, one
+round trip per point. Both of those are slower than a register, and how much slower is a property of
+the rack rather than of the program. Part 5 takes a real capability descriptor and tells you which
+of the two you landed in.
 
 `Values` is arbitrary **even when the numbers you pass are evenly spaced**. The source carries the
 claim, and a list of floats proves nothing about its own regularity. If your sweep
@@ -404,9 +392,9 @@ the key `"bus.parameter"`, and that is why `env` below carries `q0/readout.atten
 the loop variables. `get_parameter` is the read direction, handing back a fresh variable the runtime
 fills in.
 
-The write sits above both loops on purpose. Put it inside the sweep and the whole loop nest goes
-host-side, one network round trip per point, which is the `forced-host` story of Part 5 arriving
-three parts early.
+The write sits above both loops on purpose. One attenuator setting covers the whole scan, so writing
+it once outside is both what you mean and what the cheaper program looks like. Part 5 has the tools
+that tell you when a write inside a loop has dragged the loop off the sequencer with it.
 """
 
 # %%
@@ -421,7 +409,7 @@ def peek(bus, env):
 
 env_probe = qp.QProgram(label="env_probe", schema=schema)
 ro_freq = env_probe.variable("ro_freq", units="Hz")
-ro_amp = env_probe.variable("ro_amp", units="V")
+ro_amp = env_probe.variable("ro_amp", units="DAC units")
 env_probe.set_parameter(q[0].readout, "attenuation", 30.0)  # above the loops, deliberately
 with env_probe.average(shots=2):
     with env_probe.sweep(ro_amp, qp.Values([0.1, 0.4])):
@@ -509,35 +497,10 @@ print("first three points:", np.round(s21_data[:3], 3))
 
 # %% [markdown]
 r"""
-Two plots, because they fail in different ways. Magnitude shows the dip, and you look at it first.
-Phase turns by about a radian either side of the resonance, and it stays readable when the dip is
-shallow, which is how an over-coupled resonator often looks.
-
-The size of the turn is set by the coupling, and you can read it off the same 0.9. In the complex
-plane the trace draws a circle of diameter 0.9 that passes through $1$ off resonance and through
-$0.1$ on it, so its centre sits at $0.55$ and the largest phase excursion is
-$\arcsin(0.45/0.55) = 55$ degrees. A total swing of 110 degrees, or about 60 percent of the $\pi$
-that a perfectly matched notch would give. If your phase swings the full $\pi$, the resonator is
-critically coupled and half your photons are going into the substrate.
-"""
-
-# %%
-fig, (ax_mag, ax_phase) = plt.subplots(1, 2, figsize=(11, 3.6))
-
-ax_mag.plot(freqs / 1e9, np.abs(s21_data), ".-")
-ax_mag.axvline(DEVICE["q0_fr"] / 1e9, color="grey", ls=":", label="true $f_r$")
-ax_mag.set(xlabel="Readout frequency (GHz)", ylabel="|S21| (arb.)", title="Magnitude")
-ax_mag.legend()
-
-ax_phase.plot(freqs / 1e9, np.unwrap(np.angle(s21_data)), ".-", color="tab:orange")
-ax_phase.set(xlabel="Readout frequency (GHz)", ylabel="arg S21 (rad)", title="Phase")
-
-fig.tight_layout()
-plt.show()
-
-# %% [markdown]
-r"""
 ### Reading the numbers off the curve
+
+The picture comes in a moment, and it is worth more with the answer already drawn on it, so take the
+two numbers first.
 
 `argmin` is enough for the centre here, with one caveat: it can never be better than your step size.
 A 200 kHz grid gives you the resonator to 200 kHz, full stop. Part 3 fits a real curve and does
@@ -570,6 +533,71 @@ print(f"sweep step {(freqs[1] - freqs[0]) / 1e3:.0f} kHz, so f_r is quantised to
 
 # %% [markdown]
 r"""
+### The figure the result already knows how to draw
+
+`result.plot(handle)` reads the array the way `result.get(handle)` reads it and lets the shape
+choose the figure. One swept dimension besides `IQ` makes a line, and `channels="magnitude"` takes
+the hypotenuse of the two quadratures instead of drawing both. Nothing in the call names the x axis,
+because the variable was declared with a label and a unit back when the program was written and both
+rode out to the coordinate.
+
+The unit that reached the axis is hertz, and a frequency axis wants gigahertz, so `coords=` restates
+it for the figure alone. The restatement is a pair and the library insists on both halves.
+`units="GHz"` on its own would relabel numbers it never moved, and `transform=lambda v: v / 1e9` on
+its own would leave an axis reading hertz over values near 7.2. Either one alone raises.
+
+That pair has a consequence on the next line. The drawn numbers moved, so everything you hand the
+returned `Axes` afterwards is in the figure's units too, and both reference lines below are divided
+by `1e9` while `f_dip` itself stays in hertz. `Style(markers=True)` puts a dot at each of
+the 101 samples, and on a sweep this coarse the dots are the measurement while the line between them
+is the renderer joining them up.
+"""
+
+# %%
+ax = result.plot(
+    m_spec,
+    channels="magnitude",
+    coords={"ro_freq": Quantity(units="GHz", transform=lambda v: v / 1e9)},
+    value=Quantity("Readout magnitude"),
+    style=Style(markers=True),
+    title="Resonator spectroscopy",
+)
+ax.axvline(f_dip / 1e9, color="tab:red", lw=1, label=f"argmin at {f_dip / 1e9:.4f} GHz")
+ax.axvline(DEVICE["q0_fr"] / 1e9, color="grey", ls=":", label="true $f_r$")
+ax.legend(fontsize=8)
+
+# %% [markdown]
+r"""
+Draw the same measurement again with `channels="phase"` and you get the other half of the story. The
+two fail in different ways. Magnitude shows the dip and you look at it first, but it flattens out
+when the dip is shallow, which is how an over-coupled resonator often looks. Phase turns by about a
+radian either side of the resonance and stays readable there.
+
+The size of the turn is set by the coupling, and you can read it off the same 0.9. In the complex
+plane the trace draws a circle of diameter 0.9 that passes through $1$ off resonance and through
+$0.1$ on it, so its centre sits at $0.55$ and the largest phase excursion is
+$\arcsin(0.45/0.55) = 55$ degrees. A total swing of 110 degrees, or about 60 percent of the $\pi$
+that a perfectly matched notch would give. If your phase swings the full $\pi$, the resonator is
+critically coupled and half your photons are going into the substrate.
+"""
+
+# %%
+ax_phase = result.plot(
+    m_spec,
+    channels="phase",
+    coords={"ro_freq": Quantity(units="GHz", transform=lambda v: v / 1e9)},
+    value=Quantity("Phase", "rad"),
+    style=Style(markers=True),
+    title="The same sweep, phase instead of magnitude",
+)
+ax_phase.axvline(DEVICE["q0_fr"] / 1e9, color="grey", ls=":")
+
+phase = np.unwrap(np.angle(s21_data))
+swing = np.degrees(phase.max() - phase.min())
+print(f"total phase swing {swing:.0f} degrees, against the 110 the loss budget predicts")
+
+# %% [markdown]
+r"""
 ## 2.6 Results are xarray, and the dimension names are yours
 
 `qp.simulate` returns a `QProgramResult`: one record per `measure` call, keyed by the handle.
@@ -581,8 +609,10 @@ The ids have to be identifiers for that reason. They are the dimension names you
 `.sel()` six months from now, and the identifiers in the `.qp` file. Pick them like you pick column
 names.
 
-`label` and `units` do not travel into the coordinate attributes. Axis labels on your plots are
-still your job.
+The label and the units ride out alongside the id. They land on the coordinate as `long_name` and
+`units`, and that is where the axis of the figure above got its words, since nothing in that call
+named an axis. Declaring the two strings when you declare the variable is therefore the whole of
+plot labeling, done once, at the point where you still remember what the variable means.
 
 `result.get(handle)` defaults to `field=MF.IQ`. Ask for a field the measurement never requested and
 you get a `KeyError`, including the default, so a state-only measurement needs `field=MF.STATE`
@@ -595,25 +625,23 @@ objects are gone. After a `.qp` round trip, `QProgram.measurement_handles()` han
 compare equal to the originals, and Part 5 does exactly that. An integer is positional sugar for
 declaration order. `bus=` narrows the candidates before any of the three is matched, so `get(0,
 bus=q[1].readout)` means the first measurement on that bus rather than the first in the program.
+
+`plot` takes all three spellings too, for the same reason and with the same lookup behind it.
 """
 
 # %%
 print(iq.isel(ro_freq=slice(0, 4)))   # the first four rows, so the repr fits on screen
 
+print("\nwhat the variable left on the coordinate:", iq.coords["ro_freq"].attrs)
+
 # Label-based selection is the point of xarray: no index arithmetic, no guessing the axis order.
 on_resonance = iq.sel(IQ="I").sel(ro_freq=DEVICE["q0_fr"], method="nearest")
-print("\nI at the resonator:", round(float(on_resonance), 4))
+print("I at the resonator:", round(float(on_resonance), 4))
 
 try:
     result.get(m_spec, field=MF.STATE)   # this measurement asked for iq and nothing else
 except KeyError as err:
     print("asking for a field that was never requested:", err)
-
-magnitude = np.abs(iq.sel(IQ="I") + 1j * iq.sel(IQ="Q"))
-magnitude.name = "|S21|"
-magnitude.plot(marker=".")
-plt.title("The same curve, plotted by xarray itself")
-plt.show()
 
 # %% [markdown]
 r"""
@@ -643,7 +671,7 @@ to separate the two states in one shot, few enough that there are still two stat
 Two nested `with` statements, two variables, and the outer one becomes the outer dimension. That is
 the whole change to the program.
 
-The cost model changes though. A 25 x 41 grid is 1025 points, so 200 shots each would be 205k
+The arithmetic changes though. A 25 x 41 grid is 1025 points, so 200 shots each would be 205k
 samples. Drop to 50 shots per point and the same scan is 51k samples, about a second. Shots x points
 is the number to keep an eye on, in the simulator and on real hardware alike.
 """
@@ -658,7 +686,7 @@ def s21_power(bus, env):
 
 
 punchout = qp.QProgram(label="punchout", schema=schema)
-pun_amp = punchout.variable("ro_amp", label="Readout amplitude", units="V")
+pun_amp = punchout.variable("ro_amp", label="Readout amplitude", units="DAC units")
 pun_freq = punchout.variable("ro_freq", label="Readout frequency", units="Hz")
 
 with punchout.average(shots=50):
@@ -676,25 +704,40 @@ print(f"nesting: {type(shot_loop).__name__}({shot_loop.shots}) -> "
       f"{type(outer_sweep).__name__}({outer_sweep.variable.id}) -> "
       f"{type(inner_sweep).__name__}({inner_sweep.variable.id})")
 
+# %% [markdown]
+r"""
+Two sweeps make two plot dimensions, so the same `result.plot` call that drew a line for the
+one-dimensional scan draws a heatmap here, with the magnitude on the colour bar because a surface
+has only one number per cell to colour. The inner sweep runs along x and the outer up y, matching
+the loop nesting, so frequency comes out left to right and power upward without either being asked
+for. `x=` and `y=` override that when you want it the other way round, and naming one settles the
+other, which beats transposing the array yourself and then relabeling both axes to match.
+
+Both variables were declared with a label and a unit, so the frequency axis, the amplitude axis and
+the colour bar all name themselves. The two white lines are the physics, at $f_r + \chi$ and at bare
+$f_r$, and they are in gigahertz because the figure is.
+"""
+
 # %%
-punch_model = qp.MockMeasurementModel(response=s21_power, noise=0.02, seed=11)
-punch_iq = qp.simulate(punchout, model=punch_model).get(m_pun)
+punch_result = qp.simulate(
+    punchout, model=qp.MockMeasurementModel(response=s21_power, noise=0.02, seed=11)
+)
+punch_iq = punch_result.get(m_pun)
 print("dims:", punch_iq.dims, "shape:", punch_iq.shape, "(outermost sweep first)")
 
+ax_pun = punch_result.plot(
+    m_pun,
+    coords={"ro_freq": Quantity(units="GHz", transform=lambda v: v / 1e9)},
+    value=Quantity("Readout magnitude"),
+    title=r"Punchout. Dotted: $f_r + \chi$. Dashed: bare $f_r$.",
+)
+ax_pun.axvline((DEVICE["q0_fr"] + DEVICE["q0_chi"]) / 1e9, color="w", ls=":", lw=1)
+ax_pun.axvline(DEVICE["q0_fr"] / 1e9, color="w", ls="--", lw=1)
+
+# %%
 punch_mag = np.abs(punch_iq.sel(IQ="I") + 1j * punch_iq.sel(IQ="Q")).values
 amps = punch_iq.coords["ro_amp"].values
 scan_freqs = punch_iq.coords["ro_freq"].values
-
-plt.pcolormesh(scan_freqs / 1e9, amps, punch_mag, shading="nearest")
-plt.colorbar(label="|S21| (arb.)")
-plt.axvline((DEVICE["q0_fr"] + DEVICE["q0_chi"]) / 1e9, color="w", ls=":", lw=1)
-plt.axvline(DEVICE["q0_fr"] / 1e9, color="w", ls="--", lw=1)
-plt.xlabel("Readout frequency (GHz)")
-plt.ylabel("Readout amplitude (V)")
-plt.title(r"Punchout. Dotted: $f_r + \chi$. Dashed: bare $f_r$.")
-plt.show()
-
-# %%
 dip_per_amp = scan_freqs[punch_mag.argmin(axis=1)]
 
 for k in (0, 12, 24):
@@ -706,11 +749,71 @@ print(f"frequency step {(scan_freqs[1] - scan_freqs[0]) / 1e3:.0f} kHz,"
 
 # %% [markdown]
 r"""
+### The power axis, log spaced
+
+Readout power spans decades and a linear amplitude axis spends most of its points at the top end,
+where nothing is moving any more. The pull in `s21_power` has already halved at 0.35 V and is down
+to a fifth of itself by 0.7 V, and the 25-point linear sweep above put eight of its points past
+that and only six below 0.25 V. `qp.Logspace(0.02, 1.0, 20)` puts thirteen of its twenty below
+0.25 V, with five fewer measurements in total.
+
+That costs something at the other end. `Logspace` is `arbitrary`, so no sequencer register can
+produce it and the platform is back to uploading a table or stepping from the host, where `Linspace`
+would have been free. Twenty points is a cheap table, so this is the trade going the right way, and
+`KIND` printed below is the declaration a platform reads to decide.
+
+The dip depth, by the way, does not move in this model. The response is always 90 percent deep and
+only the centre slides, so the position carries all of the information in the figure.
+
+The figure is the same heatmap call with one line added to it. A log amplitude axis is not something
+the result can know you want, so it is `ax.set_yscale("log")` on the axes that comes back. That
+division holds all the way through this tutorial. The library draws the measurement, and you draw
+every decision about the figure.
+"""
+
+# %%
+power_scan = qp.QProgram(label="punchout_log", schema=schema)
+log_amp = power_scan.variable("ro_amp", label="Readout amplitude", units="DAC units")
+log_freq = power_scan.variable("ro_freq", label="Readout frequency", units="Hz")
+
+with power_scan.average(shots=50):
+    with power_scan.sweep(log_amp, qp.Logspace(0.02, 1.0, 20)):
+        with power_scan.sweep(log_freq, qp.Linspace(7.1955e9, 7.2025e9, 41)):
+            power_scan.set_gain(q[0].readout, log_amp)
+            power_scan.set_frequency(q[0].readout, log_freq)
+            m_log = power_scan.measure(q[0].readout, "readout", "weights")
+
+log_result = qp.simulate(
+    power_scan, model=qp.MockMeasurementModel(response=s21_power, noise=0.02, seed=13)
+)
+log_iq = log_result.get(m_log)
+log_amps = log_iq.coords["ro_amp"].values
+log_freqs = log_iq.coords["ro_freq"].values
+log_mag = np.abs(log_iq.sel(IQ="I") + 1j * log_iq.sel(IQ="Q")).values
+log_dip = log_freqs[log_mag.argmin(axis=1)]
+
+print("Logspace kind:", qp.Logspace(0.02, 1.0, 20).KIND, "against Linspace:",
+      qp.Linspace(0.02, 1.0, 20).KIND)
+print(f"{log_amps[0]:.3f} V -> {log_dip[0] / 1e9:.6f} GHz, "
+      f"target f_r + chi = {(DEVICE['q0_fr'] + DEVICE['q0_chi']) / 1e9:.6f}")
+print(f"{log_amps[-1]:.3f} V -> {log_dip[-1] / 1e9:.6f} GHz, "
+      f"target bare f_r = {DEVICE['q0_fr'] / 1e9:.6f}")
+
+ax_log = log_result.plot(
+    m_log,
+    coords={"ro_freq": Quantity(units="GHz", transform=lambda v: v / 1e9)},
+    value=Quantity("Readout magnitude"),
+    title="Punchout on a log power axis",
+)
+ax_log.set_yscale("log")
+
+# %% [markdown]
+r"""
 ### The same scan as a diagonal: parallel loops
 
-The map cost 1025 measurements and most of them were off resonance. Now that you know where the
-ridge is, you can walk along it: step the amplitude and the frequency **together**, one point per
-amplitude, 25 measurements instead of 1025.
+Either map cost you a rectangle of measurements and most of them were off resonance. Now that you
+know where the ridge is, you can walk along it instead: step the amplitude and the frequency
+**together**, one point per amplitude, 25 measurements instead of 1025.
 
 `sweep(a, src) | sweep(b, src)` is that lockstep pair. Both loops advance on the same tick, so they
 must have the same length. Every source can report its length without running, so the check happens
@@ -719,8 +822,18 @@ at run time. In the result the pair shares one dimension named `"ro_amp|ro_freq"
 coordinate arrays. Point $k$ of one is always paired with point $k$ of the other, and there is no
 grid.
 
-The frequency list here comes from the map measured in the cell above, so it is a `Values`
+The frequency list here comes from the linear map rather than the log one, so it is a `Values`
 source: arbitrary by construction, and honestly so.
+
+One dimension carrying two coordinates is more than an axis can hold, and `plot` draws both rather
+than dropping one. The first variable of the pair goes along the bottom and the second on a twin
+scale across the top, in the order the loops were written. Those top ticks land on samples instead
+of round numbers, because tick $k$ and sample $k$ are the same measurement and a tick anywhere else
+would be labeling a position nothing was measured at.
+
+The twin takes a `coords=` restatement keyed by its own name, the same way the bottom axis does, so
+the frequencies below are drawn as a detuning from the bare resonator in MHz. Left in gigahertz they
+would have been five ticks spanning 1.8 MHz, every one of them rounding to 7.199.
 
 A diagonal is what you want whenever the interesting region is a curve rather than a rectangle, and
 that covers more of a lab's day than the 2D map does. Ridge tracking like this. Chevron cuts, where
@@ -732,7 +845,7 @@ a ridge you have not found.
 
 # %%
 ridge = qp.QProgram(label="punchout_ridge", schema=schema)
-d_amp = ridge.variable("ro_amp", label="Readout amplitude", units="V")
+d_amp = ridge.variable("ro_amp", label="Readout amplitude", units="DAC units")
 d_freq = ridge.variable("ro_freq", label="Readout frequency", units="Hz")
 
 with ridge.average(shots=50):
@@ -741,9 +854,10 @@ with ridge.average(shots=50):
         ridge.set_frequency(q[0].readout, d_freq)
         m_ridge = ridge.measure(q[0].readout, "readout", "weights")
 
-ridge_iq = qp.simulate(
+ridge_result = qp.simulate(
     ridge, model=qp.MockMeasurementModel(response=s21_power, noise=0.02, seed=11)
-).get(m_ridge)
+)
+ridge_iq = ridge_result.get(m_ridge)
 ridge_mag = np.abs(ridge_iq.sel(IQ="I") + 1j * ridge_iq.sel(IQ="Q")).values
 
 print("dims:  ", ridge_iq.dims, ridge_iq.shape)
@@ -752,73 +866,22 @@ print("measurements:", ridge_iq.sizes["ro_amp|ro_freq"], "against", 25 * 41, "fo
 print("|S21| along the ridge:", np.round(ridge_mag[:6], 3), "...")
 print("still in the dip everywhere:", bool(ridge_mag.max() < 0.3))
 
-# %% [markdown]
-r"""
-### 🧩 Exercise 2.1: punchout on a log power axis
-
-Readout power spans decades, and a linear amplitude axis wastes most of its points at the top end.
-Redo the punchout with a log-spaced amplitude axis and pull out the punchout curve on its own.
-
-1. Build the same program with `qp.Logspace(0.02, 1.0, 20)` for the amplitude and the same 41-point
-   `Linspace` for the frequency. Keep `shots=50`.
-2. Run it with `s21_power`.
-3. Take the dip frequency per amplitude with `argmin(axis=1)` and plot it against amplitude on a
-   `plt.semilogx` axis. Draw the two targets, $f_r + \chi$ and $f_r$, as horizontal lines.
-4. Print `qp.Logspace(0.02, 1.0, 20).KIND` and write one comment line saying what that kind costs a
-   platform.
-
-The dip depth, by the way, does not move in this model. The response is always 90% deep, only the
-centre slides. The position is what carries the information.
-"""
-
-# %% solution
-power_scan = qp.QProgram(label="punchout_log", schema=schema)
-log_amp = power_scan.variable("ro_amp", label="Readout amplitude", units="V")
-log_freq = power_scan.variable("ro_freq", label="Readout frequency", units="Hz")
-
-with power_scan.average(shots=50):
-    with power_scan.sweep(log_amp, qp.Logspace(0.02, 1.0, 20)):
-        with power_scan.sweep(log_freq, qp.Linspace(7.1955e9, 7.2025e9, 41)):
-            power_scan.set_gain(q[0].readout, log_amp)
-            power_scan.set_frequency(q[0].readout, log_freq)
-            m_log = power_scan.measure(q[0].readout, "readout", "weights")
-
-log_iq = qp.simulate(
-    power_scan, model=qp.MockMeasurementModel(response=s21_power, noise=0.02, seed=13)
-).get(m_log)
-log_amps = log_iq.coords["ro_amp"].values
-log_freqs = log_iq.coords["ro_freq"].values
-log_mag = np.abs(log_iq.sel(IQ="I") + 1j * log_iq.sel(IQ="Q")).values
-log_dip = log_freqs[log_mag.argmin(axis=1)]
-
-# Logspace is arbitrary: no sequencer register can produce it, so the platform either uploads
-# the 20 values as a table or steps them one host round trip at a time.
-print("Logspace kind:", qp.Logspace(0.02, 1.0, 20).KIND)
-print(f"{log_amps[0]:.3f} V -> {log_dip[0] / 1e9:.6f} GHz, "
-      f"target f_r + chi = {(DEVICE['q0_fr'] + DEVICE['q0_chi']) / 1e9:.6f}")
-print(f"{log_amps[-1]:.3f} V -> {log_dip[-1] / 1e9:.6f} GHz, "
-      f"target bare f_r = {DEVICE['q0_fr'] / 1e9:.6f}")
-
-plt.semilogx(log_amps, log_dip / 1e9, "o-")
-plt.axhline((DEVICE["q0_fr"] + DEVICE["q0_chi"]) / 1e9, color="grey", ls=":", label=r"$f_r + \chi$")
-plt.axhline(DEVICE["q0_fr"] / 1e9, color="grey", ls="--", label=r"bare $f_r$")
-plt.xlabel("Readout amplitude (V, log axis)")
-plt.ylabel("Dip frequency (GHz)")
-plt.title("Punchout curve")
-plt.legend()
-plt.show()
-
-# %% stub
-# TODO: repeat the punchout with a log-spaced amplitude axis.
-# 1) qp.Logspace(0.02, 1.0, 20) for ro_amp, the same 41-point Linspace for ro_freq, shots=50.
-# 2) Run it with s21_power and a seed of your choice.
-# 3) dip = freqs[mag.argmin(axis=1)], then plt.semilogx(amps, dip / 1e9, "o-").
-#    Add plt.axhline for f_r + chi and for bare f_r.
-# 4) Print qp.Logspace(0.02, 1.0, 20).KIND and say in a comment what it costs a platform.
+ax_ridge = ridge_result.plot(
+    m_ridge,
+    channels="magnitude",
+    coords={
+        "ro_freq": Quantity(
+            "Dip frequency minus bare f_r", "MHz", lambda v: (v - DEVICE["q0_fr"]) / 1e6
+        )
+    },
+    value=Quantity("Readout magnitude"),
+    style=Style(markers=True),
+    title="Walking the ridge: in the dip at every power, and the pull closing as the power rises",
+)
 
 # %% [markdown]
 r"""
-### 🧩 Exercise 2.2: two resonators in one pass
+### 🧩 Exercise 2.1: two resonators in one pass
 
 Qubit 1 has its own readout resonator at 7.35 GHz. Its band does not overlap qubit 0's, so scanning
 them one after the other doubles your measurement time for no reason. Sweep both frequencies in
@@ -836,6 +899,12 @@ multiplexing is why they were spread out in the first place.
    frequency and which centre to use. `q1_fr` is in `DEVICE`.
 4. Print the dims of each record and the dip frequency each one found. Then write a comment
    explaining why there is one dimension of length 41 here and not a 41 x 41 grid.
+5. Draw each record with `result.plot(handle, channels="magnitude")`. Both records live on the same
+   `"f0|f1"` dimension, so the default reads `f0` along the bottom and `f1` across the top. That is
+   the right way round for the q0 record and the wrong way round for the q1 one, where `x="f1"` asks
+   for a bare axis carrying the frequency that record was actually measured at. Restate whichever
+   axes you draw into GHz with `coords=`, and remember that a `coords=` key naming an axis the
+   figure does not draw raises rather than being ignored.
 """
 
 # %% solution
@@ -874,13 +943,29 @@ for handle, coord, truth in ((m_q0, "f0", DEVICE["q0_fr"]), (m_q1, "f1", DEVICE[
     axis = da.coords[coord].values
     found = axis[mag.argmin()] / 1e9
     print(f"{handle.name}: dims={da.dims}, dip {found:.4f} GHz, true {truth / 1e9:.4f} GHz")
-    plt.plot((axis - axis.mean()) / 1e6, mag, ".-", label=handle.name)
 
-plt.xlabel("Offset from the centre of each band (MHz)")
-plt.ylabel("|S21| (arb.)")
-plt.title("Two resonators, one lockstep sweep")
-plt.legend()
-plt.show()
+in_ghz = Quantity(units="GHz", transform=lambda v: v / 1e9)
+
+# Both coordinates are drawn here, f0 along the bottom and f1 above, so both get restated.
+ax_pair_0 = pair_result.plot(
+    m_q0,
+    channels="magnitude",
+    coords={"f0": in_ghz, "f1": in_ghz},
+    value=Quantity("Readout magnitude"),
+    style=Style(markers=True),
+    title="q0 resonator, with the band q1 was scanned over at the same time on top",
+)
+
+# x= drops the twin, so only the axis that is left may be named in coords=.
+ax_pair_1 = pair_result.plot(
+    m_q1,
+    channels="magnitude",
+    x="f1",
+    coords={"f1": in_ghz},
+    value=Quantity("Readout magnitude"),
+    style=Style(markers=True),
+    title="q1 resonator, the same 41 measurements, drawn against f1 alone",
+)
 
 # %% stub
 # TODO: scan both readout resonators in one lockstep sweep.
@@ -890,25 +975,31 @@ plt.show()
 #    DEVICE["q1_fr"] is 7.35e9.
 # 4) Print each record's dims and its dip frequency, and explain the single 41-long dimension
 #    in a comment.
+# 5) result.plot(m_q0, channels="magnitude") reads f0 below and f1 above; the q1 record wants
+#    x="f1". Restate the drawn axes into GHz with coords={...: Quantity(units="GHz",
+#    transform=lambda v: v / 1e9)}.
 
 # %% [markdown]
 r"""
 ## Recap and what is next
 
 - A **variable** is a hole in the program, and the loop that binds it decides what goes in.
-  Expressions built on top of it re-evaluate every iteration, waveform parameters included.
+  Expressions built on top of it re-evaluate every iteration, waveform parameters included. Its
+  `label` and `units` follow the data out and label the axes of every figure you draw from it.
 - A **sweep source** says how the variable moves. `Range` and `Linspace` are `linear`, so a
   sequencer can run them from a register. `Values`, `Logspace`, `File` and the combinators are
-  `arbitrary`, and a platform pays for that in table space or host round trips, the
-  difference between a two-second scan and a twenty-second one. `Range` includes its stop value.
-  `Values` stays arbitrary even when its numbers are evenly spaced.
+  `arbitrary`, and a platform pays for that in table space or host round trips. `Range` includes its
+  stop value only when the step divides the span. `Values` stays arbitrary even when its numbers are
+  evenly spaced.
 - **`average(shots)` adds no dimension.** It shrinks the noise on `iq` as $1/\sqrt{N}$ and turns
   `state` from a 0/1 outcome into a population. Amplifier noise and projection noise both obey that
   law, and only one of them can be fixed by buying something.
 - The **measurement model** is the fake fridge, and it is the only thing in the loop that produces a
   number. No timing, no pulse physics. The program and the analysis are the real parts.
 - Results are **xarray**, one dimension per enclosing sweep, outermost first, named after your
-  variable ids, with one shared `"a|b"` dimension for a parallel pair.
+  variable ids, with one shared `"a|b"` dimension for a parallel pair. `result.plot` reads that
+  shape and picks the figure, a line for one swept dimension, a heatmap for two, a twin scale for
+  the pair. Fits, reference lines and a log axis go on the `Axes` it hands back.
 - You now have the bare resonator at 7.200 GHz, its 1.5 MHz linewidth, the loss budget hiding in the
   90 percent dip depth, and a punchout map that says how many photons you can spend before the qubit
   stops showing through. Part 3 puts a second tone on the drive line and goes looking for the qubit

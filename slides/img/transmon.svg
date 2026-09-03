@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>What a transmon is</title>
+  <desc>A capacitor sitting across a Josephson junction, and the ladder of levels that circuit
+  gives you. The junction is the nonlinear element, so the rungs crowd together as you climb and
+  the bottom two can be addressed on their own. A harmonic oscillator cannot do that, because one
+  drive frequency would hit every transition at once.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrowgrey" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#6a6a82"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="40" y="52" font-size="32" font-weight="700" fill="#1c1c2e">What a transmon is</text>
+  <text x="40" y="84" font-size="22" fill="#6a6a82">two circuit elements, one nonlinear, and the ladder that falls out of them</text>
+
+  <!-- ============ band A: the circuit ============ -->
+  <rect x="40" y="110" width="560" height="560" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="68" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The circuit</text>
+  <text x="68" y="182" font-size="20" fill="#6a6a82">a capacitor across a Josephson junction</text>
+
+  <text x="150" y="226" font-size="20" fill="#6a6a82" text-anchor="middle">capacitor</text>
+  <text x="470" y="226" font-size="20" fill="#6a6a82" text-anchor="middle">junction</text>
+
+  <!-- the loop -->
+  <line x1="150" y1="244" x2="470" y2="244" stroke="#1c1c2e" stroke-width="2"/>
+  <line x1="150" y1="424" x2="470" y2="424" stroke="#1c1c2e" stroke-width="2"/>
+
+  <!-- left branch: the capacitor -->
+  <line x1="150" y1="244" x2="150" y2="324" stroke="#1c1c2e" stroke-width="2"/>
+  <line x1="110" y1="324" x2="190" y2="324" stroke="#0f766e" stroke-width="3"/>
+  <line x1="110" y1="346" x2="190" y2="346" stroke="#0f766e" stroke-width="3"/>
+  <line x1="150" y1="346" x2="150" y2="424" stroke="#1c1c2e" stroke-width="2"/>
+
+  <!-- right branch: the boxed X of a Josephson junction -->
+  <line x1="470" y1="244" x2="470" y2="307" stroke="#1c1c2e" stroke-width="2"/>
+  <rect x="442" y="307" width="56" height="56" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <line x1="450" y1="315" x2="490" y2="355" stroke="#0f766e" stroke-width="2"/>
+  <line x1="490" y1="315" x2="450" y2="355" stroke="#0f766e" stroke-width="2"/>
+  <line x1="470" y1="363" x2="470" y2="424" stroke="#1c1c2e" stroke-width="2"/>
+
+  <text x="150" y="468" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">E_C</text>
+  <text x="150" y="496" font-size="20" fill="#6a6a82" text-anchor="middle">charging energy</text>
+  <text x="470" y="468" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">E_J</text>
+  <text x="470" y="496" font-size="20" fill="#6a6a82" text-anchor="middle">Josephson energy</text>
+
+  <rect x="68" y="520" width="504" height="60" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="92" y="558" font-size="22" font-weight="700" fill="#1c1c2e">transmon regime</text>
+  <text x="548" y="558" font-size="24" font-weight="700" fill="#0f766e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">E_J/E_C &gt;~ 50</text>
+
+  <text x="68" y="616" font-size="20" fill="#6a6a82">A big ratio buys immunity to charge noise.</text>
+  <text x="68" y="644" font-size="20" fill="#6a6a82">The cost is anharmonicity, which shrinks with it.</text>
+
+  <!-- ============ band B: the energy ladder ============ -->
+  <rect x="620" y="110" width="940" height="560" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="648" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The energy ladder</text>
+  <text x="648" y="182" font-size="20" fill="#6a6a82">the junction bends the walls, so the rungs crowd as you climb</text>
+  <text x="648" y="218" font-size="20" fill="#6a6a82">four levels of one transmon, spacing exaggerated to show the trend</text>
+
+  <!-- the cosine-flattened well -->
+  <polyline fill="none" stroke="#1c1c2e" stroke-width="2.5" points="
+            706,321.6 725.5,331.7 745,350.8 764.5,377.6 784,410.5 803.5,447.4 823,486 842.5,523.9
+            862,558.7 881.5,588.4 901,611 920.5,625.2 940,630 959.5,625.2 979,611 998.5,588.4
+            1018,558.7 1037.5,523.9 1057,486 1076.5,447.4 1096,410.5 1115.5,377.6 1135,350.8 1154.5,331.7
+            1174,321.6"/>
+
+  <!-- the levels, each drawn as wide as the well is at that height -->
+  <line x1="900" y1="610" x2="980" y2="610" stroke="#0f766e" stroke-width="3"/>
+  <line x1="833" y1="506" x2="1047" y2="506" stroke="#0f766e" stroke-width="3"/>
+  <line x1="790" y1="422" x2="1090" y2="422" stroke="#6a6a82" stroke-width="3"/>
+  <line x1="749" y1="356" x2="1131" y2="356" stroke="#6a6a82" stroke-width="3"/>
+
+  <text x="888" y="617" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;</text>
+  <text x="821" y="513" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;</text>
+  <text x="778" y="429" font-size="22" font-weight="700" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|2&gt;</text>
+  <text x="737" y="363" font-size="22" font-weight="700" fill="#6a6a82" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|3&gt;</text>
+
+  <!-- each level carried out to the annotations on the right -->
+  <line x1="980" y1="610" x2="1166" y2="610" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+  <line x1="1047" y1="506" x2="1166" y2="506" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+  <line x1="1090" y1="422" x2="1166" y2="422" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+  <line x1="1131" y1="356" x2="1166" y2="356" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+
+  <text x="1176" y="344" font-size="20" fill="#6a6a82">and on up, closer every time</text>
+
+  <!-- the leakage transition, greyed out -->
+  <rect x="1176" y="422" width="368" height="84" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <line x1="1206" y1="494" x2="1206" y2="434" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <text x="1230" y="456" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f12 = f01 + alpha</text>
+  <text x="1230" y="484" font-size="20" fill="#6a6a82" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">alpha ~ -300 MHz</text>
+  <text x="1432" y="484" font-size="20" fill="#6a6a82">&#183; leakage</text>
+
+  <!-- the qubit transition, in the accent colour -->
+  <rect x="1176" y="506" width="368" height="104" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <line x1="1206" y1="598" x2="1206" y2="518" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1230" y="546" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f01 = 4.85 GHz</text>
+  <text x="1230" y="578" font-size="20" fill="#0b5c56">the one transition you drive</text>
+
+  <!-- ============ band C: why this works at all ============ -->
+  <rect x="40" y="690" width="1520" height="140" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="68" y="730" font-size="24" font-weight="700" fill="#1c1c2e">Why this works at all</text>
+  <text x="68" y="766" font-size="21" fill="#0b5c56">A harmonic oscillator has evenly spaced levels, so one drive frequency hits every transition.</text>
+  <text x="68" y="798" font-size="21" fill="#0b5c56">The junction is the nonlinear element that breaks the spacing, and that is what makes a qubit.</text>
+
+  <!-- two miniature ladders, even against crowded -->
+  <line x1="1300" y1="790" x2="1390" y2="790" stroke="#6a6a82" stroke-width="2.5"/>
+  <line x1="1300" y1="764" x2="1390" y2="764" stroke="#6a6a82" stroke-width="2.5"/>
+  <line x1="1300" y1="738" x2="1390" y2="738" stroke="#6a6a82" stroke-width="2.5"/>
+  <line x1="1300" y1="712" x2="1390" y2="712" stroke="#6a6a82" stroke-width="2.5"/>
+  <text x="1345" y="818" font-size="20" fill="#6a6a82" text-anchor="middle">harmonic</text>
+
+  <line x1="1450" y1="790" x2="1540" y2="790" stroke="#0f766e" stroke-width="2.5"/>
+  <line x1="1450" y1="750" x2="1540" y2="750" stroke="#0f766e" stroke-width="2.5"/>
+  <line x1="1450" y1="722" x2="1540" y2="722" stroke="#0f766e" stroke-width="2.5"/>
+  <line x1="1450" y1="706" x2="1540" y2="706" stroke="#0f766e" stroke-width="2.5"/>
+  <text x="1495" y="818" font-size="20" fill="#0f766e" text-anchor="middle">transmon</text>
+
+  <text x="40" y="872" font-size="21" fill="#6a6a82">The gap between the two spacings is small, and that small gap is the whole margin a single-qubit gate has to work in.</text>
+</svg>

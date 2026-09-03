@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+     role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>How a measurement becomes a number</title>
+  <desc>The chain from a coupled qubit and resonator to a point in the IQ plane. The qubit state
+  pulls the resonator one way or the other, so a tone parked between the two answers comes back
+  different. After amplification and weighted demodulation it is one complex number per shot, and
+  a threshold turns that into a bit.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrowback" viewBox="0 0 12 12" refX="1.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M11 1 L1 6 L11 11 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrowgrey" viewBox="0 0 12 12" refX="10.5" refY="6"
+            markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L11 6 L1 11 Z" fill="#6a6a82"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text x="40" y="52" font-size="32" font-weight="700" fill="#1c1c2e">How a measurement becomes a number</text>
+  <text x="40" y="84" font-size="22" fill="#6a6a82">one tone in, one complex number out, and a line drawn between two clouds</text>
+
+  <!-- ============ 1: the coupled pair ============ -->
+  <rect x="40" y="110" width="350" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="68" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The coupled pair</text>
+  <text x="68" y="182" font-size="20" fill="#6a6a82">one qubit, one resonator</text>
+
+  <rect x="68" y="210" width="294" height="76" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="215" y="244" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">q0</text>
+  <text x="215" y="272" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f01 = 4.85 GHz</text>
+
+  <line x1="215" y1="286" x2="215" y2="346" stroke="#0f766e" stroke-width="2"/>
+  <text x="232" y="322" font-size="24" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">g</text>
+  <text x="254" y="322" font-size="20" fill="#6a6a82">coupling</text>
+
+  <rect x="68" y="346" width="294" height="76" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="215" y="380" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">resonator</text>
+  <text x="215" y="408" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
+
+  <text x="68" y="456" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Delta = -2.35 GHz</text>
+  <text x="362" y="456" font-size="20" fill="#6a6a82" text-anchor="end">f01 - fr</text>
+  <text x="68" y="492" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">g &lt;&lt; Delta</text>
+  <text x="362" y="492" font-size="20" fill="#6a6a82" text-anchor="end">dispersive</text>
+  <text x="68" y="528" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">chi ~ g^2/Delta</text>
+  <text x="362" y="528" font-size="20" fill="#6a6a82" text-anchor="end">the shift</text>
+
+  <rect x="68" y="560" width="294" height="160" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="90" y="596" font-size="20" fill="#6a6a82">so the resonator moves</text>
+  <text x="90" y="634" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;  -&gt;  fr - chi</text>
+  <text x="90" y="666" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;  -&gt;  fr + chi</text>
+  <text x="90" y="702" font-size="20" fill="#0b5c56">that shift is the signal</text>
+
+  <polygon points="396,418 416,430 396,442" fill="#0f766e"/>
+
+  <!-- ============ 2: two dips on one frequency axis ============ -->
+  <rect x="422" y="110" width="378" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="450" y="152" font-size="24" font-weight="700" fill="#1c1c2e">Two dips, one axis</text>
+  <text x="450" y="182" font-size="20" fill="#6a6a82">the same tone, two answers</text>
+
+  <!-- the split between the two dips -->
+  <text x="620" y="226" font-size="20" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi = 3.6 MHz</text>
+  <line x1="541" y1="240" x2="699" y2="240" stroke="#0f766e" stroke-width="2"
+        marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
+
+  <!-- the resonator with the qubit in |1>, dipping at fr + chi (chi is negative) -->
+  <polyline fill="none" stroke="#6a6a82" stroke-width="2.5" stroke-dasharray="7 6" points="
+            450,266.3 455,268 460,269.9 465,272.2 470,274.9 475,278 480,281.7 485,286.1
+            490,291.3 495,297.6 500,305 505,313.9 510,324.4 515,336.4 520,349.6 525,363.4
+            530,376 535,385.5 540,389.9 545,388 550,380.3 555,368.6 560,355.1 565,341.6
+            570,329 575,317.9 580,308.4 585,300.4 590,293.7 595,288.1 600,283.4 605,279.4
+            610,276.1 615,273.2 620,270.8 625,268.7 630,266.9 635,265.4 640,264 645,262.8
+            650,261.8 655,260.8 660,260 665,259.3 670,258.6 675,258 680,257.5 685,257
+            690,256.5 695,256.1 700,255.8 705,255.4 710,255.1 715,254.9 720,254.6 725,254.4
+            730,254.1 735,253.9 740,253.7 745,253.6 750,253.4 755,253.3 760,253.1 765,253
+            770,252.8 775,252.7 780,252.6 785,252.5 790,252.4"/>
+
+  <!-- the resonator with the qubit in |0>, dipping at fr - chi (chi is negative) -->
+  <polyline fill="none" stroke="#0f766e" stroke-width="2.5" points="
+            450,252.4 455,252.5 460,252.6 465,252.7 470,252.8 475,253 480,253.1 485,253.3
+            490,253.4 495,253.6 500,253.7 505,253.9 510,254.1 515,254.4 520,254.6 525,254.9
+            530,255.1 535,255.4 540,255.8 545,256.1 550,256.5 555,257 560,257.5 565,258
+            570,258.6 575,259.3 580,260 585,260.8 590,261.8 595,262.8 600,264 605,265.4
+            610,266.9 615,268.7 620,270.8 625,273.2 630,276.1 635,279.4 640,283.4 645,288.1
+            650,293.7 655,300.4 660,308.4 665,317.9 670,329 675,341.6 680,355.1 685,368.6
+            690,380.3 695,388 700,389.9 705,385.5 710,376 715,363.4 720,349.6 725,336.4
+            730,324.4 735,313.9 740,305 745,297.6 750,291.3 755,286.1 760,281.7 765,278
+            770,274.9 775,272.2 780,269.9 785,268 790,266.3"/>
+
+  <!-- the linewidth, measured across one dip at half depth -->
+  <text x="541" y="306" font-size="20" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa</text>
+  <line x1="508" y1="320" x2="574" y2="320" stroke="#0f766e" stroke-width="2"
+        marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
+
+  <!-- the tone, parked where the two curves are furthest apart -->
+  <line x1="699" y1="246" x2="699" y2="456" stroke="#1c1c2e" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="688" y="424" font-size="20" fill="#1c1c2e" text-anchor="end">readout tone</text>
+
+  <line x1="450" y1="450" x2="790" y2="450" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <line x1="620" y1="450" x2="620" y2="462" stroke="#6a6a82" stroke-width="2"/>
+  <text x="620" y="486" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
+
+  <line x1="450" y1="524" x2="490" y2="524" stroke="#0f766e" stroke-width="2.5"/>
+  <text x="500" y="530" font-size="20" fill="#1c1c2e">|0&gt; dips at fr - chi</text>
+  <line x1="450" y1="560" x2="490" y2="560" stroke="#6a6a82" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <text x="500" y="566" font-size="20" fill="#1c1c2e">|1&gt; dips at fr + chi</text>
+
+  <text x="450" y="612" font-size="21" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa = 1.5 MHz</text>
+  <text x="772" y="612" font-size="20" fill="#6a6a82" text-anchor="end">each dip</text>
+  <text x="450" y="646" font-size="21" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi = 3.6 MHz</text>
+  <text x="772" y="646" font-size="20" fill="#6a6a82" text-anchor="end">the split</text>
+
+  <rect x="442" y="666" width="336" height="76" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="466" y="700" font-size="24" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi / kappa = 2.4</text>
+  <text x="466" y="726" font-size="20" fill="#6a6a82">the figure of merit</text>
+
+  <polygon points="806,418 826,430 806,442" fill="#0f766e"/>
+
+  <!-- ============ 3: the chain after the chip ============ -->
+  <rect x="832" y="110" width="334" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="860" y="152" font-size="24" font-weight="700" fill="#1c1c2e">After the chip</text>
+  <text x="860" y="182" font-size="20" fill="#6a6a82">the tone becomes a number</text>
+
+  <rect x="860" y="210" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="999" y="238" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">returning tone</text>
+  <text x="999" y="264" font-size="20" fill="#6a6a82" text-anchor="middle">carries the state</text>
+  <line x1="999" y1="274" x2="999" y2="290" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="294" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="999" y="322" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">amplifier chain</text>
+  <text x="999" y="348" font-size="20" fill="#6a6a82" text-anchor="middle">cold first, then warm</text>
+  <line x1="999" y1="358" x2="999" y2="374" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="378" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="999" y="406" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">ADC</text>
+  <text x="999" y="432" font-size="20" fill="#6a6a82" text-anchor="middle">samples the waveform</text>
+  <line x1="999" y1="442" x2="999" y2="458" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="462" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="999" y="490" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">demodulate</text>
+  <text x="999" y="516" font-size="20" fill="#6a6a82" text-anchor="middle">weighted integration</text>
+  <line x1="999" y1="526" x2="999" y2="542" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="546" width="278" height="76" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="999" y="580" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">one complex number</text>
+  <text x="999" y="608" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">per shot</text>
+
+  <text x="860" y="668" font-size="20" fill="#6a6a82">The weights pick the</text>
+  <text x="860" y="696" font-size="20" fill="#6a6a82">part of the record</text>
+  <text x="860" y="724" font-size="20" fill="#6a6a82">that carries the state.</text>
+
+  <polygon points="1172,418 1192,430 1172,442" fill="#0f766e"/>
+
+  <!-- ============ 4: the IQ plane ============ -->
+  <rect x="1198" y="110" width="362" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="1226" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The IQ plane</text>
+  <text x="1226" y="182" font-size="20" fill="#6a6a82">one dot per shot</text>
+
+  <rect x="1226" y="206" width="306" height="304" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <line x1="1254" y1="470" x2="1516" y2="470" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <line x1="1254" y1="470" x2="1254" y2="226" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <text x="1516" y="494" font-size="20" fill="#6a6a82" text-anchor="end">I</text>
+  <text x="1272" y="242" font-size="20" fill="#6a6a82">Q</text>
+
+  <text x="1330" y="258" font-size="22" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;</text>
+  <text x="1448" y="258" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;</text>
+
+  <line x1="1330" y1="300" x2="1448" y2="300" stroke="#0f766e" stroke-width="2"
+        marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
+  <text x="1389" y="288" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">d</text>
+
+  <!-- the threshold, drawn between the clouds -->
+  <line x1="1389" y1="310" x2="1389" y2="456" stroke="#1c1c2e" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="1400" y="450" font-size="20" fill="#6a6a82">threshold</text>
+
+  <!-- one shot per circle, placed deterministically -->
+  <g fill="#0f766e">
+    <circle cx="1334.5" cy="356.0" r="4.5"/><circle cx="1324.2" cy="361.3" r="4.5"/>
+    <circle cx="1330.9" cy="345.7" r="4.5"/><circle cx="1337.5" cy="365.8" r="4.5"/>
+    <circle cx="1316.0" cy="353.5" r="4.5"/><circle cx="1343.4" cy="347.5" r="4.5"/>
+    <circle cx="1325.5" cy="372.9" r="4.5"/><circle cx="1321.2" cy="339.1" r="4.5"/>
+    <circle cx="1349.3" cy="363.1" r="4.5"/><circle cx="1309.6" cy="364.4" r="4.5"/>
+    <circle cx="1340.0" cy="334.6" r="4.5"/><circle cx="1337.5" cy="380.0" r="4.5"/>
+    <circle cx="1306.9" cy="342.6" r="4.5"/><circle cx="1357.6" cy="349.9" r="4.5"/>
+    <circle cx="1312.8" cy="380.5" r="4.5"/><circle cx="1325.9" cy="324.6" r="4.5"/>
+    <circle cx="1355.7" cy="377.6" r="4.5"/><circle cx="1294.5" cy="357.5" r="4.5"/>
+    <circle cx="1356.8" cy="329.4" r="4.5"/><circle cx="1328.1" cy="396.2" r="4.5"/>
+    <circle cx="1302.3" cy="322.9" r="4.5"/><circle cx="1376.4" cy="362.2" r="4.5"/>
+  </g>
+  <g fill="#1c1c2e">
+    <circle cx="1451.5" cy="358.9" r="4.5"/><circle cx="1440.1" cy="356.3" r="4.5"/>
+    <circle cx="1455.3" cy="348.7" r="4.5"/><circle cx="1447.4" cy="368.3" r="4.5"/>
+    <circle cx="1438.9" cy="345.1" r="4.5"/><circle cx="1463.7" cy="358.1" r="4.5"/>
+    <circle cx="1433.6" cy="366.0" r="4.5"/><circle cx="1452.2" cy="337.4" r="4.5"/>
+    <circle cx="1458.2" cy="373.8" r="4.5"/><circle cx="1427.0" cy="349.3" r="4.5"/>
+    <circle cx="1469.4" cy="346.1" r="4.5"/><circle cx="1438.3" cy="379.2" r="4.5"/>
+    <circle cx="1439.0" cy="330.9" r="4.5"/><circle cx="1473.0" cy="369.2" r="4.5"/>
+    <circle cx="1419.0" cy="363.6" r="4.5"/><circle cx="1465.1" cy="329.3" r="4.5"/>
+    <circle cx="1453.7" cy="389.1" r="4.5"/><circle cx="1419.9" cy="334.2" r="4.5"/>
+    <circle cx="1485.6" cy="352.9" r="4.5"/><circle cx="1420.7" cy="385.6" r="4.5"/>
+    <circle cx="1448.2" cy="312.8" r="4.5"/><circle cx="1479.4" cy="390.6" r="4.5"/>
+  </g>
+
+  <circle cx="1330" cy="356" r="22" fill="none" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="1330" y="424" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sigma</text>
+
+  <text x="1226" y="552" font-size="20" fill="#6a6a82">d is the gap between</text>
+  <text x="1226" y="580" font-size="20" fill="#6a6a82">the two cloud centres.</text>
+  <text x="1226" y="616" font-size="20" fill="#6a6a82">sigma is the spread</text>
+  <text x="1226" y="644" font-size="20" fill="#6a6a82">of one cloud.</text>
+  <text x="1226" y="690" font-size="20" fill="#0b5c56">Every choice upstream</text>
+  <text x="1226" y="718" font-size="20" fill="#0b5c56">shows up here as d/sigma.</text>
+
+  <!-- ============ what the separation is worth ============ -->
+  <rect x="40" y="770" width="1520" height="90" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="68" y="810" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">epsilon = (1/2) erfc(d / (2 sqrt(2) sigma))</text>
+  <text x="68" y="842" font-size="21" fill="#6a6a82">d = 4 sigma gives about 2 percent, d = 6 sigma gives about 0.1 percent. Separation and spread are the two things you tune.</text>
+</svg>

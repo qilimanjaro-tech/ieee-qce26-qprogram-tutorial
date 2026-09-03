@@ -142,11 +142,20 @@ Upon completing this tutorial, attendees will be able to:
 
 ## Format
 
-The slides carry the concepts and link circuit-level gates to physical control signals. The coding
-is instructor-led, in Jupyter notebooks, building pulse programs step by step, and each part carries
-two exercises that attendees work through on their own laptops. The attendee notebooks leave those
-blank and `notebooks/solutions/` has the answers. Every example runs on QProgram's reference
-executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
+The two halves of the material do different jobs. The slides carry the physics and the concepts:
+what a transmon is, what the fridge and the rack around it are for, how a gate becomes a voltage,
+what a measurement really returns, and why any of that needs a language of its own. The notebooks
+carry the code. They build one experiment at a time, explain what that experiment measures and why
+it comes in this order, and leave the background to the deck. The coding is instructor-led, and each
+part ends with one exercise on a real problem. The attendee notebooks leave that cell blank and
+`notebooks/solutions/` has the answer. Every example runs on QProgram's reference executor, so no
+hardware, GPU, or network access is needed for any part of the tutorial.
+
+The figures come from the library. `result.plot(measurement)` draws whatever the array's shape asks
+for, a line per quadrature, a heatmap, or an IQ scatter, and hands back the Matplotlib `Axes` it
+drew on, so a fit, a reference line, or an annotation is one more call. `waveform.plot()` draws an
+envelope through the same palette, which is why a pulse and the sweep it produced look like one
+experiment. That is the whole reason the notebooks reach for Matplotlib as rarely as they do.
 
 QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform
 and result plotting. The tutorial adds SciPy for the curve fits in Parts 3, 4, and 6.

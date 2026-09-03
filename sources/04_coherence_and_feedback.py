@@ -54,6 +54,7 @@ the qubit, so the Ramsey fringe has something to show.
 
 # %%
 import math
+from dataclasses import replace
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,6 +64,7 @@ import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram import fragment
 from qprogram.buses import BusSchema
+from qprogram.plotting import LIGHT, Quantity, Style
 from qprogram.waveforms import IQDrag, IQPair, Square
 
 DEVICE = {
@@ -88,7 +90,8 @@ r"""
 ## 4.1 Fragments: the same three moves, a different middle
 
 Every experiment in this part is the same shape. Put the qubit somewhere. Wait. Read it out. Only
-the middle changes.
+the middle changes, and the three middles are one pi pulse, two pi/2 pulses, and two pi/2 pulses
+with a pi in between.
 
 Copy-pasting the pulse lines into three programs is how calibration code rots. Someone fixes the
 DRAG `beta` in two of them and forgets the third, and a week later two experiments disagree for a
@@ -184,33 +187,30 @@ follows that rule.
 
 ## 4.2 T1: inversion recovery
 
-Excite the qubit, wait, look. Sweep the wait and the excited-state population decays as
+The first middle is the shortest one. Excite the qubit, wait, look. Sweep the wait and the
+excited-state population decays as
 
 $$P_1(t) = e^{-t/T_1}.$$
 
-$T_1$ is energy leaving the qubit and not coming back, and it is worth knowing where it goes,
-because the answer determines what you can do about it.
+$T_1$ is energy leaving the qubit and not coming back, and where it goes decides what you can do
+about it. Some of it goes down the readout line. The resonator couples to the qubit on one side and
+to a 50 ohm transmission line leading out of the fridge on the other, so the qubit has a path to the
+outside world through it, and that channel, Purcell decay, contributes a rate $\kappa (g/\Delta)^2$.
+Put this chip's numbers in and that channel alone predicts 16 microseconds, shorter than the 18 in
+`DEVICE` and therefore impossible, since no single loss channel can be faster than the total. It is
+the same over-large $g$ Part 1 backed out of $\chi$, showing up a second time. On a real datasheet
+that is the moment you go back and remeasure something, and the arithmetic that catches it costs
+thirty seconds. Real chips insert a bandpass filter between resonator and line, tuned to pass the
+resonator frequency and present a high impedance at the qubit frequency, and that filter buys back
+an order of magnitude.
 
-**Down the readout line.** The resonator is coupled to the qubit and to a 50 ohm transmission line
-that leads out of the fridge, so the qubit has a path to the outside world through it. That channel,
-called Purcell decay, contributes a rate $\kappa (g/\Delta)^2$. Put this chip's numbers in and that
-channel alone predicts 16 microseconds, which is shorter than the 18 in `DEVICE` and therefore
-impossible. No single loss channel can be faster than the total. It is the same over-large $g$ Part
-1 backed out of $\chi$, showing up a second time. On a real datasheet that is the moment you go back
-and remeasure something, and the arithmetic that catches it costs thirty seconds. Real chips insert
-a bandpass filter between resonator and line, tuned to pass the resonator frequency and present a
-high impedance at the qubit frequency, and that filter buys back an order of magnitude. It is the
-standard answer to the tension Part 1 described between coupling hard enough to read out and
-coupling so hard you kill the qubit.
-
-**Into the materials.** Two-level defects in the amorphous oxides at the junction and at the metal
-interfaces absorb energy at whatever frequency they happen to sit at. Nobody controls where they
-sit, and they move. A qubit measured hourly for a day will show $T_1$ wandering by a factor of two
-as defects drift in and out of resonance with it. A single $T_1$ number is a snapshot, and the
-honest form is a histogram.
-
-**Quasiparticles and stray radiation** account for most of the rest, and both are fought with
-shielding and filtering rather than with design.
+The rest goes into the materials and past the shielding. Two-level defects in the amorphous oxides
+at the junction and at the metal interfaces absorb energy at whatever frequency they happen to sit
+at, nobody controls where they sit, and they move. A qubit measured hourly for a day will show
+$T_1$ wandering by a factor of two as defects drift in and out of resonance with it, so a single
+$T_1$ number is a snapshot and the honest form is a histogram. Quasiparticles and stray radiation
+account for most of what is left, and both are fought with shielding and filtering rather than with
+design.
 
 The sweep below runs to 60 microseconds, a bit over three $T_1$, and both ends of that range cost
 something. Stop at one $T_1$ and the exponential's amplitude and time constant become degenerate, so
@@ -287,6 +287,20 @@ population = t1_result.get(m_t1, field=MF.STATE)
 print("state field:", population.dims, population.shape)
 print("first three points:", np.round(population.values[:3], 3))
 
+# %% [markdown]
+r"""
+Fit the exponential, then draw both. `result.plot` takes the handle and the field, works out from
+the shape that a one-dimensional sweep wants a line, and hands back the `Axes` it drew on, so the
+fit is one more call on the object that comes back. `markers=True` earns its place on a 41-point
+sweep, where the points are the measurement and the line between them is interpolation.
+
+The delays are stored in nanoseconds and nobody reads a $T_1$ that way, so `coords=` restates the
+axis in microseconds and `value=` names the y axis. Both halves of the restatement travel together,
+the new unit and the arithmetic that earns it. The consequence is the one thing to remember about
+drawing on top, and the fit shows it. Divide it by 1000 as well, because everything you hand the
+returned axes is in the figure's units rather than the array's.
+"""
+
 # %%
 # Fit an exponential with a free offset and read T1 off it.
 def decay(t, amplitude, tau, offset):
@@ -297,13 +311,16 @@ popt, _ = curve_fit(decay, delays, population.values, p0=[1.0, 10_000.0, 0.0])
 t1_fit = popt[1]
 print(f"fitted T1 = {t1_fit / 1000:.2f} us   true = {DEVICE['q0_T1'] / 1000:.2f} us")
 
-plt.plot(delays / 1000, population.values, "o", ms=4, label="measured")
-plt.plot(delays / 1000, decay(delays, *popt), "-", label=f"fit, T1 = {t1_fit / 1000:.1f} us")
-plt.xlabel("Delay (us)")
-plt.ylabel("Excited-state population")
-plt.title("Inversion recovery on q0")
-plt.legend()
-plt.show()
+ax = t1_result.plot(
+    m_t1,
+    field=MF.STATE,
+    style=Style(markers=True),
+    coords={"delay": Quantity(units="us", transform=lambda v: v / 1000)},
+    value=Quantity("Excited-state population"),
+    title="Inversion recovery on q0",
+)
+ax.plot(delays / 1000, decay(delays, *popt), label=f"fit, T1 = {t1_fit / 1000:.1f} us")
+ax.legend(fontsize=8)
 
 # %% [markdown]
 r"""
@@ -322,10 +339,10 @@ $2\chi$. Charge noise, which the transmon was invented to suppress and which it 
 exponentially, so it rarely dominates any more. And the same two-level defects that eat $T_1$,
 coupling dispersively instead of resonantly.
 
-A Ramsey sequence measures the total. Two pi/2 pulses with a gap: the first one puts the qubit on
-the equator, it precesses at the difference between your drive frequency and the qubit, and the
-second one turns that accumulated phase into a population. The result is a fringe at the detuning,
-dying out at the dephasing time:
+Same three moves, second middle. Two pi/2 pulses with a gap: the first one puts the qubit on the
+equator, it precesses at the difference between your drive frequency and the qubit, and the second
+one turns that accumulated phase into a population. The result is a fringe at the detuning, dying
+out at the dephasing time:
 
 $$P_1(t) = \tfrac{1}{2}\left(1 + \cos(2\pi \delta t)\right) e^{-t/T_2^*}.$$
 
@@ -387,6 +404,9 @@ the qubit will have moved by more than that before you finish writing it down.
 A lab person will ask about one caveat. A single Ramsey gives the *magnitude* of the detuning, not
 its sign, because $\cos$ is even. You get the sign by moving the drive a known amount and seeing
 whether the fringe speeds up or slows down.
+
+The figure is the T1 figure with a different middle in it, down to the restated axis. 161 points
+is dense enough that the markers want to be small, which `Style` takes as `markersize`.
 """
 
 # %%
@@ -404,13 +424,16 @@ print(f"FFT guess          = {freq_guess / 1e3:.1f} kHz")
 print(f"fitted T2*         = {t2star_fit / 1000:.2f} us   true = {DEVICE['q0_T2star'] / 1000:.2f} us")
 print(f"fitted detuning    = {detuning_fit / 1e3:.1f} kHz   true = {DETUNING / 1e3:.1f} kHz")
 
-plt.plot(r_delays / 1000, fringe.values, ".", ms=4, label="measured")
-plt.plot(r_delays / 1000, fringe_model(r_delays, *popt), "-", lw=1, label="fit")
-plt.xlabel("Delay (us)")
-plt.ylabel("Excited-state population")
-plt.title(f"Ramsey at {detuning_fit / 1e3:.0f} kHz detuning")
-plt.legend()
-plt.show()
+ax = ramsey_result.plot(
+    m_ramsey,
+    field=MF.STATE,
+    style=Style(markers=True, markersize=3),
+    coords={"delay": Quantity(units="us", transform=lambda v: v / 1000)},
+    value=Quantity("Excited-state population"),
+    title=f"Ramsey at {detuning_fit / 1e3:.0f} kHz detuning",
+)
+ax.plot(r_delays / 1000, fringe_model(r_delays, *popt), lw=1, label=f"fit, T2* = {t2star_fit / 1000:.1f} us")
+ax.legend(fontsize=8)
 
 # %%
 corrected = DRIVE_FREQ - detuning_fit
@@ -432,49 +455,22 @@ genuinely destroyed.
 A pi pulse in the middle of the delay separates them. It flips the Bloch vector about the drive
 axis, so whatever phase the qubit picked up in the first half gets subtracted during the second. A
 frequency offset that held still across the whole sequence cancels exactly. One that changed
-halfway through does not.
-
-The useful way to hold this is as a filter. The echo sequence is a high-pass filter on the noise
-spectrum with its corner near $1/t$, and $T_2^*$ is the same measurement with the filter switched
-off. Compare the two and you learn something about the noise itself, not just about the qubit. This
-chip's numbers say $T_\varphi^* = 12$ us and $T_{\varphi,\text{echo}} = 29$ us, so refocusing
-removed about 60 percent of the dephasing rate. Most of the noise hurting this qubit therefore lives
-below roughly 50 kHz, right where $1/f$ flux noise is expected to live. Adding more pi pulses, the
-CPMG sequence, pushes the corner to $N/t$ and keeps going until you run into the part of the
-spectrum that is genuinely white.
-
-What is left after refocusing is $T_2$, and it is longer:
+halfway through does not. What survives the refocusing is $T_2$, and it is longer than $T_2^*$:
 
 $$P_1(t) = \tfrac{1}{2} + \tfrac{1}{2} e^{-t/T_2}.$$
 
-The sequence is x90, wait $t/2$, x180, wait $t/2$, x90. You have the pieces already. The fragments
-from 4.1, and `wait` with an expression (`delay / 2` is a perfectly good duration, and it
-serializes as `wait q[0].drive (delay / 2)`).
+Third middle, and the pieces are all in hand. x90, wait $t/2$, x180, wait $t/2$, x90, built from the
+two fragments of 4.1 and from `wait` with an expression, since `delay / 2` is a perfectly good
+duration and serializes as `wait q[0].drive (delay / 2)`.
+
+One fitting decision is worth making on purpose. Fix the offset at 0.5 rather than fitting it. With
+the detuning refocused the curve relaxes to the fully mixed value, and you know that number without
+measuring it. Leave it free and it trades against `tau`, the two come out about 90 percent
+anti-correlated, and the error bar on $T_2$ roughly triples for nothing. Pinning what you know is
+not cheating, it is how you get a number you can quote.
 """
 
-# %% [markdown]
-r"""
-### 🧩 Exercise 4.1: measure T2 with an echo
-
-Build the echo experiment and fit $T_2$.
-
-1. New program, one variable `delay` (the model reads `env["delay"]`, so the name matters).
-2. `average(shots=600)` around `sweep(delay, qp.Range(0, 40_000, 800))`, 51 points.
-3. Inside: `x90`, `wait(delay / 2)`, `x180`, `wait(delay / 2)`, `x90`, `sync`, then `measure` with
-   `fields=(MF.STATE,)`.
-4. Run it with the `p_echo` model written out in the stub, `seed=31`, and fit
-   `0.5 + amplitude * exp(-t / tau)`.
-
-Fix the offset at 0.5 rather than fitting it. With the detuning refocused the curve relaxes to the
-fully mixed value, and you know that number without measuring it. Leave it free and it trades
-against `tau`: the two come out about 90 percent anti-correlated, and the error bar on $T_2$ roughly
-triples for nothing. Pinning what you know is not cheating, it is how you get a number you can
-quote.
-
-The plot and the comparison table two cells down read `echo_amp` and `t2_fit` from your solution.
-"""
-
-# %% solution
+# %%
 def p_echo(bus, env):
     """Hahn echo: the detuning is refocused, only decay is left."""
     return 0.5 + 0.5 * np.exp(-env["delay"] / DEVICE["q0_T2echo"])
@@ -507,48 +503,32 @@ echo_fit, _ = curve_fit(
 echo_amp, t2_fit = echo_fit
 print(f"fitted T2 = {t2_fit / 1000:.2f} us   true = {DEVICE['q0_T2echo'] / 1000:.2f} us")
 
-# %% stub
-# TODO: measure T2 with a Hahn echo.
-#
-# def p_echo(bus, env):
-#     return 0.5 + 0.5 * np.exp(-env["delay"] / DEVICE["q0_T2echo"])
-#
-# 1) echo = qp.QProgram(label="hahn_echo", schema=schema); e_delay = echo.variable("delay", ...)
-# 2) with echo.average(shots=600): with echo.sweep(e_delay, qp.Range(0, 40_000, 800)):
-# 3) x90 / wait(e_delay / 2) / x180 / wait(e_delay / 2) / x90 / sync / measure(fields=(MF.STATE,))
-# 4) echo_result = qp.simulate(echo, model=qp.MockMeasurementModel(p_excited=p_echo, seed=31))
-# 5) echo_data = echo_result.get(m_echo, field=MF.STATE); e_delays = echo_data.coords["delay"].values
-# 6) curve_fit(lambda t, amplitude, tau: 0.5 + amplitude * np.exp(-t / tau), ...)
-#
-# Leave the fitted amplitude and time constant in `echo_amp` and `t2_fit`, the data in
-# `echo_data`, and the delays in `e_delays`. The next cell reads them.
-
 # %% [markdown]
 r"""
 Plot it, then put the three numbers next to each other. The ordering $T_2^* < T_2 < 2T_1$ is the
 sanity check you run before believing any of it, and it follows from arithmetic rather than from
-agreement among labs. Refocusing removes noise and cannot add any, so $T_2$ can only exceed $T_2^*$.
-And since relaxation destroys phase along with energy, contributing $1/2T_1$ to the dephasing rate
-no matter what, nothing you do to the pulse sequence gets $T_2$ past $2T_1$. A measurement that
-violates either bound is a bug in your analysis, and finding out at this point costs you five
-minutes rather than a paper.
+agreement among labs, so a set that violates either bound is a bug in the analysis and not a
+discovery. Finding out at this point costs you five minutes rather than a paper.
 """
 
 # %%
-plt.plot(e_delays / 1000, echo_data.values, "o", ms=4, label="measured")
-plt.plot(
+ax = echo_result.plot(
+    m_echo,
+    field=MF.STATE,
+    style=Style(markers=True),
+    coords={"delay": Quantity(units="us", transform=lambda v: v / 1000)},
+    value=Quantity("Excited-state population"),
+    title="Hahn echo on q0",
+)
+ax.plot(
     e_delays / 1000,
     0.5 + echo_amp * np.exp(-e_delays / t2_fit),
-    "-",
     label=f"fit, T2 = {t2_fit / 1000:.1f} us",
 )
-plt.axhline(0.5, color="grey", ls=":", lw=1, label="fully mixed")
-plt.xlabel("Delay (us)")
-plt.ylabel("Excited-state population")
-plt.title("Hahn echo on q0")
-plt.legend()
-plt.show()
+ax.axhline(0.5, ls=":", lw=1, label="fully mixed")
+ax.legend(fontsize=8)
 
+# %%
 rows = [
     ("T1", t1_fit, DEVICE["q0_T1"]),
     ("T2*", t2star_fit, DEVICE["q0_T2star"]),
@@ -575,7 +555,7 @@ picks one.
 | `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots. |
 
 They are three points along one pipeline, and each one throws something away. `raw` is the ADC
-stream, which you ask for when you are debugging the readout itself: it is how you see the resonator
+stream, which you ask for when you are debugging the readout itself. It is how you see the resonator
 ringing up, how you find out that your pulse is longer than your acquisition window, and how you
 compute optimal integration weights. Multiply it by the weights and sum, and you have `iq`. Compare
 `iq` to a threshold, and you have `state`. Every step down that list is smaller and less
@@ -614,6 +594,11 @@ two readout blobs before it means anything, and it carries the shot noise of the
 
 Both recover T1 to better than 2 percent. The state fit is the closer one here, because
 classification has already thrown away the noise the projection still has to average over.
+
+Drawing them together is the case the composable axes were built for. The `state` field is a
+measurement the result can draw on its own, the projection is arithmetic you did afterwards that no
+result could have known was a measurement, and the second goes on the axes the first returned with
+an ordinary `ax.plot`.
 """
 
 # %%
@@ -626,13 +611,17 @@ from_iq, _ = curve_fit(decay, delays, projected, p0=[1.0, 10_000.0, 0.0])
 print(f"T1 from state = {from_state[1] / 1000:.2f} us")
 print(f"T1 from iq    = {from_iq[1] / 1000:.2f} us")
 
-plt.plot(delays / 1000, population.values, "o", ms=4, label="state field")
-plt.plot(delays / 1000, projected, "x", ms=5, label="iq, projected")
-plt.xlabel("Delay (us)")
-plt.ylabel("Excited-state population")
-plt.title("Same shots, two fields")
-plt.legend()
-plt.show()
+ax = t1_result.plot(
+    m_t1,
+    field=MF.STATE,
+    style=Style(markers=True),
+    coords={"delay": Quantity(units="us", transform=lambda v: v / 1000)},
+    value=Quantity("Excited-state population"),
+    title="Same shots, two fields",
+)
+ax.lines[0].set_label("state field")
+ax.plot(delays / 1000, projected, "x", ms=5, ls="none", label="iq, projected")
+ax.legend(fontsize=8)
 
 # %% [markdown]
 r"""
@@ -646,15 +635,9 @@ you put in and with $2\chi/\kappa$, the ratio Part 1 worked out. The width $\sig
 the amplifier chain's noise divided by the square root of the integration time, so it shrinks the
 longer you look and shrinks a lot if you can afford a parametric amplifier in front of the HEMT.
 
-Everything about readout fidelity is the ratio of those two numbers, and nothing else. Separate the
-clouds by $d$ and give each a width $\sigma$, put a threshold halfway between, and the fraction of
-shots that land on the wrong side is
-
-$$\varepsilon = \tfrac{1}{2}\,\mathrm{erfc}\!\left(\frac{d}{2\sqrt{2}\,\sigma}\right).$$
-
-Four sigma of separation is about 2 percent error. Six sigma is 0.1 percent. That steepness is why
-readout engineering is worth the effort, and why every factor of two in $d/\sigma$ feels like a
-different chip.
+Readout fidelity is the ratio of those two numbers and nothing else. Put a threshold halfway between
+the clouds and count the shots that land on the wrong side. The cell that does the counting also
+prints the separation in units of $\sigma$, because the two travel together.
 
 To see the shots themselves you have to stop averaging them. `average(shots)` throws the individual
 shots away and hands you the mean, so make the shot index a **sweep variable** and drop the average:
@@ -735,15 +718,28 @@ print("dims:", ground.dims, ground.shape)
 print("no average, so each point is one shot:", np.round(ground.values[:3, 0], 2))
 print(f"prepared wrong: {int(truth[:600].sum())} cold shots hot, {int(600 - truth[600:].sum())} hot shots cold")
 
+# %% [markdown]
+r"""
+`kind="scatter"` is the one figure the shape never implies, since plotting I against Q is a choice
+no dimension count makes for you. It puts I on one axis and Q on the other and flattens everything
+else into the cloud, which here is the 600-point shot axis.
+
+Two clouds means two calls. The first makes the axes, the second draws on it through `target=`, and
+a palette rotated by one slot keeps the two from sharing a hue. The legend labels go on afterwards,
+because the two runs are separate results and neither one knows the other exists. A scatter also
+refuses `value=Quantity(label=...)` outright, and the message explains itself. Its two axes are I
+and Q and already name themselves, so one label across both would hide which is which. A name for
+the figure goes in `title=` instead.
+"""
+
 # %%
-plt.scatter(ground.sel(IQ="I"), ground.sel(IQ="Q"), s=8, alpha=0.5, label="prepared |0>")
-plt.scatter(excited.sel(IQ="I"), excited.sel(IQ="Q"), s=8, alpha=0.5, label="prepared |1>")
-plt.xlabel("I (arb.)")
-plt.ylabel("Q (arb.)")
-plt.title("600 single shots per preparation")
-plt.gca().set_aspect("equal")
-plt.legend()
-plt.show()
+ax = ground_run.plot(m_ground, kind="scatter", title="600 single shots per preparation")
+rotated = Style(theme=replace(LIGHT, series=LIGHT.series[1:] + LIGHT.series[:1]))
+excited_run.plot(m_excited, kind="scatter", target=ax, style=rotated)
+for cloud, label in zip(ax.collections, ("prepared |0>", "prepared |1>"), strict=True):
+    cloud.set_label(label)
+ax.set_aspect("equal")
+ax.legend()
 
 # %% [markdown]
 r"""
@@ -768,6 +764,11 @@ Two error numbers come out of this, and they are not the same thing:
 The gap between them is the preparation error you saw above. If you ever quote a readout fidelity
 without saying which of the two numbers it is, someone will misuse it, and the usual direction of
 the misuse is a vendor quoting assignment fidelity next to a competitor's measured fidelity.
+
+The histogram is the one figure in this notebook the result cannot draw. Its x axis is a projection
+you computed from two runs and its y axis is a bin count, so nothing on either result says those
+numbers belong in one picture. Hand-rolled axes are the right answer exactly there, and the
+threshold and the two gaussians go on them the same way the fits went on the axes above.
 """
 
 # %%
@@ -791,28 +792,23 @@ print(f"assignment error = {100 * (decided != truth).mean():.1f}%  (readout alon
 print(f"gaussian estimate= {100 * 0.5 * math.erfc(separation / (2 * np.sqrt(2) * sigma)):.1f}%")
 
 bins = np.linspace(-2.0, 4.0, 60)
-plt.hist(shots[prepared == 0], bins=bins, alpha=0.6, label="prepared |0>")
-plt.hist(shots[prepared == 1], bins=bins, alpha=0.6, label="prepared |1>")
-plt.axvline(threshold, color="k", ls="--", lw=1, label=f"threshold = {threshold:.2f}")
-plt.xlabel("Projection onto the |0> to |1> axis (arb.)")
-plt.ylabel("Shots")
-plt.title("Where the threshold goes, and what it costs")
-plt.legend()
-plt.show()
+_, ax = plt.subplots()
+ax.hist(shots[prepared == 0], bins=bins, alpha=0.6, label="prepared |0>")
+ax.hist(shots[prepared == 1], bins=bins, alpha=0.6, label="prepared |1>")
+ax.axvline(threshold, color="k", ls="--", lw=1, label=f"threshold = {threshold:.2f}")
+ax.set_xlabel("Projection onto the |0> to |1> axis (arb.)")
+ax.set_ylabel("Shots")
+ax.set_title("Where the threshold goes, and what it costs")
+ax.legend(fontsize=8)
 
 # %% [markdown]
 r"""
 ## 4.7 Active reset: using a shot to decide
 
-A qubit does not start cold, and the arithmetic of waiting for it to get there is brutal. Passive
-reset means idling for several $T_1$ before every shot, and five $T_1$ on this chip is 90
-microseconds against a 2 microsecond measurement. Better than 97 percent of your fridge time is
-spent doing nothing, and worse, that fraction gets *larger* as chips improve, because $T_1$ is the
-number everybody is trying to increase.
-
-Active reset does the fast thing instead. Measure, and fire a pi pulse only if the qubit came up
-excited. A shot goes from 90 microseconds to a few, and a scan that took an afternoon takes twenty
-minutes.
+A qubit does not start cold, and waiting for it to get there is the slowest thing in a run. Passive
+reset idles for several $T_1$ before every shot, which on this chip is most of the fridge time you
+are paying for. Active reset measures instead and fires a pi pulse only if the qubit came up
+excited, turning a wait into a decision.
 
 One aside on why the qubit is warm at all. A transmon at 4.85 GHz in perfect thermal equilibrium
 with a 20 mK stage would sit at $e^{-hf/k_BT}$, or $10^{-5}$, and nobody has ever measured that.
@@ -841,10 +837,10 @@ deliver.
 Three rules, enforced in two places. The condition has to be a measurement-state predicate. Pass
 anything else and the builder raises on the spot. `elif_` and `else_` have to come **immediately**
 after their arm, because anything appended in between closes the chain, and that raises too. The
-third one waits for `validate`: every measurement you reference must have asked for `MF.STATE`. A
-condition on a classification nobody computed is a diagnostic, not a guess, and the diagnostic is
-enforced rather than advisory. `qp.simulate` validates before it executes, so such a program raises
-`UnsupportedOperationError` instead of branching.
+third one waits for `validate`. Every measurement you reference must have asked for `MF.STATE`, and
+a condition on a classification nobody computed is a diagnostic rather than a guess. `qp.simulate`
+validates before it executes, so such a program raises `UnsupportedOperationError` instead of
+branching.
 
 There is no `and` or `or` of two conditions. `qp.and_(a, b)` inside an `if_` raises and names what
 it got, so a compound test becomes a second `if_` nested inside the arm.
@@ -873,8 +869,8 @@ keep the bookkeeping itself: a fresh shot starts hot with probability `p_hot`, a
 measurement of a shot happens after the reset attempt, which lands the qubit in the ground state
 unless the pulse missed.
 
-That is a stand-in, and it is the only part of this section that is. The program, the conditional,
-the NaN handling, and the arithmetic at the end are the real thing.
+The model is a stand-in, and the only one in this section. The program, the conditional, the NaN
+handling, and the arithmetic at the end are the real thing.
 """
 
 # %%
@@ -916,7 +912,7 @@ took which branch.
 
 # %%
 peek = qp.QProgram(label="nan_demo", schema=schema)
-peek_shot = peek.variable("shot")
+peek_shot = peek.variable("shot", label="Shot index")
 with peek.sweep(peek_shot, qp.Range(0, 11, 1)):  # 12 shots, small enough to read
     check = peek.measure(q[0].readout, "readout", "weights", name="check", fields=(MF.STATE,))
     with peek.if_(check.state == 1):
@@ -931,10 +927,11 @@ print("arm ran on", int(np.isfinite(peek_result.get(verify, field=MF.STATE).valu
 
 # %% [markdown]
 r"""
-### 🧩 Exercise 4.2: active reset, before and after
+### 🧩 Exercise 4.1: active reset, before and after
 
-Build the reset experiment on 400 single shots and report the excited-state population before and
-after the reset.
+Everything so far you have written before in some other form. Reading a measurement outcome back
+into the control flow you have not, so this one is yours to build. Run the reset experiment on 400
+single shots and report the excited-state population before and after.
 
 1. One variable `shot`, swept with `qp.Range(0, 399, 1)`, no `average`.
 2. `check = program.measure(..., name="check", fields=(MF.STATE,))`.
@@ -944,9 +941,9 @@ after the reset.
    on hardware an arm that holds a bus longer than its sibling shifts everything after the branch,
    and a `sync` after the chain settles that.
 5. Run it with `ResetModel()` and pull both state arrays.
-6. The population before is the mean of `check`. For the population after, remember the NaN:
-   a cold shot never entered the arm, so its outcome after the reset attempt is what `check`
-   already said. `np.where(np.isnan(verify), check, verify)` is the whole calculation.
+6. The population before is the mean of `check`. For the population after, remember the NaN.
+   A cold shot never entered the arm, so its outcome after the reset attempt is what `check`
+   already said, and `np.where(np.isnan(verify), check, verify)` is the whole calculation.
 
 Expect roughly 18 percent before and 1 percent after: the residual is the shots where the pi pulse
 missed. Call the program `reset`, because the cell after your solution prints its `.qp` text.
@@ -1009,20 +1006,19 @@ r"""
   ordinary variable.
 - **T1, T2\*, T2** all came out of the same three moves with a different middle, and all three
   fits landed within a couple of percent of the device. $T_1$ is energy leaving, mostly through the
-  resonator and into the oxides. $T_2^*$ adds every source of frequency wander on top. The echo
-  filters out whatever is slower than the sequence, and the gap between the two tells you where in
-  the noise spectrum your problem lives.
+  resonator and into the oxides. $T_2^*$ adds every source of frequency wander on top, and the echo
+  removes whatever is slower than the sequence.
 - The fringe frequency from Ramsey is the correction to your drive frequency. Detuning on purpose is
   how you get a carrier to lock the fit onto instead of a bare decay.
 - One `measure` produces up to three **fields**, and they are one pipeline. `raw` is the ADC trace,
   weight and sum it for `iq`, threshold that for `state`. Ask for the widest one while commissioning
   and the narrowest one forever after.
-- Dropping `average` and sweeping a **shot index** gives you single shots, which is what a
-  threshold gets calibrated on. Separation over cloud width is the whole story, and the error falls
-  off an `erfc` cliff, so small improvements in the readout chain feel enormous.
+- Every figure here but the histogram came out of `result.plot(...)`, with the fit, the reference
+  line, the second series, and the legend labels added to the `Axes` it returned.
+- Dropping `average` and sweeping a **shot index** gives you single shots, the data a threshold gets
+  calibrated on. Separation over cloud width is the whole story.
 - **Feedback** is `if_(handle.state == 1)`, with NaN in the arm that did not run, and it
-  serializes into the `.qp` file like any other statement. It exists because passive reset costs
-  five $T_1$ per shot and that is most of your fridge time.
+  serializes into the `.qp` file like any other statement.
 - Everything so far assumed one rack that can do all of it. Part 5 takes these exact programs to a
   machine where the flux line has no sequencer, and lets the platform tell you what it can run.
 """

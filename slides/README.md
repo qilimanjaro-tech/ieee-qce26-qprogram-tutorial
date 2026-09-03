@@ -1,52 +1,62 @@
 # Slides: *Programming a Superconducting Qubit*
 
-A [Marp](https://marp.app/) deck, written in Markdown. It is a **thin framing deck**: title, why a
-chip arrives with no numbers on it, the state of control software in 2026, links and QR codes, the
-device under test, thirty seconds of vocabulary, then a divider and two or three slides per tutorial
-part. Six diagrams carry the structure. The teaching happens in
-[`../notebooks/`](../notebooks/); these slides orient and recap.
+A [Marp](https://marp.app/) deck, written in Markdown. **The concepts live here.** The deck opens
+with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes
+a voltage, what a measurement really returns, and what decoherence costs, then argues why any of
+that needs a language of its own. Only after all of that does QProgram appear. The notebooks in
+[`../notebooks/`](../notebooks/) carry the code and explain the experiments; they leave the
+background to these slides.
+
+Seventy-two slides, roughly in four movements: logistics, the foundations block, the QProgram block,
+then two to five slides per tutorial part. Ten diagrams carry the structure.
 
 Every content slide carries at least one concrete thing, a number, a formula, a `.qp` excerpt, or a
 diff, and the speaker carries the rest. A slide that is five compressed claims competes with the
 person talking over it, so `tools/check_style.py` applies its sentence-shape budgets to this file
-as well as to `sources/*.py`.
+and to the deck as well as to `sources/*.py`.
 
 - [`qprogram_tutorial.md`](qprogram_tutorial.md): the deck source. Edit this.
 - `qprogram_tutorial.html`: the rendered deck, produced by the Marp CLI command below. It reads
   `img/` from alongside itself, so keep the two together.
-- [`img/`](img/): six diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`,
+- [`img/`](img/): ten diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`,
   `qr-docs.svg`).
 
 | Diagram | Shows | Slide |
 |---|---|---|
+| `transmon.svg` | the circuit, the cosine well, and the ladder that crowds as you climb | Two circuit elements, and the ladder that falls out |
 | `rack.svg` | the signal chain, rack to fridge to chip and back | From a gate to a voltage and back |
+| `fridge.svg` | the stages, attenuation going down and amplification coming up | The fridge, stage by stage |
+| `rotation.svg` | carrier phase as the axis, envelope area as the angle | The two knobs, drawn |
+| `dispersive.svg` | two dips $2\chi$ apart, the chain after the chip, and the IQ clouds | The measurement chain, end to end |
 | `buses.svg` | instrument ports to bus names to chip, and what each bus kind accepts | A bus is one signal path |
-| `timing.svg` | per-bus cursors, and what `sync` does about them | Part 1: every bus keeps its own clock |
 | `stack.svg` | the software layers, script to instruments | The architecture |
+| `timing.svg` | per-bus cursors, and what `sync` does about them | Part 1: every bus keeps its own clock |
 | `anatomy.svg` | a Rabi program as a tree | Anatomy of a Rabi program |
 | `plan.svg` | the real-time versus host-side split | One program, two domains |
 
-`rack.svg` and `buses.svg` exist because most of the room writes circuits and has never seen a
-control rack. They come early, before the deck asks anyone to care about a capability token.
+The first five exist because most of the room writes circuits and has never seen a control rack.
+They come early, before the deck asks anyone to care about a capability token.
 
 ### Diagrams worth adding
 
-Two gaps, listed so the decision is visible rather than forgotten. Neither blocks the current
-deck.
+One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
 
-- **A rotation figure**: envelope area against rotation angle, carrier phase against axis, one Bloch
-  sphere and one envelope side by side. It would firm up the "What a gate turns into" slide. Lower
-  priority, because Part 1 of the notebooks already plots a real DRAG envelope.
-- **An IQ-plane figure** for single-shot readout. Deliberately *not* drawn: Part 4 plots 1200 real
-  simulated shots with a fitted threshold, and a schematic version would be strictly worse. If the
-  measurement slide ever needs a picture, take the figure out of the notebook.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together,
+  beside the chevron a calibration scan of it produces. "Two qubits, one gate" is currently carried
+  by four bullets, and it is the one slide in the foundations block with no picture behind it. Part 6
+  of the notebooks scans a real chevron, so the figure could come out of there.
+
+An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated
+shots with a fitted threshold, and a schematic version would be strictly worse. `dispersive.svg`
+carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious
+rather than asserted.
 
 ## Where the diagrams live
 
 Diagrams live here rather than in the notebooks on purpose. A notebook is opened from two directory
 depths in this repo and from Colab with no repo at all, so a relative image path is broken in at
-least one of the three. The notebooks carry the same content as text figures and tables, which
-render everywhere.
+least one of the three. The notebooks draw their own figures from the results instead, through
+`result.plot(...)` and `waveform.plot()`, which render anywhere.
 
 ## Present or edit
 
@@ -73,7 +83,19 @@ npx @marp-team/marp-cli@latest qprogram_tutorial.md --pptx --allow-local-files
 
 The deck uses KaTeX math (`$...$`), a custom teal theme in an inline `<style>` block (accent
 `#0f766e`, soft accent `#e6f4f1`), and `class:` directives for the title and divider slides. Diagrams
-are sized by height (`![h:520](img/stack.svg)`) so they fit 16:9 without cropping.
+are sized by height (`![h:470](img/stack.svg)`) so they fit 16:9 without cropping.
+
+## Drawing a new diagram
+
+The ten diagrams are hand-written SVG on a `0 0 1600 900` viewBox, with a `<title>` and a prose
+`<desc>` for accessibility and the system font stack declared once on the root element. They share
+one palette with the deck: accent `#0f766e`, soft accent `#e6f4f1`, ink `#1c1c2e`, muted `#6a6a82`,
+panel `#f5f5fa`, white ground. Boxes are `rx="10"` with a 2px stroke, bands are `rx="14"`, and a box
+title is 24px bold over 20 to 22px detail lines.
+
+Nothing goes below 18px in that coordinate space, because 900 units of height render at about 470
+CSS pixels on the slide. Read `rack.svg` before writing a new one; it is the file the rest were
+matched to.
 
 ## Regenerate the QR codes
 

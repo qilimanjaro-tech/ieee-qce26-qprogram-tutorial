@@ -7,13 +7,10 @@ QProgram. Real labs run out of those on day one. Someone has a pulse shape their
 already knows and the DSL does not. Someone drives a room-temperature attenuator that no core
 operation will ever cover. Someone scans a chevron by centre and span instead of start and stop.
 
-What happens next decides whether any of Part 5 was true. A control DSL that cannot be extended gets
-forked, and a forked DSL is not a portable format any more, it is three dialects with the same file
-extension. Lab A patches in its attenuator, lab B patches in its pulse shape, and the `.qp` file
-that was supposed to move between them now loads in one interpreter and raises in the other, or
-worse, loads in both and means different things.
-
-So the extension points are what keep the format worth having.
+QProgram answers all three the same way. You write a class, you make one registration call, and the
+serializer, the parser, the validator, and the plotting layer pick it up without a line changing in
+the core. This part builds one of each, then spends the rest of its time on the file that comes out
+and on what a day of measurement looks like once the file is the thing you keep.
 
 - register a **waveform**, a **sweep source**, and a whole **vendor namespace**, live in this
   notebook
@@ -54,6 +51,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from dataclasses import replace
 from importlib.metadata import entry_points
 from pathlib import Path
 
@@ -65,6 +63,7 @@ import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
 from qprogram.operations.operation import Operation
+from qprogram.plotting import LIGHT, Quantity, Style
 from qprogram.waveforms import IQDrag, IQPair, Square, Waveform
 
 print("imports ready")
@@ -75,7 +74,7 @@ r"""
 
 The capstone at the end runs the whole bring-up, so the six cells below collect what the earlier
 parts built: the device truth, the response models that stand in for the fridge, the pulse sequences
-from Part 4, and two helpers that turn "one sweep, one fit" into two lines. Read them once; the
+from Part 4, and the helpers that turn "one sweep, one fit" into two lines. Read them once. The
 capstone is short because they exist.
 
 The schema is the flux-tunable one this time. The custom waveform in 6.1 is a flux pulse, and a flux
@@ -187,6 +186,14 @@ print("(check, verify) per shot:", pairs)
 r"""
 Every experiment in the bring-up has the same skeleton: average, sweep one variable, do something,
 measure. `sweep_program` writes that skeleton and hands back the program and the measurement handle.
+
+It also declares the swept variable with a `label` and `units`, which costs a dict lookup here and
+pays for every axis label in the capstone. Those two strings travel onto the xarray coordinate the
+executor builds, and `result.plot` reads them back off it, so a figure comes out with `Delay (ns)`
+under the x axis and nobody typed it. `AXES` holds the pair per variable, plus the unit the figure
+wants when it differs from the unit the instrument takes. A delay is programmed in nanoseconds and
+read in microseconds; a frequency is programmed in hertz and read in gigahertz.
+
 `OUT` is where the capstone drops its files.
 """
 
@@ -194,16 +201,34 @@ measure. `sweep_program` writes that skeleton and hands back the program and the
 OUT = Path("out/bringup")
 OUT.mkdir(parents=True, exist_ok=True)
 
+# variable id -> (axis label, the unit the program uses, the unit the figure wants, the divisor).
+AXES = {
+    "ro_freq": ("Readout frequency", "Hz", "GHz", 1e9),
+    "drive_freq": ("Drive frequency", "Hz", "GHz", 1e9),
+    "amp": ("Drive amplitude", "DAC units", None, 1.0),
+    "delay": ("Delay", "ns", "us", 1000.0),
+}
+UNLABELED = (None, None, None, 1.0)
 
-def sweep_program(label, var, source, middle, *, shots, fields):
+
+def sweep_program(name, var, source, middle, *, shots, fields):
     """average -> sweep(var) -> middle(program, var) -> measure, the shape of every scan here."""
-    program = qp.QProgram(label=label, schema=schema)
-    swept = program.variable(var)
+    label, units, _, _ = AXES.get(var, UNLABELED)
+    program = qp.QProgram(label=name, schema=schema)
+    swept = program.variable(var, label=label, units=units)
     with program.average(shots=shots):
         with program.sweep(swept, source):
             middle(program, swept)
             handle = program.measure(q[0].readout, "readout", "weights", fields=fields)
     return program, handle
+
+
+def restated(var):
+    """The `coords=` entry that redraws one axis in the unit the figure wants, or None when it matches."""
+    _, _, figure_units, scale = AXES.get(var, UNLABELED)
+    if figure_units is None:
+        return None
+    return {var: Quantity(units=figure_units, transform=lambda values: values / scale)}
 
 
 def magnitude(data):
@@ -257,8 +282,14 @@ print("body:" + qp.dumps(demo).split("body:", 1)[1].rstrip())
 
 # %% [markdown]
 r"""
-The fits are one line each. `step` puts everything together: build, save the `.qp` file, run, fit,
-and keep the trace so the capstone can plot all six panels at once.
+The fits are one line each. `step` puts the pieces together: build the program, save the `.qp` file,
+run it, fit, and keep the result object so the capstone can draw all six sweeps at once.
+
+Keeping the result rather than a pair of arrays is the point of that last part. `draw` hands the
+drawing back to `result.plot`, which already knows which dimension is the sweep, what the variable
+was called, and what unit it was declared in, and `restated` says what unit to read it in. The fit
+goes over the top as an ordinary matplotlib call on the axes that comes back, in the units the figure
+is drawn in, so the delays divide by the same 1000 the axis did.
 """
 
 # %%
@@ -289,16 +320,36 @@ def half_decay(t, tau):
 TRACES = {}
 
 
-def step(name, var, source, middle, model, curve, p0, *, shots=200, field=MF.STATE):
+def step(name, var, source, middle, model, curve, p0, *, shots=200, field=MF.STATE,
+         channels=None, measured="Excited population"):
     """Run one bring-up step, save it as `<name>.qp`, fit `curve`, and return the fitted values."""
     program, handle = sweep_program(name, var, source, middle, shots=shots, fields=(field,))
     qp.save(program, OUT / f"{name}.qp")
-    data = qp.simulate(program, model=model).get(handle, field=field)
+    result = qp.simulate(program, model=model)
+    data = result.get(handle, field=field)
     x = data.coords[var].values
     y = data.values if field is MF.STATE else magnitude(data)
     popt, _ = curve_fit(curve, x, y, p0=p0, maxfev=40000)
-    TRACES[name] = (x, y, curve, popt)
+    TRACES[name] = {
+        "result": result, "handle": handle, "field": field, "var": var,
+        "channels": channels, "measured": measured, "x": x, "curve": curve, "popt": popt,
+    }
     return popt
+
+
+def draw(name, target=None):
+    """Draw one step the way its result draws itself, with the fitted curve over the top."""
+    trace = TRACES[name]
+    ax = trace["result"].plot(
+        trace["handle"], field=trace["field"], channels=trace["channels"], target=target,
+        coords=restated(trace["var"]), value=Quantity(trace["measured"]),
+        style=Style(markers=True, linewidth=0.8, legend=False),
+    )
+    scale = AXES.get(trace["var"], UNLABELED)[3]
+    ax.plot(trace["x"] / scale, trace["curve"](trace["x"], *trace["popt"]),
+            lw=1.5, color=LIGHT.series[1], label="fit")
+    ax.lines[0].set_label("measured")
+    return ax
 
 
 print("rabi shape at a_pi/2 and a_pi:", rabi(np.array([0.31, 0.62]), 0.62).round(3))
@@ -313,7 +364,7 @@ vendor's name.
 
 | You want | You write | You get for free |
 |---|---|---|
-| a pulse shape the DSL lacks | a `Waveform` subclass, `@qp.register_waveform` | `.qp` serialization from the constructor signature, structural equality, validation |
+| a pulse shape the DSL lacks | a `Waveform` subclass, `@qp.register_waveform` | `.qp` serialization from the constructor signature, structural equality, validation, plotting |
 | a sweep axis the DSL lacks | a `SweepSource` subclass, `@qp.register_sweep_source` | serialization, a capability token, lockstep length checks, xarray coordinates |
 | an operation the DSL will never have | an `Operation` plus a `VendorNamespace`, four registration calls | `program.<vendor>.<op>(...)`, a `require` line, a `vendor.<name>.<op>` token |
 
@@ -353,6 +404,14 @@ program later in this section puts a swept variable in the amplitude position an
 multiplication would meet a `Variable` instead of a number. Every shape the core ships is written
 this way. Skipping it costs nothing until a real platform calls `envelope()`, and then it fails
 inside numpy with a message that names neither the waveform nor the variable.
+
+Now read the next cell for what it does not contain. `HalfSine.plot()` appears nowhere in it.
+Neither does `area()`, `peak_amplitude()`, `spectrum()`, nor the Jupyter repr that draws the envelope
+when a bare `HalfSine(0.42, 40)` is the last line of a cell, in a light variant and a dark one. All
+of that comes from `Waveform`, and it draws through the same figure model and the same palette every
+result in this notebook is drawn with, so a pulse and the sweep it produced come out looking like one
+experiment rather than two libraries. Putting the core's `Square` beside it is a `target=` and a
+rotated palette. Two methods in, and the drawing arrives as part of the deal.
 """
 
 # %%
@@ -376,13 +435,21 @@ class HalfSine(Waveform):
 
 qp.register_waveform_token(HalfSine, "waveform.half_sine")
 
-plt.plot(HalfSine(amplitude=0.42, duration=40).envelope(), label="HalfSine(0.42, 40)")
-plt.plot(Square(amplitude=0.42, duration=40).envelope(), label="Square(0.42, 40)")
-plt.xlabel("Time (ns)")
-plt.ylabel("Flux amplitude (DAC units)")
-plt.title("A shape the core does not ship")
-plt.legend()
-plt.show()
+flux_pulse = HalfSine(amplitude=0.42, duration=40)
+ax = flux_pulse.plot()
+rotated = Style(theme=replace(LIGHT, series=LIGHT.series[1:] + LIGHT.series[:1]))
+Square(amplitude=0.42, duration=40).plot(target=ax, style=rotated)
+for line, name in zip(ax.lines, ("HalfSine(0.42, 40)", "Square(0.42, 40)"), strict=True):
+    line.set_label(name)
+ax.set_title("A shape the core does not ship", loc="left", fontsize=10)
+ax.set_ylabel("Flux amplitude (DAC units)")
+ax.legend(frameon=False, fontsize=9)
+
+print("written on HalfSine:", sorted(name for name in vars(HalfSine) if not name.startswith("_")))
+print("inherited from Waveform:",
+      [name for name in ("plot", "area", "peak_amplitude", "rms_amplitude", "spectrum")
+       if name not in vars(HalfSine)])
+print(f"area {flux_pulse.area():.3f}, peak amplitude {flux_pulse.peak_amplitude():.3f}")
 
 # %% [markdown]
 r"""
@@ -401,14 +468,9 @@ The contract is three declarations, and each has a real consumer:
 - `values()` produces the numbers, for the interpreter, for the xarray coordinate, and for
   `optimize()`.
 
-A source may not wrap a callable, and that restriction is the whole design in one line, so it is
-worth the five minutes. Imagine `Callable(lambda i: ...)` as a source. It could not answer
-`length()` without running, so a lockstep pair could not be checked at build time and the result
-array could not be allocated before the first shot. It could not honestly declare a `KIND`, so every
-sweep would fall back to arbitrary and no loop would ever compile into a register. And it could not
-serialize, so a `.qp` file holding one would either carry a pickled closure or quietly lose the
-sweep. Three properties, all of them load-bearing, all of them gone. That rule is why the format
-works.
+All three have to be answerable before the sweep runs, and that is why a source cannot wrap a
+callable. `Chevron` computes its values from three stored numbers it was handed, so the build-time
+length check, the honest `KIND`, and the round trip through text all fall out of the class below.
 """
 
 # %%
@@ -518,11 +580,16 @@ The file also round-trips. The parser rebuilds `HalfSine`, `Chevron`, and `fridg
 from the text with no help from you, because each is registered under its class name and serialized
 from its constructor signature. And the reference platform accepts every token in the registry, so
 the program validates and runs.
+
+The figure of the run is one call, and the third seam pays out there too. `flux_amp` was declared
+with a label and a unit, so the axis reads `Flux amplitude (V)`, and the positions along it are the
+numbers `Chevron.values()` produced. The dashed line is where the model put the resonance, drawn on
+the axes `plot` handed back.
 """
 
 # %%
 program = qp.QProgram(label="cz_chevron", description="flux-activated swap on the fridge rack", schema=schema)
-flux_amp = program.variable("flux_amp", label="Flux amplitude", units="V")
+flux_amp = program.variable("flux_amp", label="Flux amplitude", units="DAC units")
 
 program.fridge.set_attenuation(q[0].drive, 20.0)
 with program.average(shots=200):
@@ -545,8 +612,15 @@ def p_swap(bus, env):
     return contrast * np.sin(np.pi * omega * 40 * 1e-9) ** 2
 
 
-data = qp.simulate(program, model=qp.MockMeasurementModel(p_excited=p_swap, seed=21)).get(swap, field=MF.STATE)
+chevron_run = qp.simulate(program, model=qp.MockMeasurementModel(p_excited=p_swap, seed=21))
+data = chevron_run.get(swap, field=MF.STATE)
 amps = data.coords["flux_amp"].values
+
+ax = chevron_run.plot(swap, field=MF.STATE, value=Quantity("Swap probability"), style=Style(markers=True))
+ax.lines[0].set_label("measured")
+ax.axvline(DEVICE["cz_amp_res"], linestyle="--", color=LIGHT.series[1], label="resonance in the model")
+ax.legend(frameon=False, fontsize=9)
+
 print(f"swap peaks at {amps[data.values.argmax()]:.3f}, resonance is at {DEVICE['cz_amp_res']:.3f}")
 
 # %% [markdown]
@@ -554,11 +628,8 @@ r"""
 ### The token is the whole point
 
 Registering a token does not mean every rack has the box. Build a platform descriptor that knows
-everything except our attenuator, and the validator says what is missing and where.
-
-This is the difference between an extension and a fork. The program stays legal QProgram, the file
-stays loadable, and the machine that cannot run it says so before anything is uploaded. A fork would
-have given you the same working program on your own rack and a syntax error on everybody else's.
+everything except our attenuator, and the validator names what is missing and where it sits in the
+program, before anything is uploaded and while the file is still legal QProgram everywhere else.
 """
 
 # %%
@@ -767,14 +838,11 @@ A calibration is not a plot. It is the program that produced the plot, and the n
 out. QProgram writes the program as line-oriented text, so the ordinary tools work on it: `diff`,
 code review, `git blame`, and a checker you can run in CI.
 
-Here are two runs of the same Rabi experiment, a Monday and a Friday. Somebody changed three things,
-and the diff names all three in the language of the experiment rather than in sequencer opcodes.
-Read the output and you can reconstruct the week: the amplitude sweep now stops at 0.8 instead of
-1.0, so the pi pulse came in lower than expected and the top of the range was wasted. The readout
-frequency moved by 400 kHz, so the resonator drifted or somebody re-ran the punchout. And the shot
-count doubled, so the contrast was worse than they wanted.
-
-None of that is in a plot, and all of it is in a text file that costs nothing to keep.
+Here are two runs of the same Rabi experiment, a Monday and a Friday. Three things changed between
+them, and the diff names all three in the language of the experiment rather than in sequencer
+opcodes: the amplitude sweep now stops at 0.8 instead of 1.0, the readout frequency moved by
+400 kHz, and the shot count doubled. None of that is in a plot, and all of it is in a text file that
+costs nothing to keep.
 """
 
 # %%
@@ -783,7 +851,7 @@ scratch = Path(tempfile.mkdtemp(prefix="qp-artifacts-"))
 
 def rabi_run(label, a_stop, ro_freq, shots):
     program = qp.QProgram(label=label, schema=schema)
-    amp = program.variable("amp", label="Drive amplitude")
+    amp = program.variable("amp", label="Drive amplitude", units="DAC units")
     program.set_frequency(q[0].readout, ro_freq)
     with program.average(shots=shots):
         with program.sweep(amp, qp.Linspace(0.0, a_stop, 41)):
@@ -793,12 +861,14 @@ def rabi_run(label, a_stop, ro_freq, shots):
     return program
 
 
-qp.save(rabi_run("rabi", 1.0, 7.2000e9, 200), scratch / "rabi_monday.qp")
-qp.save(rabi_run("rabi", 0.8, 7.2004e9, 400), scratch / "rabi_friday.qp")
+monday = rabi_run("rabi", 1.0, 7.2000e9, 200)
+friday = rabi_run("rabi", 0.8, 7.2004e9, 400)
+qp.save(monday, scratch / "rabi_monday.qp")
+qp.save(friday, scratch / "rabi_friday.qp")
 
-monday = (scratch / "rabi_monday.qp").read_text().splitlines(keepends=True)
-friday = (scratch / "rabi_friday.qp").read_text().splitlines(keepends=True)
-print("".join(difflib.unified_diff(monday, friday, "rabi_monday.qp", "rabi_friday.qp", n=1)))
+before = (scratch / "rabi_monday.qp").read_text().splitlines(keepends=True)
+after = (scratch / "rabi_friday.qp").read_text().splitlines(keepends=True)
+print("".join(difflib.unified_diff(before, after, "rabi_monday.qp", "rabi_friday.qp", n=1)))
 
 # %% [markdown]
 r"""
@@ -808,85 +878,69 @@ r"""
 result against the reference platform, and prints JSON diagnostics. It exits 1 when it finds any, so
 it drops into a pre-commit hook or a CI job. No extra dependencies.
 
-Break the Friday file the way a hand edit breaks a file. Misspell a bus. The message comes back with
-the line number, the path that failed to resolve, and the buses the chip does have, because the
-`.qp` file declares its own schema. A checker that knows the layout can tell a typo from a bus that
-genuinely does not exist, and the difference matters: one is a five-second fix and the other means
-the file was written for a different chip.
+Break the Friday file the way a hand edit breaks a file, twice over. `average` becomes `avarage` and
+`q[0].drive` becomes `q[0].drve`. Then repair it from the checker output alone, taking the reported
+line number as the only clue about which repair applies. The parser stops at the first error, so it
+takes one round per break plus one more to see a clean file, and the last line proves the repaired
+text parses back to the program we started from.
 
+Read the two messages rather than the loop. The first names the keyword it did not recognize and
+lists the header forms that are legal instead. The second names the path that failed to resolve and
+the buses the chip actually has, because a `.qp` file declares its own schema and the checker reads
+it. A checker that knows the layout can tell a typo from a bus that genuinely does not exist, and
+the difference matters. One is a five-second fix and the other means the file was written for a
+different chip.
+"""
+
+# %%
+broken = scratch / "rabi_hand_edited.qp"
+broken.write_text(
+    (scratch / "rabi_friday.qp").read_text().replace("average", "avarage").replace("q[0].drive", "q[0].drve")
+)
+repairs = {"avarage": "average", "drve": "drive"}
+
+
+def lsp(mode, path):
+    """Run `python -m qprogram.lsp <mode> <file>` the way CI would, and hand back exit code and text."""
+    done = subprocess.run(
+        [sys.executable, "-m", "qprogram.lsp", mode, str(path)],
+        capture_output=True, text=True, check=False,
+    )
+    return done.returncode, done.stdout
+
+
+for attempt in range(1, 5):
+    code, out = lsp("check", broken)
+    print(f"$ python -m qprogram.lsp check {broken.name}   (exit {code})")
+    found = json.loads(out)
+    if not found:
+        print("  no diagnostics")
+        break
+    first = found[0]
+    print(f"  line {first['line'] + 1}: [{first['severity']}] {first['code']}: {first['message']}")
+    culprit = broken.read_text().splitlines()[first["line"]]
+    for wrong, right in repairs.items():
+        if wrong in culprit:
+            broken.write_text(broken.read_text().replace(wrong, right, 1))
+
+print("\nrepaired file parses back to the program we wrote:", qp.loads(broken.read_text()).body == friday.body)
+
+# %% [markdown]
+r"""
 The same module has two more modes. `explain` prints the execution plan as a tree straight from a
-shell, the fastest way to answer "why is this loop running host-side". `serve` speaks LSP over stdio
-and needs the `qprogram[lsp]` extra. The VS Code extension lives in the `qprogram-editors`
-repository and is published as `qilimanjaro.qprogram`. It is a thin front-end over that same
+shell, the fastest way to answer "why is this loop running host-side", and the cell below runs it on
+the file the loop above just repaired. `serve` speaks LSP over stdio and needs the `qprogram[lsp]`
+extra. The VS Code extension lives in the `qprogram-editors` repository and is published as
+`qilimanjaro.qprogram`. It is a thin front-end over that same
 `qprogram.lsp` module, deliberately, so an editor squiggle cannot drift from what the parser accepts
 at load time. It highlights `.qp`, runs `check` on open, on save, and debounced while you type, and
 adds a `qp: Explain execution plan` command.
 """
 
 # %%
-broken = scratch / "rabi_broken.qp"
-broken.write_text((scratch / "rabi_friday.qp").read_text().replace("q[0].drive", "q[0].drve"))
-
-for mode, target in (("check", broken), ("explain", scratch / "rabi_friday.qp")):
-    done = subprocess.run(
-        [sys.executable, "-m", "qprogram.lsp", mode, str(target)],
-        capture_output=True, text=True, check=False,
-    )
-    print(f"$ python -m qprogram.lsp {mode} {target.name}   (exit {done.returncode})")
-    if mode == "check":
-        for d in json.loads(done.stdout):
-            print(f"  line {d['line'] + 1}: [{d['severity']}] {d['code']}: {d['message']}")
-    else:
-        print(done.stdout)
-
-# %% [markdown]
-r"""
-### 🧩 Exercise 6.2: fix a file with the checker
-
-Somebody hand-edited a `.qp` file and broke it in two places. Find and fix both using nothing but
-the checker output, then prove the repaired file is the program you started from.
-
-Your job:
-
-1. Take the `cz_chevron` program from 6.1, serialize it, and break it twice, turning `average` into
-   `avarage` and `q[0].flux` into `q[0].flx`.
-2. Loop. Call `qprogram.lsp.check_text` on the current text, print the first diagnostic with its
-   1-based line number, use the reported line to decide which repair applies, and apply it.
-3. Stop when the checker returns nothing, then check that the reparsed program's `body` equals the
-   original.
-
-The parser stops at the first error, so it takes one round per break plus one more to see a clean
-file. That is what the loop is for, and it is also what a CI job looks like from the inside.
-"""
-
-# %% solution
-from qprogram.lsp import check_text
-
-repairs = {"avarage": "average", "flx": "flux"}
-edited = qp.dumps(program).replace("average", "avarage").replace("q[0].flux", "q[0].flx")
-
-for attempt in range(1, 5):
-    found = check_text(edited)
-    if not found:
-        print(f"round {attempt}: clean")
-        break
-    first = found[0]
-    print(f"round {attempt}: line {first.line + 1}: {first.message}")
-    culprit = edited.splitlines()[first.line]
-    for wrong, right in repairs.items():
-        if wrong in culprit:
-            edited = edited.replace(wrong, right, 1)
-
-print("repaired file matches the original:", qp.loads(edited).body == program.body)
-
-# %% stub
-# TODO: break a .qp file twice and repair it from the checker output alone.
-# 1) edited = qp.dumps(program), with "average" -> "avarage" and "q[0].flux" -> "q[0].flx"
-# 2) from qprogram.lsp import check_text
-# 3) Loop up to four times: call check_text(edited); if it returns nothing, print "clean" and stop.
-#    Otherwise print the first diagnostic's 1-based line and message, look at that line of `edited`,
-#    and apply whichever repair matches ({"avarage": "average", "flx": "flux"}).
-# 4) Print whether qp.loads(edited).body == program.body.
+code, plan = lsp("explain", broken)
+print(f"$ python -m qprogram.lsp explain {broken.name}   (exit {code})")
+print(plan)
 
 # %% [markdown]
 r"""
@@ -935,6 +989,11 @@ print("errors from validate on the chevron program:", reference.validate(program
 r"""
 ## 6.5 Capstone: the whole bring-up in one run
 
+The next three cells are what the other five parts were for. A program is data, so each step writes
+itself to a file. A sweep is data, so each axis labels itself from the variable that was declared.
+A result is data, so each panel draws itself. Put those three together and a day of measurement
+turns into a script that runs unattended and leaves a directory somebody else can read.
+
 Seven steps, in the order a real chip gets brought up, each one a program saved as a `.qp` file:
 
 1. **Resonator spectroscopy.** Find the readout frequency. Nothing else works without it.
@@ -971,6 +1030,7 @@ f_r, _, _, _ = step(
     lambda program, freq: program.set_frequency(q[0].readout, freq),
     qp.MockMeasurementModel(response=s21, noise=0.01, seed=11),
     dip, p0=(7.2e9, 1e6, 0.9, 1.0), field=MF.IQ,
+    channels="magnitude", measured="Readout magnitude",
 )
 CAL["f_r (GHz)"] = (f_r / 1e9, DEVICE["q0_fr"] / 1e9)
 
@@ -1027,6 +1087,13 @@ physics or a bug, and either way you want to know today rather than in the paper
 
 The fitted pulses go out beside it in a `.wfl` library, so tomorrow's run loads today's numbers from
 a file instead of from a literal somebody pasted into a script.
+
+The six panels underneath are the last figure of the tutorial, and they split the work the way every
+figure here has. matplotlib owns the grid, because a layout of six panels follows from nothing a
+single result knows. Each panel is drawn by the result that owns it, handed its axes as `target=`,
+and each axis reads its label and its unit off the variable the program declared. The fits go on top
+as ordinary calls on the axes that came back. Nothing in the loop below pulls an array out of a
+result and rebuilds a picture matplotlib could not have known was a measurement.
 """
 
 # %%
@@ -1044,11 +1111,10 @@ print(f"\nartifacts in {OUT.resolve()}:")
 print(" ", sorted(p.name for p in OUT.iterdir()))
 
 fig, axes = plt.subplots(2, 3, figsize=(12, 5.5))
-for ax, (name, (x, y, curve, popt)) in zip(axes.ravel(), TRACES.items(), strict=False):
-    ax.plot(x, y, ".", ms=4, label="measured")
-    ax.plot(x, curve(x, *popt), "-", lw=1.5, label="fit")
-    ax.set_title(name, fontsize=9)
-axes[0, 0].legend(fontsize=8)
+for ax, name in zip(axes.ravel(), TRACES, strict=True):
+    draw(name, target=ax)
+    ax.set_title(name, loc="left", fontsize=9)
+axes[0, 0].legend(frameon=False, fontsize=8)
 fig.tight_layout()
 plt.show()
 
@@ -1058,20 +1124,21 @@ r"""
 
 - Three extension seams cover new vocabulary: a `Waveform`, a `SweepSource`, and a vendor
   `Operation` behind a `VendorNamespace`. Each is a class plus a registration call, and each gets
-  serialization, validation, and a capability token without any change to the core. A fourth,
-  `register_vendor_block`, does the same for a vendor's own control flow. A fifth,
-  `register_profile`, publishes the token bundle a rack reaches by name.
+  serialization, validation, and a capability token without any change to the core. A `Waveform`
+  gets its figure and its Jupyter repr too. A fourth seam, `register_vendor_block`, does the same
+  for a vendor's own control flow, and a fifth, `register_profile`, publishes the token bundle a
+  rack reaches by name.
 - The token is what makes an extension safe. A rack that lacks it refuses the program with a named
-  diagnostic and a path, before anything reaches an instrument. A fork would have given you the same
-  working program locally and a syntax error everywhere else.
+  diagnostic and a path, before anything reaches an instrument, and the file stays legal QProgram
+  everywhere else.
 - Entry points make a `.qp` file self-describing. The `require` line names the vendor, and `loads()`
   imports the extension that claims it, so an archived file does not depend on the reader knowing
   what the author had installed.
 - The `.qp` file is the artifact you keep. It diffs, it reviews, and `python -m qprogram.lsp check`
-  turns it into a CI job.
+  turns it into a CI job that repairs by line number.
 - The capstone recovered f_r, f01, the pi amplitude, T1, T2\*, the detuning, and T2 from simulated
-  data, wrote a file per step, and put the fitted pulses in a `.wfl` library. That directory is a
-  calibration another lab could load.
+  data, wrote a file per step, drew every panel through the result that produced it, and put the
+  fitted pulses in a `.wfl` library. That directory is a calibration another lab could load.
 
 Where to read more. The published documentation at qilimanjaro-tech.github.io/qprogram carries the
 normative material in its Reference section, `docs/reference/qp-format.md` covers the text format,
@@ -1079,10 +1146,11 @@ and `src/qprogram/grammar/qp.lark` is the machine-readable grammar.
 `docs/developer/vendor-extensions.md` walks a vendor package end to end, and `qprogram-qdac` is the
 smallest complete one worth copying, at four operations and one profile.
 
-One idea to carry forward. The program, the plan, and the calibration are all data, and everything
-this tutorial did followed from that. A program you can serialize is a program you can diff, review,
-check in CI, and hand to a different machine. A plan you can print is a performance question you can
-answer before you spend fridge time on it. A calibration in a file is a number with a date on it
-rather than a literal somebody remembers typing. None of that is available to a string builder, and
-all of it is the reason to write the extra layer.
+One idea to carry forward. The program, the plan, the result, and the calibration are all data, and
+everything this tutorial did followed from that. A program you can serialize is a program you can
+diff, review, check in CI, and hand to a different machine. A plan you can print is a performance
+question you can answer before you spend fridge time on it. A result that carries its own
+coordinates is a result that draws itself and a fit that lands on the right axis. A calibration in a
+file is a number with a date on it rather than a literal somebody remembers typing. None of that is
+available to a string builder, and all of it is the reason to write the extra layer.
 """

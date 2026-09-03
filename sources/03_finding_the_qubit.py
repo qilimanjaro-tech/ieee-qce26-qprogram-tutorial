@@ -2,21 +2,18 @@
 r"""
 # 03 · Finding and driving the qubit
 
-Part 2 found the readout resonator. That tells you where to point the readout tone, and nothing
-about the qubit. A transmon sitting at 4.85 GHz is invisible in a 7.2 GHz transmission scan.
+Part 2 found the readout resonator. That tells you where to point the readout tone and nothing at
+all about the qubit. A transmon sitting at 4.85 GHz leaves no mark on a 7.2 GHz transmission scan.
 
-This part closes that gap and then calibrates a gate:
+This part closes the gap and then calibrates a gate. Two-tone spectroscopy finds `f01` by driving
+the qubit with a second tone while the readout watches the resonator. Rabi in amplitude turns that
+frequency into a pi pulse. A `WaveformLibrary` holds the pulse so later programs can name it instead
+of inlining its amplitude. The flux arc then maps `f01` against a DC bias, and it is the first
+experiment in this tutorial whose outer loop cannot run on a sequencer.
 
-1. **Two-tone spectroscopy** finds `f01` by driving the qubit with a second tone while watching the
-   resonator.
-2. **Rabi in amplitude** turns `f01` into a pi pulse, the amplitude that flips the qubit.
-3. The **calibration seam**: a program that names its pulses, and a library that supplies the
-   numbers.
-4. The **flux arc**: a 2D map of `f01` against a DC flux bias, and the first experiment in this
-   tutorial whose outer loop cannot run on a sequencer.
-
-Every fit in this notebook prints the fitted value next to the true one, because the device is
-simulated and you can check your own work.
+Each experiment consumes the answer the one before it produced, and that is how a bring-up actually
+runs. Every fit prints its value next to the true one, because the device is simulated and you can
+check your own work.
 """
 
 # %%
@@ -39,6 +36,8 @@ from importlib.metadata import version
 print("qprogram", version("qprogram"))
 
 # %%
+from dataclasses import replace
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
@@ -47,6 +46,7 @@ from scipy.optimize import curve_fit
 import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
+from qprogram.plotting import DEFAULT_SIZE, LIGHT, Quantity, Style
 from qprogram.waveforms import IQDrag, IQPair, Square
 
 print("numpy", np.__version__, "| scipy", scipy.__version__, "(curve_fit does every fit below)")
@@ -55,11 +55,11 @@ print("numpy", np.__version__, "| scipy", scipy.__version__, "(curve_fit does ev
 r"""
 ## 3.0 The device under test
 
-`DEVICE` holds the truth about the simulated chip. The measurement models read it, because they
-play the part of the fridge, and the print statements read it to grade the fits. The programs use
-exactly one number from it, `q0_fr`, and only because Part 2 measured that one already. Everything
-else they have to find out. A real experiment does not know these numbers, so neither does the code
-that would run on hardware.
+`DEVICE` holds the truth about the simulated chip. The measurement models read it because they play
+the part of the fridge, and the print statements read it to grade the fits. The programs use exactly
+one number from it, `q0_fr`, and only because Part 2 measured that one already. Everything else they
+have to find out. A real experiment does not know these numbers, so neither does the code that would
+run on hardware.
 
 Part 2 also left two waveforms behind, the readout pulse and the integration weights. The programs
 below ask for them by name, as the strings `"readout"` and `"weights"`, and the library in 3.3 is
@@ -93,47 +93,35 @@ print("target to recover: f01 =", DEVICE["q0_f01"] / 1e9, "GHz")
 r"""
 ## 3.1 Two-tone spectroscopy
 
-You cannot see the qubit directly. Nothing you send down the readout line at 7.2 GHz interacts with
-something sitting at 4.85 GHz, and nothing comes back on the drive line at all, because the drive
-line has no ADC. The qubit is only ever observed through the resonator, and only ever because of
-$\chi$.
-
-So the trick is to run two tones at once and watch for a coincidence:
+Nothing you send down the readout line at 7.2 GHz touches something sitting at 4.85 GHz, and the
+drive line has no ADC, so the qubit is only ever seen through the resonator. Running two tones at
+once is the way around that.
 
 1. Park the readout tone on the resonator, where Part 2 put it, and keep it there.
 2. Send a second tone down the **drive** line and sweep its frequency across the band where the
    qubit ought to be.
-3. When the second tone hits $f_{01}$ the qubit gets excited. The resonator, coupled to it, shifts
-   by $2\chi$ = 3.6 MHz. Against a 1.5 MHz linewidth that is a large move, so the readout tone that
-   was sitting in the dip is suddenly off it, and the transmission you measure jumps.
+3. When the second tone hits $f_{01}$ the qubit gets excited and the resonator, coupled to it,
+   shifts by $2\chi$ = 3.6 MHz. Against a 1.5 MHz linewidth that is a large move, so the readout
+   tone that was sitting in the dip is suddenly off it and the transmission you measure jumps.
 
-Read that chain backwards and you have the reason the resonator has to come first. The signal is not
-the qubit, it is the resonator changing its mind about where it lives, and you cannot notice that
+Read that chain backwards and you have the reason the resonator had to come first. The signal is not
+the qubit. It is the resonator changing its mind about where it lives, and you cannot notice that
 unless you were already parked in the right place.
 
-### Why the drive tone is long and weak
-
-The pulse for this scan is 4 microseconds at 2 percent of full scale, and both of those numbers are
-deliberate.
-
-**Weak**, because you do not yet know the amplitude of a pi pulse. Producing that number is the
-point of this section, so you cannot ask for a clean flip. What you can do is saturate the
-transition. Drive it hard enough to keep pumping population up, and stimulated emission brings it
-back down at the same rate. A saturated two-level system settles at equal populations, so the peak
-of a spectroscopy scan tops out at 0.5 and never goes higher no matter how hard you push. The model
-below returns 0.45 for exactly that reason, and if you ever see a two-tone peak above 0.5 you are
-looking at a calibration error in your readout, not at a very excited qubit.
-
-**Long**, because the population has to reach that steady state before the readout looks. At these
-Rabi rates the transition saturates in well under a microsecond, so 4 us is comfortable rather than
-tight.
+The drive pulse for this scan is 4 microseconds at 2 percent of full scale, and both numbers are
+deliberate. Weak, because the amplitude of a pi pulse is the thing this part exists to produce, so a
+clean flip is not yet available to you. What a weak tone can do instead is saturate the transition
+and hold the population at a steady value, which for a two-level system tops out at 0.5. The model
+below returns 0.45 at resonance for that reason, and a two-tone peak above 0.5 is a readout
+calibration error rather than a very excited qubit. Long, because that steady state has to be
+reached before the readout looks, and at these Rabi rates the transition saturates in well under a
+microsecond.
 
 The window is 20 MHz wide, so this scan assumes you already know `f01` to roughly that much, from
-the chip design, from a cooldown last month, or from a wide survey scan like the flux arc in 3.4.
-Drive a survey scan hard and the line broadens, which keeps the peak findable on a coarse grid. This
-tone is weak, so the line stays near its 2 MHz low-power width and the 250 kHz step puts eight
-points across it. Part 1 wrote down where that 2 MHz comes from. It is the 35 kHz coherence
-linewidth of a 9 us $T_2^*$, power-broadened by the very tone you are using to see it.
+the chip design, from a cooldown last month, or from a wide survey scan like the flux arc in 3.4. A
+weak tone leaves the line near its 2 MHz low-power width, and the 250 kHz step then puts eight
+points across it. Part 1 wrote down where that 2 MHz comes from, the 35 kHz coherence linewidth of a
+9 us $T_2^*$, power-broadened by the very tone you are using to see it.
 
 The drive bus is an IQ channel, so the saturation tone is an `IQPair`. A bare `Square` on that bus
 raises a `ValidationError` at build time.
@@ -167,7 +155,7 @@ the quantity of interest is the qubit population, so the measurement asks for a 
 program.measure(bus, "readout", "weights", fields=(MF.STATE,))
 ```
 
-`fields=` is a request to the platform: produce classified single-shot outcomes for this
+`fields=` is a request to the platform. Produce classified single-shot outcomes for this
 measurement, not just the integrated point. Three things follow from it.
 
 - `average(shots)` adds no dimension. Averaging 200 single-shot zeros and ones gives you the
@@ -177,11 +165,13 @@ measurement, not just the integrated point. Three things follow from it.
   about 0.035 at the top of this peak with 200 shots. Nothing is added by hand. The `noise=`
   argument of `MockMeasurementModel` perturbs the IQ point rather than the classified outcome, so
   the models in this notebook do not pass it.
-- You read it back with `result.get(handle, field=MF.STATE)`. A bare `result.get(handle)` defaults
-  to `iq` and raises `KeyError` here, because this measurement never asked for `iq`.
-- On real hardware the classifier needs its own calibration (Part 4 does that with single shots).
-  In the simulator the `p_excited` callback of `MockMeasurementModel` supplies the probability and
-  the model draws the shots.
+- You read it back with `result.get(handle, field=MF.STATE)`, and you draw it with
+  `result.plot(handle, field=MF.STATE)`. A bare `result.get(handle)` defaults to `iq` and raises
+  `KeyError` here, because this measurement never asked for `iq`.
+
+On real hardware the classifier needs its own calibration, and Part 4 does that with single shots.
+In the simulator the `p_excited` callback of `MockMeasurementModel` supplies the probability and the
+model draws the shots.
 """
 
 # %%
@@ -213,6 +203,11 @@ Two details in that text worth a second look. The readout pulse and weights are 
 `"readout"` and `"weights"`, because nothing in this experiment depends on their shape. And
 `fields=["state"]` is on the measure line, so the file records what the experiment asked the
 hardware to produce.
+
+The `label` and `units` on `drive_freq` do a second job the moment the result comes back. Both ride
+along on the coordinate, so the x axis of the next figure names itself and you never type an axis
+label again. Declare them on every variable you sweep. Hertz is still the wrong scale for reading a
+20 MHz window, and `Quantity` is how the figure says gigahertz without the stored array moving.
 """
 
 # %%
@@ -225,12 +220,21 @@ print("dims:", pop.dims, "shape:", pop.shape)
 spec_freqs = pop.coords["drive_freq"].values
 spec_pop = pop.values
 
-plt.plot(spec_freqs / 1e9, spec_pop, ".", label="measured")
-plt.axvline(DEVICE["q0_f01"] / 1e9, color="grey", linestyle=":", label="true f01")
-plt.xlabel("Drive frequency (GHz)")
-plt.ylabel("Excited-state population")
-plt.title("Two-tone qubit spectroscopy on q0")
-plt.legend()
+# Two restatements every figure below reuses. The array stays in hertz; only the drawing moves.
+GHZ = Quantity(units="GHz", transform=lambda v: v / 1e9)
+POPULATION = Quantity("Excited-state population")
+
+ax = result.plot(
+    m_spec,
+    field=MF.STATE,
+    style=Style(markers=True),  # 81 coarse points: the samples are the measurement
+    coords={"drive_freq": GHZ},
+    value=POPULATION,  # the state field would otherwise label itself "State"
+    title="Two-tone qubit spectroscopy on q0",
+)
+ax.lines[0].set_label("measured")
+ax.axvline(DEVICE["q0_f01"] / 1e9, color=LIGHT.muted, linestyle=":", label="true f01")
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
@@ -249,13 +253,13 @@ $$P(f) = P_0 + \frac{A}{1 + \left(\dfrac{f - f_{01}}{\gamma}\right)^2}$$
 
 with $\gamma$ the half width at half maximum, so the linewidth you would quote in a paper is
 $2\gamma$. Four free parameters, and `curve_fit` wants a starting guess for each. Read them off the
-data: the peak position from `argmax`, the height from the range, the width from your prior (a few
+data. The peak position from `argmax`, the height from the range, the width from your prior (a few
 megahertz), and the floor from the median.
 
 Starting guesses matter more than they look. `curve_fit` is a local optimizer, so a Lorentzian
 started three linewidths away from the peak sees a flat landscape and stays where it was put. Every
-guess below is read off the data rather than typed in, and that habit is what keeps a fit working
-when the qubit moves overnight.
+guess below is read off the data rather than typed in, and that habit keeps a fit working when the
+qubit moves overnight.
 """
 
 # %%
@@ -280,59 +284,68 @@ print(f"true      : {DEVICE['q0_f01'] / 1e9:.6f} GHz")
 print(f"error     : {(f01_fit - DEVICE['q0_f01']) / 1e6:+.3f} MHz")
 print(f"linewidth : {2 * abs(hwhm_fit) / 1e6:.3f} MHz fitted vs {DEVICE['q0_linewidth'] / 1e6:.3f} MHz true")
 
+# %% [markdown]
+r"""
+Draw the fit on top of the data and one rule of the plotting API starts to matter. `GHZ` moved the
+numbers on the axis rather than the tick labels, so the axes the call returns is in gigahertz and
+everything you add to it has to arrive in gigahertz too. The fit was computed in hertz, so it gets
+divided by `1e9` on the way in, and so does each reference line. The colours come out of `LIGHT`,
+the theme the measurement was drawn with, so an overlay does not turn up in a palette of its own.
+"""
+
 # %%
 dense = np.linspace(spec_freqs[0], spec_freqs[-1], 800)
 
-plt.plot(spec_freqs / 1e9, spec_pop, ".", color="tab:blue", label="measured")
-plt.plot(dense / 1e9, lorentzian(dense, *spec_fit), color="tab:red", label="Lorentzian fit")
-plt.axvline(f01_fit / 1e9, color="tab:red", linestyle="--", label=f"fit {f01_fit / 1e9:.5f} GHz")
-plt.axvline(DEVICE["q0_f01"] / 1e9, color="grey", linestyle=":", label="true f01")
-plt.xlabel("Drive frequency (GHz)")
-plt.ylabel("Excited-state population")
-plt.title("f01 from a Lorentzian fit")
-plt.legend(fontsize=8)
+ax = result.plot(
+    m_spec,
+    field=MF.STATE,
+    style=Style(markers=True),
+    coords={"drive_freq": GHZ},
+    value=POPULATION,
+    title="f01 from a Lorentzian fit",
+)
+ax.lines[0].set_label("measured")
+ax.plot(dense / 1e9, lorentzian(dense, *spec_fit), color=LIGHT.series[1], label="Lorentzian fit")
+ax.axvline(f01_fit / 1e9, color=LIGHT.series[1], linestyle="--", label=f"fit {f01_fit / 1e9:.5f} GHz")
+ax.axvline(DEVICE["q0_f01"] / 1e9, color=LIGHT.muted, linestyle=":", label="true f01")
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
 r"""
 ## 3.2 Rabi: how hard to hit it
 
-You now know where the qubit is. The next question is how much amplitude a 40 ns pulse needs to
-rotate the state by $\pi$.
+You now know where the qubit is, to a fifth of a linewidth. The next question is how much amplitude
+a 40 ns pulse needs to rotate the state by $\pi$, and the scan that answers it starts by setting the
+drive to the frequency you just fitted.
 
 The physics is one line. A resonant drive rotates the Bloch vector about an axis in the equatorial
-plane, at an angular rate set by the drive amplitude, so the total angle turned is the integral of
-that rate over the pulse. Hold the shape and the duration fixed and the angle is simply proportional
-to the amplitude. The excited-state population after a rotation by $\theta$ is $\sin^2(\theta/2)$,
-so sweeping the amplitude sweeps you through $\theta = \pi$ and the population traces a $\sin^2$
-whose first maximum is the pi pulse.
-
-Note that the ceiling here is 1, not the 0.5 of the section above. Spectroscopy saturates a
-transition and lands at equal populations; Rabi drives it coherently and can put everything in
-$|1\rangle$. Two scans, two different maxima, and the difference is whether you are pumping or
-rotating.
+plane at a rate set by the drive amplitude, so with the shape and the duration held fixed the angle
+turned is proportional to the amplitude. The excited-state population after a rotation by $\theta$
+is $\sin^2(\theta/2)$, so sweeping amplitude sweeps you through $\theta = \pi$ and the population
+traces a $\sin^2$ whose first maximum is the pi pulse. The ceiling is 1 here rather than the 0.45 of
+the scan above, because a coherent rotation can put everything in $|1\rangle$ and a saturated
+transition cannot. Two scans, two different maxima, and the peak height alone tells you which one
+you are looking at.
 
 **Why sweep amplitude rather than duration.** Both produce an oscillation and both are used. An
-amplitude sweep keeps the envelope shape fixed, so the pulse's spectral content does not change as
-you move along the axis, and it is a continuous knob with 14 or 16 bits behind it. A duration sweep
-changes the shape, and it is quantised to the sample clock, so at 40 ns your step size is a few
-percent of the answer. Amplitude is the one you calibrate with; duration is the one you sweep when
-you are studying the pulse itself.
+amplitude sweep keeps the envelope shape fixed, so the spectral content of the pulse does not change
+as you move along the axis, and it is a continuous knob with 14 or 16 bits behind it. A duration
+sweep changes the shape, and it is quantised to the sample clock, so at 40 ns your step size is a
+few percent of the answer. Amplitude is the knob you calibrate with. Duration is the one you sweep
+when you are studying the pulse itself.
 
-Two things in the program are new.
-
-The pulse is an `IQDrag`, the standard single-qubit envelope on a transmon, a Gaussian on I with its
-scaled derivative on Q. Part 1 has the full story on why the derivative is there.
-
-The swept variable goes **inside the waveform**:
+Two things in the program are new. The pulse is an `IQDrag`, the standard single-qubit envelope on a
+transmon, a Gaussian on I with its scaled derivative on Q, and Part 1 has the full story on why the
+derivative is there. And the swept variable goes **inside the waveform**:
 
 ```python
 program.play(q[0].drive, IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1))
 ```
 
 `amp` is a `Variable`, not a number. Every waveform parameter accepts an `Expression`, so the pulse
-is parametric and the loop binds it. The `.qp` text keeps the variable name, which means the file
-records the sweep rather than 41 hard-coded pulses.
+is parametric and the loop binds it. The `.qp` text keeps the variable name, so the file records the
+sweep rather than 41 hard-coded pulses.
 """
 
 # %%
@@ -342,7 +355,7 @@ def p_rabi(bus, env):
 
 
 rabi = qp.QProgram(label="rabi_amplitude", description="Amplitude Rabi on q0", schema=schema)
-amp = rabi.variable("amp", label="Drive amplitude", units="V")
+amp = rabi.variable("amp", label="Drive amplitude", units="DAC units")
 
 with rabi.average(shots=200):
     with rabi.sweep(amp, qp.Linspace(0.0, 1.0, 41)):
@@ -363,12 +376,17 @@ print("dims:", rabi_data.dims, "shape:", rabi_data.shape)
 print("highest measured point at amplitude", round(float(rabi_amps[rabi_pop.argmax()]), 4))
 print("(a noisy estimate of the pi amplitude; the fit below uses every point)")
 
-plt.plot(rabi_amps, rabi_pop, ".", label="measured")
-plt.axvline(DEVICE["q0_a_pi"], color="grey", linestyle=":", label="true pi amplitude")
-plt.xlabel("Drive amplitude (DAC units)")
-plt.ylabel("Excited-state population")
-plt.title("Amplitude Rabi on q0")
-plt.legend()
+# The amplitude axis carries no unit change, so this figure needs no coords= at all.
+ax = rabi_result.plot(
+    m_rabi,
+    field=MF.STATE,
+    style=Style(markers=True),
+    value=POPULATION,
+    title="Amplitude Rabi on q0",
+)
+ax.lines[0].set_label("measured")
+ax.axvline(DEVICE["q0_a_pi"], color=LIGHT.muted, linestyle=":", label="true pi amplitude")
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
@@ -395,9 +413,9 @@ come free with a fit you were running anyway.
 One refinement worth knowing about, because this fit is only the first pass. The precision on
 $a_\pi$ is limited by how sharply the curve turns over at its maximum, and a $\sin^2$ is flat there.
 The standard next step is to play the pi pulse an odd number of times, say 21, and sweep the
-amplitude again: an error $\epsilon$ per pulse becomes $21\epsilon$ in the measured angle, and the
-same scan resolves the amplitude 21 times better. Every lab has that experiment. It needs nothing
-this tutorial has not already shown you.
+amplitude again. An error $\epsilon$ per pulse becomes $21\epsilon$ in the measured angle, and the
+same scan resolves the amplitude 21 times better. Every lab has that experiment, and it needs
+nothing this tutorial has not already shown you.
 """
 
 # %%
@@ -423,15 +441,19 @@ print(f"contrast    : {contrast_fit:.3f}   floor: {floor_fit:.3f}")
 # %%
 dense_amp = np.linspace(rabi_amps[0], rabi_amps[-1], 400)
 
-plt.plot(rabi_amps, rabi_pop, ".", color="tab:blue", label="measured")
-plt.plot(dense_amp, rabi_model(dense_amp, *rabi_fit), color="tab:red", label="sin^2 fit")
-plt.axvline(a_pi_fit, color="tab:red", linestyle="--", label=f"pi at {a_pi_fit:.4f}")
-plt.axvline(a_pi_fit / 2, color="tab:orange", linestyle="--", label=f"pi/2 at {a_pi_fit / 2:.4f}")
-plt.axvline(DEVICE["q0_a_pi"], color="grey", linestyle=":", label="true pi amplitude")
-plt.xlabel("Drive amplitude (DAC units)")
-plt.ylabel("Excited-state population")
-plt.title("Pi amplitude from a sin^2 fit")
-plt.legend(fontsize=8)
+ax = rabi_result.plot(
+    m_rabi,
+    field=MF.STATE,
+    style=Style(markers=True),
+    value=POPULATION,
+    title="Pi amplitude from a sin^2 fit",
+)
+ax.lines[0].set_label("measured")
+ax.plot(dense_amp, rabi_model(dense_amp, *rabi_fit), color=LIGHT.series[1], label="sin^2 fit")
+ax.axvline(a_pi_fit, color=LIGHT.series[1], linestyle="--", label=f"pi at {a_pi_fit:.4f}")
+ax.axvline(a_pi_fit / 2, color=LIGHT.series[3], linestyle="--", label=f"pi/2 at {a_pi_fit / 2:.4f}")
+ax.axvline(DEVICE["q0_a_pi"], color=LIGHT.muted, linestyle=":", label="true pi amplitude")
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
@@ -440,18 +462,23 @@ r"""
 
 A calibrated gate, in this stack, is a waveform object with numbers in it. Nothing more.
 
-`PI_PULSE` flips the qubit. `X90_PULSE` takes it to the equator and is the workhorse of Part 4:
-Ramsey needs two of them, and the echo needs two with a pi pulse in between. Both are plain
-`IQDrag` instances, so they compare by structure. Two pulses are equal when every parameter
-matches. A calibration set is diffable for that reason, and it is why an amplitude gets rounded
-before it goes in a file. The fit above knows this amplitude to about 0.002, so four decimals is
-already finer than the measurement, and it keeps the text readable.
+`PI_PULSE` flips the qubit. `X90_PULSE` takes it to the equator and is the workhorse of Part 4,
+where Ramsey needs two of them and the echo needs two with a pi pulse in between. Both are plain
+`IQDrag` instances, so they compare by structure. Two pulses are equal when every parameter matches.
+A calibration set is diffable for that reason, and it is also why an amplitude gets rounded before
+it goes into a file. The fit above knows this amplitude to about 0.002, so four decimals is already
+finer than the measurement and it keeps the text readable.
 
 Halving `a_pi` for the x90 assumes the response is exactly $\sin^2$. On this simulated chip it is,
 by construction. On a real one it is not quite, because the DAC and the amplifier chain are not
 perfectly linear and because a shorter effective rotation samples the pulse envelope differently.
 Exercise 3.1 measures the pi/2 amplitude instead of assuming it, and comparing the two numbers is
 how you find out whether your drive line is linear over the range you care about.
+
+An `IQWaveform` draws itself on two stacked panels, one per quadrature, and `plot()` hands back that
+`(I, Q)` pair. Give the pair to a second call as `target=` and both pulses land on the same two
+panels. The second call also gets a rotated palette, because the theme hands out its colours in
+order and two calls in a row would otherwise draw the x90 in the pi pulse's hues.
 """
 
 # %%
@@ -463,17 +490,15 @@ print("x90 :", X90_PULSE.amplitude, "over", X90_PULSE.get_duration(), "ns")
 print("structural equality:", PI_PULSE == IQDrag(PI_PULSE.amplitude, 40, 10, 0.1))
 print("a different beta is a different pulse:", PI_PULSE == IQDrag(PI_PULSE.amplitude, 40, 10, 0.2))
 
-t_ns = np.arange(PI_PULSE.get_duration())
+ax_i, ax_q = PI_PULSE.plot()
+rotated = Style(theme=replace(LIGHT, series=LIGHT.series[2:] + LIGHT.series[:2]))
+X90_PULSE.plot(target=(ax_i, ax_q), style=rotated)
 
-plt.plot(t_ns, PI_PULSE.get_I().envelope(), color="tab:blue", label="pi, I (Gaussian)")
-plt.plot(t_ns, PI_PULSE.get_Q().envelope(), color="tab:orange", label="pi, Q (DRAG)")
-plt.plot(t_ns, X90_PULSE.get_I().envelope(), "--", color="tab:blue", label="x90, I")
-plt.plot(t_ns, X90_PULSE.get_Q().envelope(), "--", color="tab:orange", label="x90, Q")
-plt.axhline(0.0, color="grey", linewidth=0.5)
-plt.xlabel("Time (ns)")
-plt.ylabel("Amplitude (DAC units)")
-plt.title("The two calibrated drive pulses")
-plt.legend(fontsize=8)
+for panel in (ax_i, ax_q):
+    for line, name in zip(panel.lines, ("pi", "x90"), strict=True):
+        line.set_label(name)
+    panel.legend(fontsize=8)
+ax_i.set_title("The two calibrated drive pulses", loc="left", fontsize=10, pad=6)
 plt.show()
 
 # %% [markdown]
@@ -490,6 +515,8 @@ definition of a $\pi/2$ rotation.
 
 Print the fitted $a_{90}$, the halved $a_\pi$ from the full fit, and the true $a_\pi / 2$ from
 `DEVICE`. You have `rabi_amps`, `rabi_pop`, `a_pi_fit`, `contrast_fit`, and `floor_fit` in scope.
+The point of the exercise is the comparison at the end. A number you assumed and a number you
+measured are not the same number, and on a real drive line they can differ by percent.
 """
 
 # %% solution
@@ -528,10 +555,10 @@ r"""
 ## 3.3 The calibration seam
 
 Look at what just happened to the experiment code. The Rabi program has `IQDrag(amplitude=amp, ...)`
-baked into it, and that was right: the pulse shape *is* the experiment. But every program that comes
-after it wants "the pi pulse", whatever today's number happens to be. If each one inlines 0.6176,
-then recalibrating means editing every file, and a file from six months ago silently claims a
-calibration it never had.
+baked into it, and that was right, because the pulse shape *is* the experiment. But every program
+that comes after it wants "the pi pulse", whatever today's number happens to be. If each one inlines
+0.6176, then recalibrating means editing every file, and a file from six months ago silently claims
+a calibration it never had.
 
 QProgram splits the two. Where a waveform is expected you may write a **string alias**, and the
 program is then a statement about structure with a hole in it:
@@ -611,23 +638,23 @@ for line in qp.dumps(three.with_waveforms(library)).splitlines():
 # %% [markdown]
 r"""
 `q[0]` and `q[1]` each have an exact entry, so the same alias becomes two different pulses. All
-three readouts come from the one family entry, and that is what a family entry is for. `q[2]` has no
-`pi` at any tier, so the alias survives the bind as the string it was rather than raising, and the
-thing that will complain is the platform that needs samples to upload. A plain dictionary would
-resolve one name one way everywhere, and that is the reason the library exists.
+three readouts come from the one family entry, and a family entry exists for exactly that. `q[2]`
+has no `pi` at any tier, so the alias survives the bind as the string it was rather than raising,
+and the thing that will complain is the platform that needs samples to upload. A plain dictionary
+would resolve one name one way everywhere, and that is the reason the library exists.
 """
 
 # %% [markdown]
 r"""
-Binding costs you something, and the output above shows it plainly: the `measure` line now carries
+Binding costs you something, and the output above shows it plainly. The `measure` line now carries
 two full `IQPair` constructors. That is the trade. An aliased file is short and reviewable but means
 nothing without its library; a bound file is self-contained but unreadable and out of date the
 moment you recalibrate.
 
-The library has its own text format, `.wfl`, and it stays outside the `.qp` file on purpose.
-The program is the experiment you designed. The library is the state of the fridge this morning.
-Those two things change on completely different schedules, and a lab that keeps them in one file
-ends up unable to answer "was this the same experiment?" across a recalibration.
+The library has its own text format, `.wfl`, and it stays outside the `.qp` file on purpose. The
+program is the experiment you designed. The library is the state of the fridge this morning. Those
+two things change on completely different schedules, and a lab that keeps them in one file ends up
+unable to answer "was this the same experiment?" across a recalibration.
 
 The cell below makes the failure concrete. The same program, bound to last week's library and to
 today's, is two different pulses and one unchanged file on disk. If those numbers had been inlined,
@@ -654,43 +681,30 @@ print("the program on disk         :", play_line(seq))
 r"""
 ## 3.4 The flux arc
 
-A flux-tunable transmon has a third line. A DC bias threads flux through a loop on the chip and
-moves `f01`. Here is where the shape of that curve comes from, because it is one of the few places
-in a bring-up where the functional form is derived rather than empirical.
-
-Replace the transmon's single Josephson junction with two in a loop, a SQUID, and the two current
-paths interfere. Threading flux $\Phi$ through the loop shifts their relative phase, so the pair
-behaves as one junction with a tunable Josephson energy,
-
-$$E_J(\Phi) = E_{J,\max}\left|\cos\frac{\pi \Phi}{\Phi_0}\right|$$
-
-and the transmon's transition frequency is $hf_{01} \approx \sqrt{8 E_J E_C} - E_C$, dominated by
-the square root. Put those together and the frequency follows the square root of a cosine:
+A flux-tunable transmon has a third line. A DC bias threads flux through a SQUID loop on the chip
+and moves `f01`. The loop's Josephson energy follows a cosine of that flux and the transmon
+frequency follows the square root of the energy, so the curve you measure is a square root of a
+cosine:
 
 $$f_{01}(V) = f_{\max} \sqrt{\left| \cos \frac{\pi (V - V_0)}{V_\Phi} \right|}$$
 
-Three things in that expression are yours to measure, and the units explain why. Your DAC puts out
+Three numbers in that expression are yours to measure, and the units explain why. Your DAC puts out
 volts, not flux quanta, and the volts reach the loop through a mutual inductance nobody wrote down,
 so $V_\Phi$ is the bias interval that threads one flux quantum and it comes out of a fit. $V_0$ is
 the bias where the loop sees zero flux, and it is not zero volts, because the fridge has an ambient
 field and because the neighbouring qubits' flux lines couple into this loop too. On this simulated
 chip $V_0$ is 0.05 V. On a real one it moves every cooldown.
 
-$V_0$ is the **sweet spot**, and it is the number you actually want. The derivative
-$\mathrm{d}f_{01}/\mathrm{d}\Phi$ vanishes there, so first-order flux noise does nothing to the
-qubit frequency, and $T_2^*$ is at its maximum. Every coherence number in Part 4 was measured with
-the qubit parked there. Move a few tens of millivolts off and $T_2^*$ falls off a cliff while $T_1$
-barely notices, which is a diagnostic in itself: a $T_2^*$ that is bad today and was fine yesterday
-often means the flux bias drifted, not that the qubit did.
+$V_0$ is the flat top of the arc, and it is the number you actually want. Park the qubit there and
+first-order flux noise stops moving its frequency, so $T_2^*$ is at its maximum. Every coherence
+number in Part 4 was measured with the qubit sitting at $V_0$.
 
-You find $V_0$ by repeating the spectroscopy of 3.1 at a series of biases. The scan is two
-dimensional. Bias on the outer loop, drive frequency on the inner one.
-
-Two changes to the program.
+You find it by repeating the spectroscopy of 3.1 at a series of biases, which makes the scan two
+dimensional. Bias on the outer loop, drive frequency on the inner one. Two changes to the program.
 
 `BusSchema.flux_tunable_transmon()` adds `q[i].flux`, a **single**-channel bus with no ADC. Single
-channel means single-channel waveforms: `Square`, not `IQPair`. Try it the other way and the builder
-raises before you get near an instrument.
+channel means single-channel waveforms, `Square` rather than `IQPair`. Try it the other way and the
+builder raises before you get near an instrument.
 
 `set_offset(bus, value)` writes a DC level rather than playing a pulse. A bias line wants exactly
 that. The value is the swept variable, so the outer loop is a sequence of DC writes.
@@ -734,9 +748,9 @@ for bias_v in (-0.15, 0.05, 0.25):
 r"""
 On the frequency grid: 25 bias points times 61 frequency points times 50 shots is 76k interpreted
 shots, a little over a second. The frequency step is about 10 MHz, which would step straight over a
-2 MHz line. That is why the model uses a 20 MHz power-broadened width, and it is not a cheat. A flux
-arc is a survey scan. You drive it hard on purpose so the peak is wider than your grid, find the
-ridge to within a step or two, and then go back with a narrow low-power scan at the one bias you
+2 MHz line. The model uses a 20 MHz power-broadened width for that reason, and it is not a cheat. A
+flux arc is a survey scan. You drive it hard on purpose so the peak is wider than your grid, find
+the ridge to within a step or two, and then go back with a narrow low-power scan at the one bias you
 care about. Trying to survey a 600 MHz band at 2 MHz resolution would need 300 columns instead of
 61, and every one of them would be measuring nothing.
 
@@ -775,31 +789,50 @@ print("bias step:", round(float(biases[1] - biases[0]), 4), "V")
 print("frequency step:", round(float(arc_freqs[1] - arc_freqs[0]) / 1e6, 2), "MHz")
 print("ridge (GHz):", np.round(ridge / 1e9, 3))
 
+# %% [markdown]
+r"""
+Two nested sweeps mean two plot dimensions, so `plot` infers a heatmap and colours it by the
+population. Left alone it would put the inner sweep along x, matching the loop nesting, and `x=`
+overrides that. The arc reads the way a bring-up log draws it with bias along the bottom, so `x=`
+names the bias and the frequency settles onto y. The ridge and the sweet-spot line go on afterwards,
+in the units the figure is now drawn in.
+"""
+
 # %%
-plt.pcolormesh(biases, arc_freqs / 1e9, arc_grid.T, shading="nearest", cmap="viridis")
-plt.colorbar(label="Excited-state population")
-plt.plot(biases, ridge / 1e9, "w.", markersize=4, label="brightest point")
-plt.axvline(DEVICE["flux_offset"], color="white", linestyle=":", linewidth=1, label="true sweet spot")
-plt.xlabel("Flux bias (V)")
-plt.ylabel("Drive frequency (GHz)")
-plt.title("Flux arc: f01 against bias")
-plt.legend(fontsize=8, loc="lower center")
+ax = arc_result.plot(
+    m_arc,
+    field=MF.STATE,
+    x="bias",  # bias along the bottom, frequency up the side
+    coords={"arc_freq": GHZ},
+    value=POPULATION,  # this labels the colour bar rather than an axis
+    title="Flux arc: f01 against bias",
+)
+# The theme's ramp is blue, so the two annotations take warm slots from the same palette and
+# stay legible over the map and inside the legend box.
+ax.plot(biases, ridge / 1e9, ".", color=LIGHT.series[1], markersize=5, label="brightest point")
+ax.axvline(DEVICE["flux_offset"], color=LIGHT.series[3], linestyle="--", linewidth=1.2, label="true sweet spot")
+ax.legend(fontsize=8, loc="lower center")
 plt.show()
 
 # %% [markdown]
 r"""
 ### Fitting the arc
 
-The ridge is quantised to the 10 MHz frequency grid, so no single point is better than 10 MHz. The
-fit comes out much better than any of its inputs, and the same reason will come up again.
-Twenty-five noisy points constrain three parameters, and the arc's symmetry about the sweet spot
-pins $V_0$ far more tightly than the bias step suggests: the curve on the left of the maximum and
-the curve on the right both vote on where the middle is. Fit $f_{\max}$, $V_0$, and $\Phi_0$ and
-check all three.
+The ridge is quantised to the 10 MHz frequency grid, so no single point in it is better than 10 MHz.
+The fit comes out much better than any of its inputs, and the reason will come up again. Twenty-five
+noisy points constrain three parameters, and the symmetry of the arc pins $V_0$ far more tightly
+than the bias step suggests, because the curve to the left of the maximum and the curve to the right
+both vote on where the middle is. Fit $f_{\max}$, $V_0$, and $V_\Phi$ and check all three.
 
 A word on the starting guess. The arc is flat at the top and steep at the edges, so a bad guess for
 the period can land the fit a full period away. Start with $V_0$ at the brightest column and
 $V_\Phi$ at roughly twice the bias span you scanned.
+
+The figure of the fitted arc is the one plot in this notebook still built by hand, and the reason is
+worth a sentence. A result knows its own dimensions, its own coordinates, and the units on them, so
+it can draw itself and label both axes. A curve you computed from three fitted parameters is two
+numpy arrays and nothing else, so matplotlib stays wherever the data is derived. Count the lines in
+the cell below that exist only to name an axis and you have the difference.
 """
 
 # %%
@@ -827,36 +860,37 @@ print(f"period true  : {DEVICE['flux_period']:.4f} V")
 # %%
 dense_bias = np.linspace(biases[0], biases[-1], 400)
 
-plt.plot(biases, ridge / 1e9, ".", color="tab:blue", label="ridge from the map")
-plt.plot(dense_bias, arc_model(dense_bias, *arc_fit) / 1e9, color="tab:red", label="arc fit")
-plt.axvline(offset_fit, color="tab:red", linestyle="--", label=f"sweet spot {offset_fit:+.4f} V")
-plt.axvline(DEVICE["flux_offset"], color="grey", linestyle=":", label="true sweet spot")
-plt.xlabel("Flux bias (V)")
-plt.ylabel("f01 (GHz)")
-plt.title("The fitted flux arc")
-plt.legend(fontsize=8)
+# No result to ask, so the figure, the size, and both axis labels are all typed out here.
+fig, ax = plt.subplots(figsize=DEFAULT_SIZE)
+ax.plot(biases, ridge / 1e9, ".", color=LIGHT.series[0], label="ridge from the map")
+ax.plot(dense_bias, arc_model(dense_bias, *arc_fit) / 1e9, color=LIGHT.series[1], label="arc fit")
+ax.axvline(offset_fit, color=LIGHT.series[1], linestyle="--", label=f"sweet spot {offset_fit:+.4f} V")
+ax.axvline(DEVICE["flux_offset"], color=LIGHT.muted, linestyle=":", label="true sweet spot")
+ax.set_xlabel("Flux bias (V)")
+ax.set_ylabel("f01 (GHz)")
+ax.set_title("The fitted flux arc", loc="left", fontsize=10, pad=6)
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
 r"""
-### 🧩 Exercise 3.2: park the qubit at a target frequency
+### Parking the qubit at a target frequency
 
-The arc is a calibration in both directions. You measured $f_{01}$ against bias; the useful form is
-bias against $f_{01}$. Invert the model:
+The arc is a calibration in both directions. You measured $f_{01}$ against bias, and the useful form
+is bias against $f_{01}$. Inverting the model gives
 
 $$V = V_0 + \frac{V_\Phi}{\pi} \arccos\!\left( \left( \frac{f_{\text{target}}}{f_{\max}} \right)^{2} \right)$$
 
-Find the bias that puts `f01` at 4.70 GHz, then grade yourself: feed that bias to `f01_of_bias`,
-which is the true device, and report the miss in megahertz.
+and the cell below solves it for 4.70 GHz, then grades itself by feeding the answer back to
+`f01_of_bias`, the true device.
 
-You have `arc_fit` (as `f_max_fit`, `offset_fit`, `period_fit`), `arc_model`, and `f01_of_bias`.
-One thing to think about before you print: `arccos` returns one value, but the arc is symmetric
-about the sweet spot, so there are two biases that give any frequency below $f_{\max}$. Which side
-you want depends on what else is on the chip. Real chips have neighbours and couplers with their own
-frequencies, and half the job of choosing a parking spot is staying away from all of them.
+`arccos` returns one value, but the arc is symmetric about the sweet spot, so two biases give any
+frequency below $f_{\max}$ and both are printed. Which side you want depends on what else is on the
+chip. Real chips have neighbours and couplers with their own frequencies, and half the job of
+choosing a parking spot is staying away from all of them.
 """
 
-# %% solution
+# %%
 f_target = 4.70e9
 step = (period_fit / np.pi) * np.arccos((f_target / f_max_fit) ** 2)
 
@@ -868,48 +902,20 @@ for side, bias_solution in (("above the sweet spot", offset_fit + step), ("below
 
 print(f"\ntarget was {f_target / 1e9:.3f} GHz; the two solutions are mirrored about the sweet spot.")
 
-# %% stub
-# TODO: solve the fitted arc for the bias that puts f01 at 4.70 GHz.
-# 1) f_target = 4.70e9
-# 2) step = (period_fit / np.pi) * np.arccos((f_target / f_max_fit) ** 2)
-# 3) the two candidate biases are offset_fit + step and offset_fit - step
-# 4) for each, print arc_model(bias, *arc_fit) and f01_of_bias(bias), and the miss in MHz.
-
 # %% [markdown]
 r"""
-### What that outer loop actually is
+### One thing to carry into the break
 
-Read the flux arc program again and notice what it does not say.
-
-```
-average 50:
-  for bias in Linspace(start=-0.15, stop=0.25, num=25):
-    set_offset q[0].flux bias
-    for arc_freq in Linspace(start=4300000000.0, stop=4900000000.0, num=61):
-      ...
-```
-
-Two `for` loops, written identically. On a real rack they are nothing alike.
-
-The inner loop retunes a microwave source and fires a pulse. That is microseconds per step, and it
-belongs inside the sequencer, compiled to instructions that run without the control PC in the loop.
-
-The outer loop writes a DC voltage to a bias source. Those settle in milliseconds, they are often on
-a slow serial bus, and on plenty of racks they are a different instrument entirely with no sequencer
-in it. That loop has to run **host-side**: the control computer sets the bias, waits, arms the
-sequencer, and collects a full inner scan before moving on.
-
-Which is fine, as long as it is the *outer* loop. 25 host round trips cost 25 milliseconds against a
-scan that takes seconds. Get the nesting wrong, or let something drag the shot loop host-side too,
-and the same experiment becomes 76,000 round trips and a lunch break. Part 5 opens with exactly that
-failure and the one-line rewrite that fixes it.
+The two `for` loops in the flux arc program are written identically, and on a real rack they are
+nothing alike. The inner one retunes a microwave source and fires a pulse, which is microseconds per
+step and belongs inside the sequencer. The outer one writes a DC voltage to a bias source that
+settles in milliseconds, and on plenty of racks that source is a different instrument with no
+sequencer in it at all, so the loop has to run host-side.
 
 You never said which was which, and you should not have to. Which loop can run in real time is a
-property of the rack, not of the experiment. Part 5 is about exactly that: you hand this program to
-a platform descriptor, and the validator tells you where each loop lands, warns you when a loop got
-demoted to host-side, and offers a rewrite that recovers the real-time averaging you lost.
-
-We will come back to it after the break.
+property of the rack, not of the experiment. Part 5 hands this exact program to a platform
+descriptor that reports where each loop landed, warns you when one got demoted to host-side, and
+offers the rewrite that recovers the real-time averaging you lost.
 """
 
 # %% [markdown]
@@ -918,26 +924,27 @@ r"""
 
 - **Two-tone spectroscopy** found `f01` to well under a linewidth, by parking on the resonator and
   watching it move by $2\chi$ when the drive hit resonance. The new mechanism was
-  `fields=(MF.STATE,)`: ask the measurement for classified outcomes, read them with
-  `result.get(handle, field=MF.STATE)`, and averaging hands you a population instead of a shot.
-- A saturated transition tops out at 0.5. A coherent rotation reaches 1. That difference is the
-  whole distinction between the spectroscopy scan and the Rabi scan, and it tells you which one you
-  are looking at from the peak height alone.
-- **Rabi in amplitude** gave the pi amplitude. The new mechanism was a `Variable` living inside a
-  waveform constructor, so `IQDrag(amplitude=amp, ...)` is one parametric pulse rather than 41
-  literal ones. The fitted contrast and floor are free diagnostics, and worth watching over weeks.
-- Fit for the parameter you want, not for a generic curve. `a_pi` and `f01` came out of the fit with
-  their own uncertainties because the models were written in terms of them.
+  `fields=(MF.STATE,)`. Ask the measurement for classified outcomes, read them back with
+  `result.get(handle, field=MF.STATE)`, and averaging hands you a population rather than a shot.
+- **Rabi in amplitude** turned that frequency into a pi amplitude. The new mechanism was a
+  `Variable` living inside a waveform constructor, so `IQDrag(amplitude=amp, ...)` is one parametric
+  pulse rather than 41 literal ones. The fitted contrast and floor are free diagnostics and worth
+  watching over weeks.
+- Fit for the parameter you want, not for a generic curve. `a_pi` and `f01` came out of their fits
+  with their own uncertainties because the models were written in terms of them.
+- **Every measured figure came from `result.plot`**, with the fits and the reference lines drawn on
+  the axes it returned. Declaring `label=` and `units=` on a swept variable is what put the words on
+  the x axis, and `Quantity` moved hertz to gigahertz on the drawing without touching the array. The
+  one hand-rolled figure left is the fitted arc, and that is derived data rather than a measurement.
 - **The calibrated pulses are objects.** `PI_PULSE` and `X90_PULSE` are `IQDrag` instances with
   numbers in them and they compare by structure. Part 4 wraps the same shape in a fragment so the
   amplitude lives in exactly one place.
 - **The calibration seam** is the string alias plus `with_waveforms`. The program says `play "pi"`
-  and stays stable across recalibration; the `WaveformLibrary` carries today's numbers in its own
-  `.wfl` file.
-- **The flux arc** is a square root of a cosine because a SQUID's Josephson energy is a cosine and
-  the transmon frequency goes as its square root. The flat top is the sweet spot, where flux noise
-  stops mattering to first order, and it is where every coherence number in Part 4 gets measured. It
-  was also the first 2D scan whose outer loop steps a slow DC source, written without saying so.
+  and stays stable across recalibration, and the `WaveformLibrary` carries today's numbers in its
+  own `.wfl` file.
+- **The flux arc** put the sweet spot well inside a bias step, and inverting the fitted arc parks
+  the qubit anywhere on the curve you ask for. It was also the first 2D scan whose outer loop steps
+  a slow DC source, written without saying so.
 
 Next: **Part 4, coherence and feedback.** T1, Ramsey, and echo, built out of reusable pulse
 fragments, then single-shot readout and active reset with a real conditional on a measured state.

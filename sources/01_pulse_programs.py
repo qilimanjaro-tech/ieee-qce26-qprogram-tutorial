@@ -53,142 +53,30 @@ print("measurement fields:", [field.value for field in MF])
 r"""
 ## 1.1 From a circuit to a voltage
 
-If you write circuits, you already have a working model of a quantum computer, and this part is
-going to open it up. Not because the model is wrong. Because underneath every `X(q0)` there is a
-shaped microwave burst whose amplitude somebody measured last Tuesday, and this tutorial lives at
-the layer where the measuring happens.
+A circuit says `X(q0)`. To emit it, an instrument has to be told which output port, at what carrier
+frequency, with what envelope shape, for how many nanoseconds, at what amplitude, and what else has
+to stay quiet while it happens. A gate carries none of that, because supplying those numbers is the
+calibration engineer's job and not the algorithm's. QProgram's answer is to keep the program as
+data and let the platform decide how to run it. Part 5 is about that decision, Part 1 is about the
+data, and the slides carry the chip and the rack that the data describes.
 
-Start with the object itself.
+Three facts about the wiring are enough to read every cell below. The first is that a qubit is
+reached by at most three coaxial lines and each one has a single job. A drive line carries a
+microwave tone near $f_{01}$ and rotates the state. A readout line carries a tone near $f_r$, the
+frequency of a resonator sitting next to the qubit, and interrogates it. A flux line holds a slow,
+near-DC level that moves $f_{01}$, on tunable qubits only. Every operation in this part puts a
+voltage on one of those lines or records what comes back on one.
 
-### The chip, and the three wires that reach it
+The second concerns the return path. A circuit's `measure(q0)` returns a bit; the hardware returns
+one complex number per shot, the amplitude and phase of a tone that went past the resonator and
+picked up a state-dependent shift on the way. Turning that number into a 0 or a 1 means putting a
+threshold between two clouds in the IQ plane, and the threshold is a calibration of its own that
+Part 4 measures. Until then `MF.IQ` is the raw point and `MF.STATE` is the platform's
+classification of it.
 
-A transmon is not an atom. It is a circuit: a capacitor and a Josephson junction acting as a
-nonlinear inductor, patterned in aluminium on silicon and cooled to about 10 millikelvin. Like any
-oscillator it has a ladder of energy levels, and the junction's nonlinearity makes the rungs
-unevenly spaced, so you can address the bottom two on their own and call them $|0\rangle$ and
-$|1\rangle$. The gap between them is a frequency. On the chip in this tutorial it is 4.85 GHz, which
-is the microwave band, the same neighbourhood as radar and wifi.
-
-Being a circuit, it is driven and measured the way any microwave circuit is, with voltages on
-coaxial cable. Each qubit has at most three lines reaching it, and each line does exactly one job:
-
-| line | what runs on it | what it does |
-|---|---|---|
-| **drive** | a microwave tone near $f_{01}$ | rotates the state |
-| **readout** | a microwave tone near $f_r$, the frequency of a resonator next to the qubit | interrogates the state |
-| **flux** | a slow, near-DC voltage through a coil | moves $f_{01}$, on tunable qubits only |
-
-Those three lines are the entire interface to a quantum computer at this level. Every operation in
-this tutorial either puts a voltage on one of those lines or records what comes back on one. The
-deck draws the whole chain, rack to fridge to chip and back, in `slides/img/rack.svg`.
-
-### What a gate turns into
-
-Take the three single-qubit gates a circuit person writes most.
-
-**`X(q0)`** is a shaped burst on the drive line, on resonance with $f_{01}$. Two properties of that
-burst do all the work. The **area** under the envelope sets the rotation angle, so the burst whose
-area gives a half turn is the pi pulse and half of it is an $X/2$. The **phase** of the carrier sets
-the axis in the equatorial plane, so the same burst at 0 degrees is an $X$ and at 90 degrees is a
-$Y$. One envelope, two knobs, every single-qubit rotation.
-
-**`Z(theta)`** plays nothing at all. A rotation about $Z$ is a change of reference frame, so instead
-of emitting anything you advance the phase of every subsequent pulse on that line and the qubit
-cannot tell the difference. It costs zero time and carries no error, so compilers push as many $Z$
-rotations as they can into phase bookkeeping. In the operation list below it is `set_phase`.
-
-**`CZ(q0, q1)`** is not a single-line operation at all. Either you push one qubit's frequency with a
-flux pulse until it interacts with its neighbour, or you drive a two-qubit transition with a
-microwave tone. Both take 40 to 500 ns, both are calibrated per pair, and Part 6 scans one.
-
-| circuit | what the instrument emits |
-|---|---|
-| `X(q0)` | 40 ns burst on the drive line, area $\pi$, phase 0 |
-| `Y(q0)` | the same burst, phase 90 degrees |
-| `X/2(q0)` | the same shape, half the amplitude |
-| `Z(theta)` | nothing. Advance the phase of everything after it |
-| `CZ(q0,q1)` | a flux excursion on one qubit, 40 to 500 ns, calibrated per pair |
-| `measure(q0)` | a 2 us tone on the readout line, integrated and thresholded |
-
-### What a measurement turns into
-
-This is the one that surprises people coming from circuits, so it gets its own section.
-
-`measure(q0)` returns a bit. The hardware does not return a bit.
-
-You cannot observe the qubit directly. Nothing you put on the drive line comes back, because there
-is no ADC on it. What you observe instead is a **resonator**, a short length of patterned line
-coupled to the qubit, whose own frequency depends on which state the qubit is in. The two
-frequencies differ by $2\chi$, or 3.6 MHz on this chip.
-
-So the measurement is indirect and it goes like this. Send a tone down the feedline past the
-resonator. The field that comes back out carries an amplitude and a phase that depend on the qubit's
-state. That field is a few tens of microwave photons, around $10^{-19}$ joules, so it climbs an
-amplifier chain on the way out: a near-quantum-limited parametric amplifier at 10 mK, a HEMT at 4 K,
-ordinary amplifiers at room temperature. Then it is digitized, multiplied by a set of integration
-weights, and summed into **one complex number**.
-
-One number, not a bit. Collect many shots and you get two clouds in the IQ plane, and turning a
-cloud into a bit means putting a threshold between them, and that threshold is a calibration of its
-own. Part 4 does it.
-
-Three consequences to carry forward, because they shape everything above this layer:
-
-- a measurement takes about 2 microseconds, some 50 times longer than a gate;
-- it has an error rate around 1 percent, ten to a hundred times worse than a good gate, and that
-  asymmetry is why error-correction schemes are built the way they are;
-- it is quantum non-demolition in principle, so the qubit is left in the state you just measured
-  rather than destroyed. Part 4's active reset is built on exactly that.
-
-### The rack that produces all of it
-
-Three kinds of box, sharing one clock:
-
-- an **AWG with a sequencer**: envelope memory, a numerically controlled oscillator per output to
-  make the carrier, registers holding frequency, phase, gain and offset, and a small instruction set
-  with loops in it. Typically 1 GSa/s, so instructions land on a 4 ns grid;
-- a **digitizer** on the readout return, with integration weights and usually a threshold comparator
-  on board, so a shot can be classified fast enough to branch on;
-- a **slow DC source** for the flux lines, with more bits and far more filtering than an AWG output,
-  because a flux line's job is to hold still.
-
-Section 1.3 turns that hardware into the operation list, and Part 5 is about what happens when the
-next lab wires the same three jobs onto different boxes.
-
-### Why none of this fits in a circuit
-
-A circuit says `X(q0)`. An instrument needs to know: which output port, at what carrier frequency,
-what envelope shape, how many nanoseconds, at what amplitude, and what else must stay quiet while
-it happens. A gate-level program cannot say any of that, because saying it is the calibration
-engineer's job, not the algorithm's.
-
-A control stack has to express things a circuit cannot:
-
-| What you need to say | Why |
-|---|---|
-| step a carrier frequency over 81 points | you do not know where the resonator is yet |
-| a 40 ns DRAG envelope at amplitude 0.62 | that is what a pi pulse on this chip happens to be |
-| a 2 us square readout tone plus integration weights | the resonator needs time to respond |
-| wait 8 us, then measure again | that is a T1 point |
-| align two buses before the readout | otherwise the pulses drift apart by a clock cycle |
-
-Every one of those is a number somebody measured, and the measuring is most of the work. A chip that
-runs a circuit today needed a week of scans to reach the point where the circuit means anything, and
-it will need an hour of them again tomorrow because the numbers move. Qubit frequencies wander with
-flux noise and with whatever two-level defects the amorphous oxide happens to be hosting this week.
-Readout resonators shift when the fridge warms by a millikelvin. A pi amplitude is only a pi
-amplitude until the attenuator chain drifts. Everything above the gate assumes those numbers exist;
-everything that produces them lives below it.
-
-The second problem is portability. Every vendor ships its own sequencer language, and they are all
-assembly-shaped for good reasons. The thing running them is an FPGA that has to hit a 4 ns clock
-edge without asking anyone's permission. So the loops are register loops, the branches are counted
-in cycles, and the waveform memory is addressed by hand. Correct, fast, and welded to one box. Move
-the chip to a fridge with a different AWG and you rewrite the experiment rather than the config, and
-you spend a month re-earning trust in scans you had already trusted for a year.
-
-QProgram's answer is to keep the program as data and let the platform decide how to run it. Part 5
-is about that decision. Part 1 is about the data.
+The third is that every number in those two paragraphs was measured, on this chip, by somebody
+running a scan that has no gate-level spelling, and that all of them move. The chip here is
+simulated so that you can run the scans on a laptop, and these are its numbers.
 """
 
 # %%
@@ -273,10 +161,10 @@ linewidth in this tutorial looks too wide, it is because somebody chose to make 
 r"""
 ## 1.2 Buses and schemas
 
-A bus is one signal path, and section 1.1 already walked it: a port on an instrument, through the
-room-temperature attenuator, into the fridge, down through cold attenuators and filters at each
-temperature stage, and out at one line on the chip. Everything QProgram calls a bus is that whole
-chain, named once.
+Those numbers reach the chip along wires, and a wire is the thing QProgram makes you name. A bus is
+one signal path taken whole, from a port on an instrument, through the room-temperature attenuator,
+into the fridge, down through the cold attenuators and filters at each temperature stage, and out at
+one line on the chip. QProgram names that chain once and addresses everything through the name.
 
 The interesting question is why the *path* is the unit of addressing rather than the qubit, which is
 what a circuit person would reach for. Two facts settle it.
@@ -382,8 +270,8 @@ only.
 r"""
 ## 1.3 Operations: what the electronics offer
 
-Here is the complete list of things a sequencer can be told to do. It is short, and the shortness is
-the point.
+Naming a line is half of the vocabulary. The other half is the list of things you can tell the
+electronics to do on that line, and the list is short. The shortness is the point.
 
 | What the hardware does | QProgram | Where it lands |
 |---|---|---|
@@ -558,11 +446,16 @@ print(qp.dumps(drive_program))
 r"""
 ## 1.4 Waveforms are data
 
-A waveform is a pure-data description of an envelope. It knows nothing about hardware, and it can be
-built, compared, and plotted with no program around it.
+Both programs above played an envelope without ever saying what an envelope is. A waveform is a
+pure-data description of one. It knows nothing about hardware, and it can be built, compared, and
+drawn with no program around it.
 
-Two methods carry the whole contract: `envelope(resolution=1)` returns the samples as a numpy array,
-and `get_duration()` returns nanoseconds. That is enough to draw the gallery.
+Three methods carry the whole contract. `envelope(resolution=1)` returns the samples as a numpy
+array, `get_duration()` returns nanoseconds, and `plot()` draws the envelope and hands back the
+matplotlib `Axes` it drew on. The plot method is the route whenever the goal is to look at a shape.
+matplotlib is for the parts a figure of one envelope cannot decide for itself, and a row of six
+panels is one of those, so the gallery below opens the row by hand and then gives each panel to a
+waveform as `target=`. Part 2 passes the same argument to `result.plot`.
 
 Each of these shapes exists because a specific thing goes wrong without it:
 
@@ -599,10 +492,9 @@ gallery = [
 
 fig, axes = plt.subplots(1, len(gallery), figsize=(17, 2.4))
 for ax, waveform in zip(axes, gallery, strict=True):
-    samples = waveform.envelope()  # one sample per ns at the default resolution
-    ax.plot(np.arange(len(samples)), samples)
-    ax.set_title(f"{type(waveform).__name__}\n{waveform.get_duration()} ns", fontsize=9)
-    ax.set_xlabel("ns")
+    waveform.plot(target=ax)  # the waveform draws itself onto the panel we opened for it
+    # plot() titles the panel with the class name; add the duration to it.
+    ax.set_title(f"{type(waveform).__name__}\n{waveform.get_duration()} ns", loc="left", fontsize=9)
 fig.tight_layout()
 plt.show()
 
@@ -649,38 +541,39 @@ Nothing in this tutorial measures `beta`, and the reference simulator has no thi
 into, so the 0.15 in the cells above is a placeholder with the right shape and no provenance. Treat
 it the way you would treat any uncalibrated number in someone else's script.
 
-Note the two y-axes in the plot. The Q channel is a derivative, so it is antisymmetric and carries a
-factor of $1/\sigma$: with `beta=0.15` and `sigma=10` its peak is about a hundred times smaller than
-the I peak. Plotted on one axis it would be a flat line at zero.
+An `IQWaveform` draws itself as two panels stacked on a shared time axis, and `plot()` returns them
+as an `(I, Q)` pair, so the figure below is one call plus a title, a zero line, and a label written
+onto the axes that came back. The two panels carry their own vertical scales, and the difference
+between those scales is the physics. A derivative is antisymmetric and it picks up a factor of
+$1/\sigma$, so with `beta=0.15` and `sigma=10` the Q peak is about a hundred times smaller than the
+I peak. Forced onto one axis it would be a flat line at zero.
 """
 
 # %%
-i_samples = pi_pulse.get_I().envelope()
-q_samples = pi_pulse.get_Q().envelope()
-
-fig, ax = plt.subplots(figsize=(6.5, 3.2))
-(line_i,) = ax.plot(i_samples, label="I: Gaussian")
-ax.axhline(0.0, color="grey", linewidth=0.6)
-ax.set_xlabel("Time (ns)")
-ax.set_ylabel("I amplitude (DAC units)")
-ax.set_title(f"IQDrag, the pi pulse on qubit 0 ({pi_pulse.get_duration()} ns)")
-
-twin = ax.twinx()  # Q is ~100x smaller, so give it its own scale
-(line_q,) = twin.plot(q_samples, color="tab:orange", label=f"Q: derivative x beta={pi_pulse.beta}")
-twin.set_ylabel("Q amplitude (DAC units)")
-ax.legend(handles=[line_i, line_q], loc="upper right", fontsize=9)
+ax_i, ax_q = pi_pulse.plot()  # an IQWaveform hands back the two panels it drew
+ax_i.set_title(f"IQDrag, the pi pulse on qubit 0 ({pi_pulse.get_duration()} ns)", loc="left")
+ax_q.axhline(0.0, color="grey", linewidth=0.6)
+ax_q.annotate(
+    f"the derivative of I, scaled by beta={pi_pulse.beta}",
+    xy=(0.98, 0.95),
+    xycoords="axes fraction",
+    ha="right",
+    va="top",
+    fontsize=8,
+)
 plt.show()
 
+i_samples = pi_pulse.get_I().envelope()  # the samples themselves, for the arithmetic
+q_samples = pi_pulse.get_Q().envelope()
 print("peak I:", round(float(i_samples.max()), 4), "| peak |Q|:", round(float(np.abs(q_samples).max()), 4))
 
 # %% [markdown]
 r"""
-There is a shorter route when the only goal is to look. `waveform.plot()` draws the envelope on a
-fresh figure and returns the axis, or draws onto axes you supply, `ax=` for a single-channel
-waveform and `axes=` for the I and Q pair of an `IQWaveform`. A waveform left on its own as the last
-line of a notebook cell renders the same picture through the IPython display protocol, with no
-plotting code at all. The gallery above went the long way because `envelope()` is the method your
-own analysis will call.
+There is a shorter spelling still. Both waveform bases define `_repr_html_`, so a bare waveform on
+the last line of a notebook cell renders its own envelope with no plotting call at all, in a light
+and a dark version so the picture survives either notebook theme. `plot()` makes the axes the cell's
+value instead, which a notebook prints as `<Axes: ...>` next to the figure, so bind it or end the
+line with a semicolon.
 """
 
 # %%
@@ -740,8 +633,10 @@ print("after binding:", resolved)
 r"""
 ## 1.5 The program is a tree
 
-Every builder call appended a node. `program.body` is the root `Block`, and `body.elements` is a
-plain Python list of its immediate children, in the order you wrote them.
+Binding a waveform produced a new program rather than mutating the old one, which is a hint about
+what a program is underneath. Every builder call appended a node. `program.body` is the root
+`Block`, and `body.elements` is a plain Python list of its immediate children, in the order you
+wrote them.
 
 `drive_program` has three top-level children, because the four preparation statements live inside
 the `block()`.
@@ -760,7 +655,7 @@ write the recursion yourself.
 
 Keeping a program as data means you can compute things about a sequence before anything runs. The
 cell below reads how many nanoseconds this program books on the drive line, straight off the AST.
-That is a toy version of a real question. Fridge time is the scarce resource in any lab, and the
+It is a toy version of a real question. Fridge time is the scarce resource in any lab, and the
 duration of a sweep is the product of its point count, its shot count, and the length of one shot,
 all three of which are sitting in the tree before you press go. A scan you can price is a scan you
 can decide not to run.
@@ -798,7 +693,7 @@ print("schema:   ", drive_program.schema)
 r"""
 ## 1.6 `.qp`, the text format
 
-A program is data, so it serializes. `qp.dumps` writes the `.qp` text format and `qp.loads` reads it
+A tree of plain objects serializes. `qp.dumps` writes the `.qp` text format and `qp.loads` reads it
 back; `qp.save` and `qp.load` are the same pair against a file.
 
 The format is deliberately boring: one statement per line, indentation for nesting, quoting as the
@@ -833,16 +728,46 @@ assert qp.loads(qp.dumps(drive_program)).body == drive_program.body
 
 # %% [markdown]
 r"""
-Why a lab should care about a text format, in three lines:
+Three things follow from having that file, and a lab feels all three. A text diff of two calibration
+runs a week apart shows exactly which numbers moved. A pulse sequence a colleague can read in a pull
+request gets checked before it costs fridge time. And the file is the experiment. Six months from
+now the `.qp` next to your data still loads, still carries the measurement names you indexed the
+results by, and does not depend on the notebook that happened to build it.
 
-- **Diffs.** Two calibration runs a week apart differ by a handful of numbers, and a text diff shows
-  you exactly which ones. You will do this in Exercise 1.2.
-- **Review.** A pulse sequence that a colleague can read in a pull request is a sequence that gets
-  checked before it costs fridge time.
-- **Reproduction.** The file is the experiment. Six months from now the `.qp` next to your data
-  still loads, still carries the measurement names you indexed the results by, and does not depend
-  on the notebook that happened to build it.
+The first of those is worth doing rather than describing. `out/drive_then_read.qp` is on disk, so
+retune the pi pulse the way you would retune it in a lab, by opening the file and changing the
+number from 0.62 to 0.31 (`str.replace` stands in for the editor). The unified diff shows the one
+line that moved, and loading the edited text back gives a program whose body no longer compares
+equal to the original.
+
+Watch the last two loops in particular. Structural equality is not a yes-or-no answer about a file,
+it is a yes-or-no answer about any node in the tree, so comparing `body.elements` pairwise and then
+descending into the one child that changed localises a colleague's edit to a single operation
+without reading the file at all.
 """
+
+# %%
+original_text = path.read_text()
+edited_text = original_text.replace("amplitude=0.62", "amplitude=0.31")
+
+diff = difflib.unified_diff(
+    original_text.splitlines(keepends=True),
+    edited_text.splitlines(keepends=True),
+    "measured.qp",
+    "retuned.qp",
+)
+print("".join(diff))
+
+retuned = qp.loads(edited_text)
+print("whole body equal?", retuned.body == drive_program.body)
+
+for index, (before, after) in enumerate(zip(drive_program.body.elements, retuned.body.elements, strict=True)):
+    print(f"  [{index}] {type(before).__name__:<8}", "same" if before == after else "CHANGED")
+
+print("inside the changed block:")
+inner = zip(drive_program.body.elements[0].elements, retuned.body.elements[0].elements, strict=True)
+for index, (before, after) in enumerate(inner):
+    print(f"  [0][{index}] {type(before).__name__:<13}", "same" if before == after else "CHANGED")
 
 # %% [markdown]
 r"""
@@ -893,57 +818,6 @@ except qp.ValidationError as exc:
 
 # %% [markdown]
 r"""
-### 🧩 Exercise 1.2: edit the file, load it back, find the change
-
-`out/drive_then_read.qp` is on disk. Retune the pi pulse by hand and prove that exactly one node of
-the program moved.
-
-1. Read the file text, and produce an edited copy where `amplitude=0.62` becomes `amplitude=0.31`.
-   (In the lab you would open the file in an editor. `str.replace` stands in for that here.)
-2. Print a unified diff of the two texts with `difflib.unified_diff`, so you can see the one line
-   that changed.
-3. `qp.loads` the edited text and confirm the whole body no longer compares equal.
-4. Then localise it: compare `body.elements` pairwise, and inside the one child that changed,
-   compare its `elements` pairwise too. Exactly one operation should come out different.
-
-Step 4 is the interesting one. Structural equality is not a yes/no answer about a file, it is a
-yes/no answer about any node in the tree, and that is how you localise what a colleague changed.
-"""
-
-# %% solution
-original_text = path.read_text()
-edited_text = original_text.replace("amplitude=0.62", "amplitude=0.31")
-
-diff = difflib.unified_diff(
-    original_text.splitlines(keepends=True),
-    edited_text.splitlines(keepends=True),
-    "measured.qp",
-    "retuned.qp",
-)
-print("".join(diff))
-
-retuned = qp.loads(edited_text)
-print("whole body equal?", retuned.body == drive_program.body)
-
-for index, (before, after) in enumerate(zip(drive_program.body.elements, retuned.body.elements, strict=True)):
-    print(f"  [{index}] {type(before).__name__:<8}", "same" if before == after else "CHANGED")
-
-print("inside the changed block:")
-inner = zip(drive_program.body.elements[0].elements, retuned.body.elements[0].elements, strict=True)
-for index, (before, after) in enumerate(inner):
-    print(f"  [0][{index}] {type(before).__name__:<13}", "same" if before == after else "CHANGED")
-
-# %% stub
-# TODO: retune the saved program by editing its text.
-# 1) original_text = path.read_text(); edited_text = original_text.replace("amplitude=0.62",
-#    "amplitude=0.31")
-# 2) print a unified diff: difflib.unified_diff(a.splitlines(keepends=True), ..., "a", "b")
-# 3) retuned = qp.loads(edited_text); compare retuned.body == drive_program.body
-# 4) zip(drive_program.body.elements, retuned.body.elements, strict=True) and report which index
-#    changed, then do the same one level down inside .elements[0].elements
-
-# %% [markdown]
-r"""
 ## Recap and what is next
 
 - A **bus** is one signal path. Strings work; a `BusSchema` gives you `BusRef`s that are still
@@ -952,9 +826,9 @@ r"""
 - **Operations** are the verbs: `play`, `measure`, `wait`, `sync`, `set_frequency`, `set_gain`,
   `reset_phase`. You
   built a readout tone with an acquisition, and a pi pulse followed by a readout.
-- **Waveforms are data.** `envelope()` plots them, structural equality compares them, and a string
-  alias leaves the number to be filled in later. That alias is the seam between a stable sequence
-  and a drifting calibration.
+- **Waveforms are data.** `plot()` draws them, `envelope()` hands you the samples, structural
+  equality compares them, and a string alias leaves the number to be filled in later. That alias is
+  the seam between a stable sequence and a drifting calibration.
 - **The program is a tree.** `body.elements`, `walk()`, `buses`, `variables`. You read a pulse-time
   budget off the AST before anything ran, the same move a compiler makes.
 - **`.qp` is the artifact.** `loads(dumps(p)).body == p.body`, so the file is the experiment, and a

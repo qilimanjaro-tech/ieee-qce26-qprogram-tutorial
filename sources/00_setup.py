@@ -2,8 +2,8 @@
 r"""
 # 00 · Setup and environment check
 
-**Run this notebook before the tutorial.** It is a pass/fail check. If the last cell draws a curve
-with a sharp dip near 7.2 GHz, you are ready.
+**Run this notebook before the tutorial.** It is pass/fail. If the last cell draws a curve with a
+sharp dip near 7.2 GHz, your environment is ready and there is nothing else to prepare.
 
 Nothing here talks to hardware. QProgram ships a pure-Python reference platform, so every experiment
 in this tutorial runs on your laptop. JupyterLab, VS Code, and Google Colab all work.
@@ -18,16 +18,8 @@ r"""
 
 A superconducting qubit arrives from the fab as a chip with three wires on it and no numbers
 attached. Nobody knows where its readout resonator sits, where its transition frequency sits, how
-hard you have to hit it to flip it, or how long it stays flipped. Bring-up is the process of turning
-that chip into a row in a table. Every experiment in this tutorial is one entry in that row, run in
-the only order they can be run in, because each one needs the answer from the last.
-
-If your quantum computing so far has been circuits, here is the orientation in one paragraph. A
-transmon is a circuit on a silicon chip at 10 millikelvin, and you reach it with microwaves on
-coaxial cable. `X(q0)` is a 40 ns shaped burst on one line, and its area is the rotation angle.
-`measure(q0)` is a 2 microsecond tone on another line, whose echo comes back as a complex number
-that you threshold into a bit. Part 1 opens with that chain, wire by wire, and assumes you have
-never seen a control rack.
+hard you have to hit it to flip it, or how long it stays flipped. Bring-up is the work of turning
+that chip into a row in a table, and each experiment in the tutorial fills one cell of that row.
 
 | Experiment | Answers | Needed for |
 |---|---|---|
@@ -39,22 +31,29 @@ never seen a control rack.
 | single-shot readout | the threshold, and the error it costs | any feedback at all |
 | active reset | how fast you can start the next shot | throughput |
 
-Along the way the library arrives one problem at a time, because each experiment needs a piece of it
-that the one before did not. Sweeps show up when you have to step a frequency. Averaging shows up
-when one shot turns out to be nothing but noise. Conditionals show up when a measurement has to
-change what the program does next. By the end you will have a calibration set for a simulated qubit
-and the files that produced it, in a format another lab could load.
+The third column is a chain, not a list of nice-to-haves. The rows run in the order printed and in
+no other, because each experiment is pointed by the answer the one above it returned. A qubit scan
+needs a working readout to see anything at all, a Rabi needs a qubit frequency to drive, a coherence
+curve needs a $\pi$ pulse to prepare the state it then watches decay. Get the first row wrong and
+the other six are measuring the wrong thing without telling you.
 
-The last two parts change the question. Instead of measuring a chip, you take a working calibration
-to a rack that is wired differently and find out what a machine has to agree to before it will run
-your program, then extend the language with vocabulary the core does not ship.
+The library arrives at the same pace, one problem at a time. Sweeps show up when you have to step a
+frequency. Averaging shows up when one shot turns out to be nothing but noise. Conditionals show up
+when a measurement has to change what the program does next. The last two parts change the question
+and take a finished calibration to a rack that is wired differently, to find out what a machine has
+to agree to before it will run your program.
+
+Six checks follow, each printing one line you can read at a glance. The last one draws the picture
+that says the whole stack works.
 """
 
 # %% [markdown]
 r"""
 ## Check 1: Python version
 
-QProgram is pure Python and needs 3.11 or newer. Versions through 3.14 are tested.
+Start with the interpreter, since nothing below runs without it. QProgram is pure Python and needs
+3.11 or newer, and versions through 3.14 are tested. The fix differs by platform, so the cell prints
+the one that applies to you.
 """
 
 # %%
@@ -72,11 +71,11 @@ else:
 r"""
 ## Check 2: install QProgram
 
-The cell below does nothing if QProgram is already installed, and installs it otherwise (a fresh
-Colab runtime, for example). The `viz` extra pulls in matplotlib for the plots. `scipy` is not a
-QProgram dependency. The tutorial uses it to fit the curves you measure. Parts 5 and 6 also read two
-vendor extension packages, `qprogram-qblox` and `qprogram-qdac`, and their own first cells install
-them. Neither drives an instrument.
+With a supported interpreter the next cell does nothing at all if QProgram is already installed, and
+installs it otherwise, which is the case on a fresh Colab runtime. The `viz` extra pulls in
+matplotlib for the plots. `scipy` is not a QProgram dependency; the tutorial uses it to fit the
+curves you measure. Parts 5 and 6 also read two vendor extension packages, `qprogram-qblox` and
+`qprogram-qdac`, and their own first cells install them. Neither drives an instrument.
 
 One note on spelling before the imports start. The QProgram documentation writes a single import,
 `import qprogram as qp`, and reaches the rest through it, as in `qp.BusSchema.transmon()`,
@@ -109,29 +108,25 @@ print("qprogram", version("qprogram"))
 r"""
 ## Check 3: build a program
 
-The smallest experiment that tells you something about a chip is a frequency sweep of the readout
-line. A transmon is not measured directly. It is measured through a resonator coupled to it, and the
-resonator is a length of superconducting line that absorbs strongly at one frequency and passes
-everything else. Send a tone down the feedline, step its frequency across the band the designer
-aimed at, and record what comes back out. Where the transmission drops, the resonator lives.
-
-This is the first measurement anyone runs on a new chip, and everything downstream depends on it,
-because a readout tone parked at the wrong frequency returns the same number whatever the qubit is
+The library is in, so the remaining checks build, serialize, run, and draw one real experiment, the
+resonator spectroscopy that opens the table above. A transmon is never measured directly. It is
+measured through a resonator coupled to it, so the first scan on a new chip sends a tone down the
+feedline, steps its frequency across the band the designer aimed at, and records what comes back.
+Where the transmission drops, the resonator lives. Everything downstream depends on that number,
+because a readout tone parked at the wrong frequency returns the same value whatever the qubit is
 doing.
 
-Five names build it, one line each:
+Five names build the scan, one line each. `BusSchema.transmon()` describes the chip layout, giving
+each qubit a `drive` line and a `readout` line with an ADC on it. `QProgram` is the builder, and
+every method call on it appends a node to a tree. `program.variable(...)` declares the swept
+parameter along with the label and units that later name its axis. `average` and `sweep` are context
+managers that nest, so the `with` statements are the loops. And `measure` returns a handle you use
+later to pull the data out.
 
-- `BusSchema.transmon()` describes the chip layout. Each qubit has a `drive` line and a `readout`
-  line, and the readout line has an ADC.
-- `QProgram` is the builder. Every method call appends a node to a tree.
-- `program.variable(...)` declares the swept parameter.
-- `average` and `sweep` are context managers that nest, so the `with` statements are the loops.
-- `measure` returns a handle you use later to pull the data out.
-
-The scan below is a survey: 100 MHz wide in 81 steps, so 1.25 MHz per point against a resonator
-about 1.5 MHz wide. Roughly one sample per linewidth. That is enough to find the dip and nowhere
-near enough to measure it, which is the right trade for a first look. Part 2 comes back with a 20
-MHz window at 200 kHz steps once it knows where to point.
+The scan below is a survey, 100 MHz wide in 81 steps, so 1.25 MHz per point against a resonator
+about 1.5 MHz wide. Roughly one sample per linewidth is enough to find the dip and nowhere near
+enough to measure it, which is the right trade for a first look. Part 2 comes back with a 20 MHz
+window at 200 kHz steps once it knows where to point.
 """
 
 # %%
@@ -156,9 +151,9 @@ print("measurement handle:", m0.name)
 r"""
 ## Check 4: read the program back as text
 
-A QProgram is data, not a script, so it serializes. `qp.dumps` writes the `.qp` text format. One
-statement per line, indentation for nesting, no hidden state. This is the file you commit next to
-your results.
+Nothing ran yet. What the last cell built is a tree, and because a QProgram is data rather than a
+script, that tree serializes. `qp.dumps` writes the `.qp` text format, one statement per line,
+indentation for nesting, no hidden state. This is the file you commit next to your results.
 """
 
 # %%
@@ -169,8 +164,8 @@ r"""
 ## Check 5: run it
 
 `qp.simulate` runs the program on the reference platform, a pure-Python interpreter that ships
-inside QProgram. It does not model pulses or timing. It models the shape of the experiment: the
-loops, the averaging, and one measurement record per `measure` call.
+inside QProgram. It does not model pulses or timing. It models the shape of the experiment, meaning
+the loops, the averaging, and one measurement record per `measure` call.
 
 Where the numbers come from is up to you. A `MeasurementModel` is asked for one sample per shot, and
 it receives `env`, a dict of the loop variables currently bound. Here the response is the standard
@@ -182,7 +177,7 @@ with $f_r$ = 7.20 GHz and $\kappa$ = 1.5 MHz. Two facts hide in that second numb
 resonance 1.5 MHz wide has a loaded quality factor of 4800, and it fills and empties in about
 $1/\kappa$, or 106 ns. Both matter later. The quality factor sets how sharply the resonance moves
 when the qubit changes state, and the fill time is the reason a readout pulse is measured in
-microseconds rather than nanoseconds: you have to wait for the resonator to reach steady state
+microseconds rather than nanoseconds, since you have to wait for the resonator to reach steady state
 before the light coming back means anything.
 """
 
@@ -207,8 +202,10 @@ print("dims:", data.dims, "shape:", data.shape)
 
 # %% [markdown]
 r"""
-The result is an `xarray.DataArray`. Its dimensions are named after your loop variables, so the
-sweep you wrote is the axis you index. `IQ` is the extra axis every integrated measurement carries.
+Those dimensions are the shape of what you wrote. The result is an `xarray.DataArray` whose axes are
+named after your loop variables, so the sweep you declared is the axis you index. `IQ` is the extra
+axis every integrated measurement carries, holding the two quadratures of each point. Combine them
+and the dip should sit where the model put it.
 """
 
 # %%
@@ -226,19 +223,26 @@ print("baseline scatter:", round(float(off_resonance.std()), 5))
 r"""
 ## Check 6: plotting
 
-Several parts of the tutorial draw figures, so the last check is matplotlib. If you see a curve with
-a dip in it, plotting works.
+Several parts of the tutorial draw figures, so the last check is the drawing path. The result knows
+how to plot itself, and it takes the axis label straight off the variable you declared in Check 3.
+`coords` restates the frequency in GHz for the figure without touching the stored array, `value`
+names the measured quantity, and the axes that comes back takes the reference line at the true
+resonator. If the figure comes up, plotting works.
 """
 
 # %%
 import matplotlib.pyplot as plt
+from qprogram.plotting import Quantity
 
-plt.plot(freqs / 1e9, magnitude)
-plt.axvline(F_RESONATOR / 1e9, color="grey", linestyle=":", label="true resonator")
-plt.xlabel("Readout frequency (GHz)")
-plt.ylabel("|S21| (arb.)")
-plt.title("Resonator spectroscopy on a simulated chip")
-plt.legend()
+ax = result.plot(
+    m0,
+    channels="magnitude",
+    coords={"ro_freq": Quantity(units="GHz", transform=lambda v: v / 1e9)},
+    value=Quantity("Readout magnitude"),
+    title="Resonator spectroscopy on a simulated chip",
+)
+ax.axvline(F_RESONATOR / 1e9, color="grey", linestyle=":", label="true resonator")
+ax.legend(fontsize=8)
 plt.show()
 
 # %% [markdown]
@@ -246,7 +250,7 @@ r"""
 A curve with a dip near 7.2 GHz means the whole stack works. Build, serialize, run, plot.
 See you at the tutorial.
 
-Curious already? Change `shots=100` to `shots=2` in Check 3 and rerun the last four cells. Watch two
+Curious already? Change `shots=100` to `shots=2` in Check 3 and rerun from there. Watch two
 different things happen, or rather watch one of them fail to happen.
 
 The dip does not move. It is 90 percent deep and the sweep steps 1.25 MHz at a time, so its

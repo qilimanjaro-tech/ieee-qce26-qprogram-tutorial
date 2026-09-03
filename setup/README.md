@@ -63,7 +63,7 @@ pieces this tutorial and your editor want, in brackets after the package name:
 
 | Extra | Adds | Used for |
 |-------|------|----------|
-| `viz` | matplotlib | every plot in the tutorial, and `Waveform.plot()`. Install it. |
+| `viz` | matplotlib | every figure in the tutorial. `result.plot(...)` draws a measurement and `waveform.plot()` draws an envelope, and both need it. Install it. |
 | `lsp` | pygls | `python -m qprogram.lsp serve`, the language server behind the VS Code extension. Optional, mentioned in Part 6. |
 
 `python -m qprogram.lsp check file.qp` and `python -m qprogram.lsp explain file.qp` need **no** extra:
@@ -79,7 +79,8 @@ them. Parts 0 to 4 never touch either one.
 
 **scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing,
 `scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, and the
-capstone in Part 6. Install it alongside QProgram:
+capstone in Part 6. The library draws the data; scipy works out what the data means. Install it
+alongside QProgram:
 
 ```bash
 pip install "qprogram[viz]==0.1.0" scipy
@@ -148,6 +149,7 @@ plus the plot.
 | `ModuleNotFoundError: No module named 'scipy'` | `pip install scipy`. Parts 3, 4, and 6 fit curves. |
 | `python -m qprogram.lsp serve` fails to import | The `lsp` extra is missing: `pip install "qprogram[lsp]"`. The `check` and `explain` modes do not need it. |
 | Plots stay invisible | matplotlib is inline by default in a notebook kernel, so check you are in a kernel and not running the file as a script. The notebooks deliberately carry no `%matplotlib` magic. |
+| A figure comes with `<Axes: ...>` printed beside it | `result.plot(...)` returns the axes it drew on, and a notebook prints the last value of a cell. Bind it (`ax = result.plot(m0)`) or end the line with a semicolon. |
 | Colab offers to restart the session after the install | Re-run the first cell. The install is cached for the session. |
 | A notebook cell is slower than you expect | The simulator costs roughly 10 microseconds per shot, so `shots x sweep points` is the number that matters. Drop `shots` while you are experimenting. |
 | Anything else | Use Colab (Option B). It sidesteps every local toolchain problem. |
