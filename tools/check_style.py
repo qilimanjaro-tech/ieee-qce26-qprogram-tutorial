@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
 """Check the tutorial text against the house style.
 
-Three rules, all mechanical:
+Four rules, all mechanical:
 
 1. No em dashes or en dashes. Use a comma, parentheses, or two sentences.
 2. No filler vocabulary from the banned list below.
 3. No sentence shape over its per-file budget (see BUDGETS).
+4. No hard-wrapped paragraph. One paragraph, list item, or blockquote is one line.
 
 Rules 1 and 2 are line based and apply to every text file. Rule 3 counts sentence shapes in
 prose only, per file, and applies to the globs in BUDGETED. Markdown cells are the prose of a
 source file, so code, tables, fenced blocks, and inline code are all excluded before counting.
+
+Rule 4 applies to the globs in UNWRAPPED, which is every file whose text reaches a reader
+through a renderer. A renderer wraps to the reader's width, so a hard wrap in the source adds
+nothing and costs a diff that shows every rewrapped line instead of the sentence that changed.
+In the Marp deck it also stopped text reflowing, since Marp Core turns a soft break into a
+forced one. `tools/unwrap.py` holds the rule and fixes a file in place. It deliberately does
+not cover `tools/*.py`, whose docstrings are read as source rather than rendered.
+
+Rules 1 and 3 read the file line by line, and rule 4 changes what a line is, so the two
+interact: a construction broken across a wrap (`is\nwhat`) hid from rule 3 until rule 4 was
+enforced. The budgets below are calibrated against unwrapped prose.
 
 The budgets exist because the vocabulary list cannot catch rhythm. One `That is` opener reads
 well and eight in a file read like a machine. Each budget is seeded from the file that was
@@ -35,6 +47,10 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from unwrap import wrapped, wrapped_in_source  # noqa: E402  (needs the path above)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -103,6 +119,10 @@ BUDGETS = (
 # colons.
 BUDGETED = ("sources/*.py", "slides/*.md")
 
+# Files whose text is rendered for a reader, and so must carry no hard-wrapped paragraph.
+# `tools/*.py` is absent on purpose: a docstring is read as source, not rendered.
+UNWRAPPED = ("README.md", "setup/*.md", "slides/*.md", "sources/*.py")
+
 CELL = re.compile(r"^# %%(?P<rest>.*)$")
 FENCE = re.compile(r"```.*?```", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`]*`")
@@ -161,6 +181,17 @@ def budgets(path: Path) -> list[str]:
     return problems
 
 
+def hard_wraps(path: Path) -> list[str]:
+    """Report every paragraph, list item, or blockquote that spans more than one line."""
+    text = path.read_text(encoding="utf-8")
+    found = wrapped_in_source(text) if path.suffix == ".py" else wrapped(text, front_matter=True)
+    return [
+        f"{path.relative_to(ROOT)}:{lineno}: hard-wrapped paragraph, {first[:60]!r} "
+        f"(fix with: python tools/unwrap.py {path.relative_to(ROOT)})"
+        for lineno, first in found
+    ]
+
+
 def check(path: Path) -> list[str]:
     problems: list[str] = []
     for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
@@ -181,6 +212,7 @@ def main(argv: list[str]) -> int:
     # This file quotes every banned word, so checking it would always fail.
     paths = [path for path in paths if path.resolve() != SELF]
     budgeted = {p.resolve() for pattern in BUDGETED for p in ROOT.glob(pattern)}
+    unwrapped = {p.resolve() for pattern in UNWRAPPED for p in ROOT.glob(pattern)}
     problems: list[str] = []
     for path in paths:
         if not path.is_file():
@@ -188,6 +220,8 @@ def main(argv: list[str]) -> int:
         problems.extend(check(path))
         if path.resolve() in budgeted:
             problems.extend(budgets(path))
+        if path.resolve() in unwrapped:
+            problems.extend(hard_wraps(path))
     for problem in problems:
         print(problem)
     print(f"checked {len(paths)} files, {len(problems)} problems")

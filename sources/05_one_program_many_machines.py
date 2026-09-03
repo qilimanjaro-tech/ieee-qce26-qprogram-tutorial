@@ -2,19 +2,11 @@
 r"""
 # 05 · One program, many machines
 
-The flux sweep from Part 3 works. It found the sweet spot, and the numbers agreed with the device.
-Now someone in the lab next door wants to run it on their rack, and their rack is not your rack.
+The flux sweep from Part 3 works. It found the sweet spot, and the numbers agreed with the device. Now someone in the lab next door wants to run it on their rack, and their rack is not your rack.
 
-Here is the asymmetry this part is about. A Ramsey experiment is a Ramsey experiment in every lab on
-earth. The physics moved between institutions decades ago and moves freely today. You read a paper,
-you reproduce the measurement, and nobody has to ship you a machine. The *code* that runs it has
-never moved at all. It is written against one vendor's sequencer, in one vendor's dialect, with the
-hardware-loop and software-loop split hard-coded on line one, and porting it means rewriting an
-experiment that was already correct and then spending a month re-earning the trust you had in it.
+Here is the asymmetry this part is about. A Ramsey experiment is a Ramsey experiment in every lab on earth. The physics moved between institutions decades ago and moves freely today. You read a paper, you reproduce the measurement, and nobody has to ship you a machine. The *code* that runs it has never moved at all. It is written against one vendor's sequencer, in one vendor's dialect, with the hardware-loop and software-loop split hard-coded on line one, and porting it means rewriting an experiment that was already correct and then spending a month re-earning the trust you had in it.
 
-Closing that gap needs two things. The program has to stop encoding decisions that belong to the
-machine, and the machine has to be able to state what it can do in a form a program can be checked
-against. This part is both halves:
+Closing that gap needs two things. The program has to stop encoding decisions that belong to the machine, and the machine has to be able to state what it can do in a form a program can be checked against. This part is both halves:
 
 - **5.1** The flux sweep that works, and the rack next door where it does not.
 - **5.2** The tokens every node in the program asks for.
@@ -53,8 +45,7 @@ print("qprogram-qblox", version("qprogram-qblox"), "· qprogram-qdac", version("
 r"""
 ## 5.1 The same experiment, a different rack
 
-Everything so far ran on `qp.simulate`, which accepts the whole language. A real rack does not.
-Take two racks that both call themselves "a transmon control setup":
+Everything so far ran on `qp.simulate`, which accepts the whole language. A real rack does not. Take two racks that both call themselves "a transmon control setup":
 
 | | Rack A (yours) | Rack B (next door) |
 |---|---|---|
@@ -64,17 +55,9 @@ Take two racks that both call themselves "a transmon control setup":
 | bus names | `q0/drive` | `drive_q0` |
 | pulse shapes | your calibration | their calibration |
 
-One row of that table decides everything after it. Rack B's flux line is a purpose-built DC source
-with twenty bits, a heavily filtered output, no FPGA behind it, and a network cable between it and
-the lab server. A loop that steps that voltage cannot be a sequencer loop and cannot be made into
-one. It has to be driven from the host, one point at a time, with the fast part of the experiment
-nested inside it.
+One row of that table decides everything after it. Rack B's flux line is a purpose-built DC source with twenty bits, a heavily filtered output, no FPGA behind it, and a network cable between it and the lab server. A loop that steps that voltage cannot be a sequencer loop and cannot be made into one. It has to be driven from the host, one point at a time, with the fast part of the experiment nested inside it.
 
-Now notice what you did *not* write in Part 3. You never said which loop was a hardware loop and
-which was a software loop, because that is not a property of your experiment. It is a property of
-the rack, and the rack is the thing that just changed. Something has to read the program against
-the new machine and work the split out before anything is uploaded, and `qp.validate` does it from
-the AST with no instrument attached.
+Now notice what you did *not* write in Part 3. You never said which loop was a hardware loop and which was a software loop, because that is not a property of your experiment. It is a property of the rack, and the rack is the thing that just changed. Something has to read the program against the new machine and work the split out before anything is uploaded, and `qp.validate` does it from the AST with no instrument attached.
 """
 
 # %%
@@ -115,14 +98,9 @@ print("buses on this chip:", [q[0].drive, q[0].readout, q[0].flux])
 r"""
 ### The experiment we are porting
 
-One slice of the Part 3 flux arc, kept in one dimension so the execution plans below stay readable.
-Park the drive tone at 4.85 GHz, step the flux bias, and record the excited-state population. The
-qubit is only in resonance with the parked tone when the flux puts it at the sweet spot, so the
-population peaks there.
+One slice of the Part 3 flux arc, kept in one dimension so the execution plans below stay readable. Park the drive tone at 4.85 GHz, step the flux bias, and record the excited-state population. The qubit is only in resonance with the parked tone when the flux puts it at the sweet spot, so the population peaks there.
 
-Two details in the program matter later. `set_offset` is the only operation that touches the flux
-bus, and on rack B it is the only operation that cannot run in the sequencer. `sync` is written with
-an explicit target list, and 5.4 is about what happens when it is not.
+Two details in the program matter later. `set_offset` is the only operation that touches the flux bus, and on rack B it is the only operation that cannot run in the sequencer. `sync` is written with an explicit target list, and 5.4 is about what happens when it is not.
 """
 
 # %%
@@ -152,22 +130,13 @@ print(qp.dumps(program))
 r"""
 ### Run it on rack A
 
-The reference platform supports the whole language, so this is the "it works on my rack" baseline.
-The measurement model is the qubit-spectroscopy Lorentzian from Part 3 with the peak moved along
-the arc, the whole physical content of the experiment. This one uses the natural 2 MHz line rather
-than the broadened survey line. The bias steps are 2 mV, and near the sweet spot that puts nine
-points across the peak.
+The reference platform supports the whole language, so this is the "it works on my rack" baseline. The measurement model is the qubit-spectroscopy Lorentzian from Part 3 with the peak moved along the arc, the whole physical content of the experiment. This one uses the natural 2 MHz line rather than the broadened survey line. The bias steps are 2 mV, and near the sweet spot that puts nine points across the peak.
 
-The line shape in bias is worth a second, because it is the sweet spot showing up in the data rather
-than in an argument. Near the top of the arc the frequency is flat against bias, so the detuning
-grows as the *square* of the bias offset instead of linearly, and a Lorentzian in detuning becomes a
-quartic in bias:
+The line shape in bias is worth a second, because it is the sweet spot showing up in the data rather than in an argument. Near the top of the arc the frequency is flat against bias, so the detuning grows as the *square* of the bias offset instead of linearly, and a Lorentzian in detuning becomes a quartic in bias:
 
 $$p(V) = \mathrm{floor} + \frac{A}{1 + \left(\frac{V - V_0}{w}\right)^4}$$
 
-A quartic has flatter shoulders and steeper flanks than a Lorentzian, and the flat top is the reason
-you park a qubit here. First-order flux noise does nothing at $V_0$. The steep flanks are what makes
-$V_0$ easy to fit, because both of them constrain the centre.
+A quartic has flatter shoulders and steeper flanks than a Lorentzian, and the flat top is the reason you park a qubit here. First-order flux noise does nothing at $V_0$. The steep flanks are what makes $V_0$ easy to fit, because both of them constrain the centre.
 """
 
 # %%
@@ -220,21 +189,11 @@ ax.legend(fontsize=8)
 r"""
 ## 5.2 What the program asks for
 
-Before a rack can refuse a program, the program has to say what it needs. Every node in the tree
-does that through `required_capabilities()`, as a set of flat dotted **tokens**: `op.play`,
-`waveform.iq_drag`, `sweep.linear`. A token is set membership, so checking one is a hash lookup, and
-a set of them serializes into a profile a vendor can publish and you can read.
+Before a rack can refuse a program, the program has to say what it needs. Every node in the tree does that through `required_capabilities()`, as a set of flat dotted **tokens**: `op.play`, `waveform.iq_drag`, `sweep.linear`. A token is set membership, so checking one is a hash lookup, and a set of them serializes into a profile a vendor can publish and you can read.
 
-The set is **instance-aware**. It depends on the node's data and not just on its class, so a `play`
-of a `Square` asks for different tokens than a `play` of an `IQPair`, and a `play` of a string alias
-asks for almost nothing, because the alias has not been resolved to a shape yet.
+The set is **instance-aware**. It depends on the node's data and not just on its class, so a `play` of a `Square` asks for different tokens than a `play` of an `IQPair`, and a `play` of a string alias asks for almost nothing, because the alias has not been resolved to a shape yet.
 
-The prefix says where a token is checked. `op.*` and `waveform.*` go to the bus the operation
-touches, or to the platform when the operation touches no bus at all. `block.*`, `sweep.*`, and
-`expr.*` always go to the platform, even when they show up on an operation that does touch a bus.
-The `expr.variable` on the `set_offset` below is a claim about the expression language, not about
-the flux line. Two other things travel alongside the tokens, numeric limits and callable predicates,
-and 5.5 is where both earn their keep.
+The prefix says where a token is checked. `op.*` and `waveform.*` go to the bus the operation touches, or to the platform when the operation touches no bus at all. `block.*`, `sweep.*`, and `expr.*` always go to the platform, even when they show up on an operation that does touch a bus. The `expr.variable` on the `set_offset` below is a claim about the expression language, not about the flux line. Two other things travel alongside the tokens, numeric limits and callable predicates, and 5.5 is where both earn their keep.
 """
 
 # %%
@@ -256,20 +215,13 @@ r"""
 
 A `PlatformCapabilities` has three parts:
 
-- `bus`: a profile per `(element_kind, bus_kind)` slot, so `("q", "flux")` can differ from
-  `("q", "drive")`.
+- `bus`: a profile per `(element_kind, bus_kind)` slot, so `("q", "flux")` can differ from `("q", "drive")`.
 - `platform`: the bus-less half. Blocks, sweep shapes, and expression kinds live here.
-- `default_bus_profile`: the fallback for a raw-string bus, which carries no schema metadata to
-  route on, and for a schema-backed bus whose slot the platform did not list.
+- `default_bus_profile`: the fallback for a raw-string bus, which carries no schema metadata to route on, and for a schema-backed bus whose slot the platform did not list.
 
-Each of those is a `BusCapabilities`, and a `BusCapabilities` is two halves. `rt` is the sequencer,
-`host` is the lab server, and either half may be `None`. Rack B says what it is through that `None`.
-The flux slot has no `rt` half at all, and that single missing field carries the whole of 5.1 in a
-form a program can be checked against.
+Each of those is a `BusCapabilities`, and a `BusCapabilities` is two halves. `rt` is the sequencer, `host` is the lab server, and either half may be `None`. Rack B says what it is through that `None`. The flux slot has no `rt` half at all, and that single missing field carries the whole of 5.1 in a form a program can be checked against.
 
-Real vendor code builds these from registered profiles (`CompilerCapabilities.from_profile(...)`).
-Here we build them by hand from the live token registry, because seeing the set subtraction is the
-point.
+Real vendor code builds these from registered profiles (`CompilerCapabilities.from_profile(...)`). Here we build them by hand from the live token registry, because seeing the set subtraction is the point.
 """
 
 # %%
@@ -308,16 +260,9 @@ print("flux rt half:              ", slow.rt)
 r"""
 ### Validate
 
-`qp.validate(program, caps)` returns a list of diagnostics and an execution plan, and it never
-raises. Validation reports and the caller decides. An editor plugin wants every diagnostic it can
-get and no exceptions, a CI job wants a non-zero exit, an interactive notebook wants to keep going
-and show you the plan. A platform's `execute()` is the one thing that turns an error into an
-exception.
+`qp.validate(program, caps)` returns a list of diagnostics and an execution plan, and it never raises. Validation reports and the caller decides. An editor plugin wants every diagnostic it can get and no exceptions, a CI job wants a non-zero exit, an interactive notebook wants to keep going and show you the plan. A platform's `execute()` is the one thing that turns an error into an exception.
 
-The plan maps each operation and each block to the set of domains it may run in. The root `body` is
-not an entry, because there is nowhere else for it to run. Operations come first, then the loops
-that contain them. In the output below the drive and readout operations can go either way, the
-`set_offset` on the flux bus is host-side only, and both loops inherit that from it.
+The plan maps each operation and each block to the set of domains it may run in. The root `body` is not an entry, because there is nowhere else for it to run. Operations come first, then the loops that contain them. In the output below the drive and readout operations can go either way, the `set_offset` on the flux bus is host-side only, and both loops inherit that from it.
 """
 
 # %%
@@ -334,17 +279,9 @@ for node, domains in plan.items():
 r"""
 ### The plan, drawn
 
-`qp.explain` renders the same plan as a tree: each node as its `.qp` line, the domain column on the
-right (`[rt|host]`, `[rt]`, `[host]`, or `[--]` for a node with no executable domain at all), and the
-diagnostics annotated inline (`!!` error, `~` warning, `i` info).
+`qp.explain` renders the same plan as a tree: each node as its `.qp` line, the domain column on the right (`[rt|host]`, `[rt]`, `[host]`, or `[--]` for a node with no executable domain at all), and the diagnostics annotated inline (`!!` error, `~` warning, `i` info).
 
-The `forced-host` warning is a *warning*, not an error, and the difference is worth the arithmetic.
-The program will run. It will run with the averaging loop on the host, which means 200 network round
-trips per bias point rather than 200 sequencer iterations. At a millisecond per round trip that is
-20200 milliseconds, so twenty seconds where the sequencer would have taken a fraction of one, and
-the whole thing scales with your shot count. On a real rack that is the difference between a coffee
-break and a lunch break, and the validator says so out loud rather than letting you find out from
-the clock.
+The `forced-host` warning is a *warning*, not an error, and the difference is worth the arithmetic. The program will run. It will run with the averaging loop on the host, which means 200 network round trips per bias point rather than 200 sequencer iterations. At a millisecond per round trip that is 20200 milliseconds, so twenty seconds where the sequencer would have taken a fraction of one, and the whole thing scales with your shot count. On a real rack that is the difference between a coffee break and a lunch break, and the validator says so out loud rather than letting you find out from the clock.
 """
 
 # %%
@@ -354,9 +291,7 @@ print(qp.explain(program, caps))
 r"""
 ## 5.4 `qp.optimize`: the rewrite the plan is asking for
 
-Look at the info line in the plan. The averaging is host-side only because it *encloses* the flux
-sweep, but nothing inside the averaging needs the host. Swap the two loops and the problem goes
-away:
+Look at the info line in the plan. The averaging is host-side only because it *encloses* the flux sweep, but nothing inside the averaging needs the host. Swap the two loops and the problem goes away:
 
 ```
 average 200:                          for bias in Linspace(...):     # host, one DAC write per point
@@ -366,21 +301,11 @@ average 200:                          for bias in Linspace(...):     # host, one
     measure q[0].readout ...              measure q[0].readout ...
 ```
 
-The arithmetic changes completely. Before the rewrite, every one of the 20200 executions is a host
-round trip. After it, the host does 101 DAC writes and the sequencer does 20200 iterations on its
-own. Same experiment, same data, two orders of magnitude in wall clock.
+The arithmetic changes completely. Before the rewrite, every one of the 20200 executions is a host round trip. After it, the host does 101 DAC writes and the sequencer does 20200 iterations on its own. Same experiment, same data, two orders of magnitude in wall clock.
 
-`qp.optimize(program, caps)` applies it. It is opt-in, because the rewrite is not unconditionally
-equivalent. It groups all 200 shots of one bias point together instead of interleaving passes over
-the sweep, identical for a stationary system and different under drift. If your chip wanders over
-ten minutes, the interleaved version spreads that drift evenly across the whole sweep and the
-reordered one concentrates it into a slope along the bias axis. Most of the time you want the speed.
-Occasionally you want the interleaving, and then you do not call `optimize`.
+`qp.optimize(program, caps)` applies it. It is opt-in, because the rewrite is not unconditionally equivalent. It groups all 200 shots of one bias point together instead of interleaving passes over the sweep, identical for a stationary system and different under drift. If your chip wanders over ten minutes, the interleaved version spreads that drift evenly across the whole sweep and the reordered one concentrates it into a slope along the bias axis. Most of the time you want the speed. Occasionally you want the interleaving, and then you do not call `optimize`.
 
-The hoisted `set_offset` also runs once per bias point instead of once per shot. For a DC bias that
-is the whole point, and it would be wrong for an operation with side effects, so the rewrite
-only ever hoists a leading run of host-side-only operations and refuses to move one past an
-operation it would reorder against.
+The hoisted `set_offset` also runs once per bias point instead of once per shot. For a DC bias that is the whole point, and it would be wrong for an operation with side effects, so the rewrite only ever hoists a leading run of host-side-only operations and refuses to move one past an operation it would reorder against.
 """
 
 # %%
@@ -395,30 +320,13 @@ print("body[0] after: ", type(optimized.body.elements[0]).__name__)
 r"""
 ### The broadcast that blocks the rewrite
 
-`program.sync()` with no arguments means "align every bus in this program". It is a different
-operation from `program.sync([q[0].drive, q[0].readout])`, even though both ask for the same token
-`op.sync`. A broadcast touches every bus, so the validator intersects the domains of every bus in
-the program, and the flux bus has no real-time half. The bare `sync` therefore lands on the host,
-in the middle of a run of real-time operations, and the rewrite refuses to hoist across it.
+`program.sync()` with no arguments means "align every bus in this program". It is a different operation from `program.sync([q[0].drive, q[0].readout])`, even though both ask for the same token `op.sync`. A broadcast touches every bus, so the validator intersects the domains of every bus in the program, and the flux bus has no real-time half. The bare `sync` therefore lands on the host, in the middle of a run of real-time operations, and the rewrite refuses to hoist across it.
 
-One habit, `sync()` instead of `sync([...])`, costs a factor of a hundred in run time and produces
-no error message anywhere. The same thing that made the plan correct made the rewrite impossible.
-Naming the two buses you actually want aligned costs you nothing.
+One habit, `sync()` instead of `sync([...])`, costs a factor of a hundred in run time and produces no error message anywhere. The same thing that made the plan correct made the rewrite impossible. Naming the two buses you actually want aligned costs you nothing.
 
-Leaving the flux bus out of the `sync` list is not the same as leaving it unaligned. The broadcast
-does not vanish. It lands on the host, and that placement is exactly why it blocks the rewrite. What
-no `sync` can do is hold a bus with no sequencer to a sequencer's clock. Instruments in that
-position line up through a hardware trigger line instead: the slow box arms a chassis trigger
-output at a chosen point in its own sequence, and the fast box waits on that line. The alignment
-happens in copper rather than in the AST, and that is why `sync` can afford to be about sequencer
-buses only.
+Leaving the flux bus out of the `sync` list is not the same as leaving it unaligned. The broadcast does not vanish. It lands on the host, and that placement is exactly why it blocks the rewrite. What no `sync` can do is hold a bus with no sequencer to a sequencer's clock. Instruments in that position line up through a hardware trigger line instead: the slow box arms a chassis trigger output at a chosen point in its own sequence, and the fast box waits on that line. The alignment happens in copper rather than in the AST, and that is why `sync` can afford to be about sequencer buses only.
 
-The pattern the rewrite matches is narrow, and it is worth knowing its shape rather than calling
-`optimize` hopefully. The averaging block's only child has to be one flat sweep whose body holds no
-nested block. Add a second sweep inside the first and the average is still forced host-side, but the
-`reorderable-averaging` hint is gone and `optimize` returns the program it was given. The hint and
-the rewrite are computed from the same predicate, so they cannot disagree. No hint means no rewrite,
-and reading the diagnostics is how you find out that calling `optimize` did nothing.
+The pattern the rewrite matches is narrow, and it is worth knowing its shape rather than calling `optimize` hopefully. The averaging block's only child has to be one flat sweep whose body holds no nested block. Add a second sweep inside the first and the average is still forced host-side, but the `reorderable-averaging` hint is gone and `optimize` returns the program it was given. The hint and the rewrite are computed from the same predicate, so they cannot disagree. No hint means no rewrite, and reading the diagnostics is how you find out that calling `optimize` did nothing.
 """
 
 # %%
@@ -448,18 +356,11 @@ print("broadcast, optimize gives body[0] =", broadcast_top)
 r"""
 ## 5.5 Diagnostics as a contract
 
-Three more racks, three ways to say no. All three come back through the same channel, a list of
-`Diagnostic` objects with a `severity`, a machine-readable `code`, a `message`, the offending
-`node`, and a structural `path` you can resolve back to a line of `.qp` text.
+Three more racks, three ways to say no. All three come back through the same channel, a list of `Diagnostic` objects with a `severity`, a machine-readable `code`, a `message`, the offending `node`, and a structural `path` you can resolve back to a line of `.qp` text.
 
-The machine-readable half matters more than it sounds. A message is for a person reading a terminal.
-A `code` is for a script deciding whether this failure is one your CI should fail on, and a `path`
-is for an editor putting a squiggle under the right line. Part 6 runs the same diagnostics from a
-shell and gets JSON.
+The machine-readable half matters more than it sounds. A message is for a person reading a terminal. A `code` is for a script deciding whether this failure is one your CI should fail on, and a `path` is for an editor putting a squiggle under the right line. Part 6 runs the same diagnostics from a shell and gets JSON.
 
-First case, the rack does not implement the operation. Rack C has a plain DC source on the flux
-line, one that takes a voltage over a serial link and has no offset register at all. Drop
-`op.set_offset` from its token set and the program stops being runnable, at one exact node.
+First case, the rack does not implement the operation. Rack C has a plain DC source on the flux line, one that takes a voltage over a serial link and has no offset register at all. Drop `op.set_offset` from its token set and the program stops being runnable, at one exact node.
 """
 
 # %%
@@ -482,23 +383,11 @@ print(qp.explain(program, caps_dc))
 
 # %% [markdown]
 r"""
-Read that tree from the leaves up. The `set_offset` row is `[--]`, no executable domain at all, and
-it carries the diagnostic that says why. The sweep above it is also `[--]` and carries nothing of its
-own, because an operation that can run nowhere empties the loop holding it. Looking on the loop's own
-line for a reason will not find one. The `average` at the top still reads `[rt|host]`, and the
-difference from 5.3 is instructive. There the sweep was host-side rather than empty, and a host-side
-loop does pull its enclosing block host-side, which the `forced-host` warning reported. An empty child
-does not propagate that way, so the `average` keeps the domain its own operations allow.
+Read that tree from the leaves up. The `set_offset` row is `[--]`, no executable domain at all, and it carries the diagnostic that says why. The sweep above it is also `[--]` and carries nothing of its own, because an operation that can run nowhere empties the loop holding it. Looking on the loop's own line for a reason will not find one. The `average` at the top still reads `[rt|host]`, and the difference from 5.3 is instructive. There the sweep was host-side rather than empty, and a host-side loop does pull its enclosing block host-side, which the `forced-host` warning reported. An empty child does not propagate that way, so the `average` keeps the domain its own operations allow.
 
 ### From a path to a line of the file
 
-The round trip only works when the program came from a file. `program.source_map` on a program you
-built in Python is empty, because there is no file for a node to have come from. The parser records
-which line produced which node, so the map arrives populated only on a program that came through
-`qp.loads`. A program already on disk needs none of this, since loading it fills the map and every
-diagnostic reports against a line directly. `expand()` returns a copy with an empty map for the same
-reason, because inlining a call produces nodes no line of the file ever held. `qp.resolve_path` and
-`qp.node_path` walk between a path and its node in either direction, with no file involved.
+The round trip only works when the program came from a file. `program.source_map` on a program you built in Python is empty, because there is no file for a node to have come from. The parser records which line produced which node, so the map arrives populated only on a program that came through `qp.loads`. A program already on disk needs none of this, since loading it fills the map and every diagnostic reports against a line directly. `expand()` returns a copy with an empty map for the same reason, because inlining a call produces nodes no line of the file ever held. `qp.resolve_path` and `qp.node_path` walk between a path and its node in either direction, with no file involved.
 """
 
 # %%
@@ -516,23 +405,11 @@ for diag in qp.validate(program, caps_dc)[0]:
 r"""
 ### A numeric limit
 
-Second case, the program is expressible but too big. A sequencer runs its loops out of a fixed
-number of hardware registers, and there is no spilling to memory when you run out, so
-`max_loop_nesting` is a hard wall rather than a performance cliff. Below is the Part 3 flux arc on a
-smaller grid, three repetition levels deep (average, bias, frequency), against a rack whose
-sequencer has two.
+Second case, the program is expressible but too big. A sequencer runs its loops out of a fixed number of hardware registers, and there is no spilling to memory when you run out, so `max_loop_nesting` is a hard wall rather than a performance cliff. Below is the Part 3 flux arc on a smaller grid, three repetition levels deep (average, bias, frequency), against a rack whose sequencer has two.
 
-The `limit` field carries the pair `(name, observed)`, so a tool can report the number without
-parsing the message.
+The `limit` field carries the pair `(name, observed)`, so a tool can report the number without parsing the message.
 
-The validator reads four limit keys and passes over every other one. `max_loop_nesting`,
-`max_parallel_loops`, and `max_measurements` come off the platform slot, and `min_wait_duration_ns`
-off the bus a node routes to. A profile is free to publish a number outside that set, and
-`qdac-default-v1` does exactly that with a `min_dwell_ns` waveform floor no core check reads.
-Enforcing such a floor is the platform's job, through
-`CompilerCapabilities.from_profile(name, extra_predicates=...)`. The same call takes
-`limit_overrides=`, which tightens a published limit for one device without republishing the
-profile.
+The validator reads four limit keys and passes over every other one. `max_loop_nesting`, `max_parallel_loops`, and `max_measurements` come off the platform slot, and `min_wait_duration_ns` off the bus a node routes to. A profile is free to publish a number outside that set, and `qdac-default-v1` does exactly that with a `min_dwell_ns` waveform floor no core check reads. Enforcing such a floor is the platform's job, through `CompilerCapabilities.from_profile(name, extra_predicates=...)`. The same call takes `limit_overrides=`, which tightens a published limit for one device without republishing the profile.
 """
 
 # %%
@@ -563,17 +440,9 @@ for diag in qp.validate(arc, caps_shallow)[0]:
 r"""
 ### A rule about how a value is used
 
-Third case, the operation is supported, the limits are fine, and it still cannot run, because of
-how two nodes interact. Take `wait(bus, duration)` as the canonical example. It accepts a variable,
-but on many backends the wait instruction takes a fixed-step counter. A delay swept by `Range` is a
-register increment. The same delay swept by `Values([0, 200, 800, 3200])` is an arbitrary list,
-and there is nowhere to put it.
+Third case, the operation is supported, the limits are fine, and it still cannot run, because of how two nodes interact. Take `wait(bus, duration)` as the canonical example. It accepts a variable, but on many backends the wait instruction takes a fixed-step counter. A delay swept by `Range` is a register increment. The same delay swept by `Values([0, 200, 800, 3200])` is an arbitrary list, and there is nowhere to put it.
 
-No flat token can express that. `op.wait` is either supported or not, and it is supported in both
-cases. The answer depends on the *binding loop*, a different node in the tree, several levels up,
-and possibly not even written yet when the `wait` was appended. Predicates are the mechanism for
-exactly this. A predicate is a callable that receives each node and a `ValidationContext` carrying
-the cross-node facts, eight queries in all:
+No flat token can express that. `op.wait` is either supported or not, and it is supported in both cases. The answer depends on the *binding loop*, a different node in the tree, several levels up, and possibly not even written yet when the `wait` was appended. Predicates are the mechanism for exactly this. A predicate is a callable that receives each node and a `ValidationContext` carrying the cross-node facts, eight queries in all:
 
 | Query | Returns |
 |---|---|
@@ -586,10 +455,7 @@ the cross-node facts, eight queries in all:
 | `ctx.known_measurement_names()` | every measurement name in the program |
 | `ctx.program_buses` | every bus the program touches |
 
-Yield a `Diagnostic` for a hard no. Yield a `DomainConstraint` instead when the answer is "not in
-the sequencer, but the host can do it". The classifier subtracts that domain from the binding loop
-and the program still runs, which is the second road to the `forced-host` warning from 5.3, where
-the flux slot simply had no real-time half to begin with.
+Yield a `Diagnostic` for a hard no. Yield a `DomainConstraint` instead when the answer is "not in the sequencer, but the host can do it". The classifier subtracts that domain from the binding loop and the program still runs, which is the second road to the `forced-host` warning from 5.3, where the flux slot simply had no real-time half to begin with.
 """
 
 # %%
@@ -645,22 +511,13 @@ for source in (qp.Range(0, 20_000, 500), qp.Values([0, 200, 800, 3200, 12_800]))
 
 # %% [markdown]
 r"""
-Notice which of those two is the natural thing to write. A $T_1$ scan wants log-spaced delays,
-because the interesting part of an exponential is the first time constant and a linear grid spends
-most of its points in the tail. Every experimentalist reaches for `Values` or `Logspace` here, and
-on rack D every one of them gets an error at build time rather than a mystery at 3 a.m.
+Notice which of those two is the natural thing to write. A $T_1$ scan wants log-spaced delays, because the interesting part of an exponential is the first time constant and a linear grid spends most of its points in the tail. Every experimentalist reaches for `Values` or `Logspace` here, and on rack D every one of them gets an error at build time rather than a mystery at 3 a.m.
 
 ### A rule about your own wiring
 
-Rack D's rule came out of an instruction set. Most of the rules a lab writes for itself come out of
-the wiring. Rack B's flux line goes through a bias tee that saturates at 0.25 V, and a sweep that
-asks for more will not blow anything up. It will clip, silently, and you get a flux arc with a flat
-section that looks exactly like a sweet spot.
+Rack D's rule came out of an instruction set. Most of the rules a lab writes for itself come out of the wiring. Rack B's flux line goes through a bias tee that saturates at 0.25 V, and a sweep that asks for more will not blow anything up. It will clip, silently, and you get a flux arc with a flat section that looks exactly like a sweet spot.
 
-Five lines catch it. Filter for `SetOffset` nodes, find the sweep that binds the offset value with
-`ctx.binding_loop_of`, read the sweep's own numbers off `loop.source.values()`, and yield an error
-when the largest magnitude is past `SAFE_VOLTS`. Nothing in the core could know that number. Your
-rack knows it, and now it can say so. The two scans below differ only in the range they cover.
+Five lines catch it. Filter for `SetOffset` nodes, find the sweep that binds the offset value with `ctx.binding_loop_of`, read the sweep's own numbers off `loop.source.values()`, and yield an error when the largest magnitude is past `SAFE_VOLTS`. Nothing in the core could know that number. Your rack knows it, and now it can say so. The two scans below differ only in the range they cover.
 """
 
 # %%
@@ -717,17 +574,9 @@ for low, high in ((-0.05, 0.15), (-0.40, 0.40)):
 r"""
 ## 5.6 The rack that already exists
 
-Rack B was invented for this notebook. The instrument on its flux line was not. A QDevil QDAC is a
-multi-channel DC source with no FPGA on it, and it sits on the flux lines of a great many
-dilution-fridge racks. Two published packages describe the two halves of rack B, and both install
-from PyPI with no dependency beyond QProgram itself.
+Rack B was invented for this notebook. The instrument on its flux line was not. A QDevil QDAC is a multi-channel DC source with no FPGA on it, and it sits on the flux lines of a great many dilution-fridge racks. Two published packages describe the two halves of rack B, and both install from PyPI with no dependency beyond QProgram itself.
 
-`qprogram-qdac` adds a `qdac` vendor namespace and registers `qdac-default-v1`, the bus profile for
-one QDAC channel. `qprogram-qblox` does the same for a Qblox cluster, with `qblox-default-v1`
-describing one sequencer. Importing either package runs its registration side effects, and after
-that `CompilerCapabilities.from_profile` resolves the profile by name. Neither package talks to an
-instrument. Both are description and vocabulary, so both run on a laptop next to everything else in
-this notebook.
+`qprogram-qdac` adds a `qdac` vendor namespace and registers `qdac-default-v1`, the bus profile for one QDAC channel. `qprogram-qblox` does the same for a Qblox cluster, with `qblox-default-v1` describing one sequencer. Importing either package runs its registration side effects, and after that `CompilerCapabilities.from_profile` resolves the profile by name. Neither package talks to an instrument. Both are description and vocabulary, so both run on a laptop next to everything else in this notebook.
 """
 
 # %%
@@ -748,20 +597,11 @@ print("waveform.iq on a qdac channel:    ", qdac_chan.supports("waveform.iq"))
 
 # %% [markdown]
 r"""
-Two of those answers are worth a second look. `qblox-default-v1` claims `op.set_offset` because a
-sequencer output really does have an offset register behind it. `qdac-default-v1` refuses the same
-token, and the refusal is deliberate. Setting a QDAC channel is not a sequencer opcode at all, it is
-a slow-control write over the chassis link, so the package gives it a vendor operation of its own
-rather than borrowing a core name whose semantics do not fit. `waveform.iq` is absent for a blunter
-reason, a QDAC channel being one wire.
+Two of those answers are worth a second look. `qblox-default-v1` claims `op.set_offset` because a sequencer output really does have an offset register behind it. `qdac-default-v1` refuses the same token, and the refusal is deliberate. Setting a QDAC channel is not a sequencer opcode at all, it is a slow-control write over the chassis link, so the package gives it a vendor operation of its own rather than borrowing a core name whose semantics do not fit. `waveform.iq` is absent for a blunter reason, a QDAC channel being one wire.
 
-Our hand-built rack B was generous. It handed the flux slot the entire token registry, which made
-`program.set_offset` legal there. A published profile lists what the instrument actually implements,
-so the first thing the real rack says about the Part 5 program is that it cannot run it at all.
+Our hand-built rack B was generous. It handed the flux slot the entire token registry, which made `program.set_offset` legal there. A published profile lists what the instrument actually implements, so the first thing the real rack says about the Part 5 program is that it cannot run it at all.
 
-That gap between the descriptor you invent while learning a protocol and the one a vendor publishes
-is worth expecting. Hand-written descriptors are almost always too permissive, because you write
-down the things you thought of.
+That gap between the descriptor you invent while learning a protocol and the one a vendor publishes is worth expecting. Hand-written descriptors are almost always too permissive, because you write down the things you thought of.
 """
 
 # %%
@@ -779,10 +619,7 @@ for diag in qp.validate(program, vendor_caps)[0]:
 
 # %% [markdown]
 r"""
-So a port can need a third change, beyond the bus names and the pulse shapes of 5.7. When the new
-rack drives a line with a different class of instrument, the operation itself changes. One line of
-the program moves from `program.set_offset` to `program.qdac.set_offset`, and the `.qp` file records
-the dependency in its header.
+So a port can need a third change, beyond the bus names and the pulse shapes of 5.7. When the new rack drives a line with a different class of instrument, the operation itself changes. One line of the program moves from `program.set_offset` to `program.qdac.set_offset`, and the `.qp` file records the dependency in its header.
 
 The rest of the experiment is untouched. Rewrite the flux line and validate again.
 """
@@ -810,22 +647,13 @@ print(qp.explain(vendor_program, vendor_caps))
 
 # %% [markdown]
 r"""
-The `require qdac 0.1` line is now in the header, and `require qblox` is not, because the program
-uses a qdac operation and no qblox operation. A `require` line records what the file needs from
-whatever reads it, not the rack it happened to run on.
+The `require qdac 0.1` line is now in the header, and `require qblox` is not, because the program uses a qdac operation and no qblox operation. A `require` line records what the file needs from whatever reads it, not the rack it happened to run on.
 
-The plan is the more interesting half. A Qblox sequencer operation is real-time only and a QDAC
-write is host only, so the sweep now holds children with no domain in common, and the validator
-calls that `mixed-domain`. The `[--]` column on the sweep means no domain can run it, and the
-severity is error rather than warning.
+The plan is the more interesting half. A Qblox sequencer operation is real-time only and a QDAC write is host only, so the sweep now holds children with no domain in common, and the validator calls that `mixed-domain`. The `[--]` column on the sweep means no domain can run it, and the severity is error rather than warning.
 
-Which turns `qp.optimize` from a speed fix into the thing that makes the program legal. The rewrite
-from 5.4 hoists the DC write out of the averaging block, and every operation left inside the average
-is a Qblox operation running in the sequencer.
+Which turns `qp.optimize` from a speed fix into the thing that makes the program legal. The rewrite from 5.4 hoists the DC write out of the averaging block, and every operation left inside the average is a Qblox operation running in the sequencer.
 
-Worth pausing on that. The same rewrite was a nice-to-have on one rack and a hard requirement on
-another, and nothing about the program changed between the two. Whether an optimization is optional
-turns out to be a property of the machine, in the same way the loop split was.
+Worth pausing on that. The same rewrite was a nice-to-have on one rack and a hard requirement on another, and nothing about the program changed between the two. Whether an optimization is optional turns out to be a property of the machine, in the same way the loop split was.
 """
 
 # %%
@@ -834,14 +662,9 @@ print(qp.explain(hoisted, vendor_caps))
 
 # %% [markdown]
 r"""
-Zero errors, zero warnings, and the averaging back in hardware where 200 shots cost 200 sequencer
-iterations instead of 200 network round trips.
+Zero errors, zero warnings, and the averaging back in hardware where 200 shots cost 200 sequencer iterations instead of 200 network round trips.
 
-One caveat about the rewrite, which 5.4 stated and this is the place to see. Reordering the
-loops regroups the shots. Rack A interleaved passes over the bias axis; the hoisted program takes
-all 200 shots of one bias point before moving on. For a stationary device the two are the same
-experiment, and the simulator's random draws still differ point by point. The fit is what has to
-agree, and it does.
+One caveat about the rewrite, which 5.4 stated and this is the place to see. Reordering the loops regroups the shots. Rack A interleaved passes over the bias axis; the hoisted program takes all 200 shots of one bias point before moving on. For a stationary device the two are the same experiment, and the simulator's random draws still differ point by point. The fit is what has to agree, and it does.
 """
 
 # %%
@@ -857,15 +680,9 @@ print(f"device truth:                  {DEVICE['flux_offset'] * 1e3:.2f} mV")
 r"""
 ### The soft answer, in the vendor's own words
 
-Section 5.5 said a predicate may yield a `DomainConstraint` rather than a `Diagnostic` when the
-answer is "not in the sequencer, but the host can do it". Nothing in this notebook has produced one
-yet, because rack B got its host-side classification from an empty `rt` half instead.
-`qdac-default-v1` ships the predicate, and one change to the rack is enough to make it speak.
+Section 5.5 said a predicate may yield a `DomainConstraint` rather than a `Diagnostic` when the answer is "not in the sequencer, but the host can do it". Nothing in this notebook has produced one yet, because rack B got its host-side classification from an empty `rt` half instead. `qdac-default-v1` ships the predicate, and one change to the rack is enough to make it speak.
 
-Give the Qblox slots a host half as well. The package's own documentation fills only the real-time
-half, because that is the honest description of a sequencer, so the rack below is more forgiving
-than a Qblox cluster really is. It is the shape in which the constraint has something left to
-decide, and it is how any rack behaves whose fast slots can also be driven one shot at a time.
+Give the Qblox slots a host half as well. The package's own documentation fills only the real-time half, because that is the honest description of a sequencer, so the rack below is more forgiving than a Qblox cluster really is. It is the shape in which the constraint has something left to decide, and it is how any rack behaves whose fast slots can also be driven one shot at a time.
 """
 
 # %%
@@ -882,16 +699,9 @@ for diag in qp.validate(vendor_program, soft_caps)[0]:
 
 # %% [markdown]
 r"""
-The text in parentheses is not the validator's wording. It is the `reason` string the QDAC package
-attached to its `DomainConstraint`, quoted back at the node where the constraint changed the plan.
-A rack that declines part of a program, in the vendor's own sentence, at the loop the vendor cares
-about, is the whole point of the predicate machinery from 5.5.
+The text in parentheses is not the validator's wording. It is the `reason` string the QDAC package attached to its `DomainConstraint`, quoted back at the node where the constraint changed the plan. A rack that declines part of a program, in the vendor's own sentence, at the loop the vendor cares about, is the whole point of the predicate machinery from 5.5.
 
-Both racks reach the same place by different roads. On the strict one the flux slot has no real-time
-half and the sweep is an error until `qp.optimize` moves the DC write. On the forgiving one the
-predicate subtracts `rt` from the binding loop and the program runs as a warning. A vendor that
-publishes both the empty half and the predicate is covered either way, which is why the QDAC package
-ships both.
+Both racks reach the same place by different roads. On the strict one the flux slot has no real-time half and the sweep is an error until `qp.optimize` moves the DC write. On the forgiving one the predicate subtracts `rt` from the binding loop and the program runs as a warning. A vendor that publishes both the empty half and the predicate is covered either way, which is why the QDAC package ships both.
 """
 
 
@@ -899,16 +709,9 @@ ships both.
 r"""
 ## 5.7 Porting: names, then numbers
 
-Two things have to change when the program moves next door, and QProgram keeps them apart on
-purpose, because they change for different reasons and on different schedules.
+Two things have to change when the program moves next door, and QProgram keeps them apart on purpose, because they change for different reasons and on different schedules.
 
-**Bus references** change with `program.rebind`. It re-resolves every `BusRef` structurally through
-a schema, so the result is still a typed `BusRef` with its element, index, kind, channel type, and
-ADC flag intact. That is why it can move an experiment onto a different qubit, or onto a rack with
-a different naming convention, and still validate. A textual find-and-replace would produce strings
-that look right and carry no metadata, and the first thing you would lose is the channel check that
-Part 1 spent a section on. Auto-generated measurement names that embed the bus are re-derived; names
-you chose yourself are left alone.
+**Bus references** change with `program.rebind`. It re-resolves every `BusRef` structurally through a schema, so the result is still a typed `BusRef` with its element, index, kind, channel type, and ADC flag intact. That is why it can move an experiment onto a different qubit, or onto a rack with a different naming convention, and still validate. A textual find-and-replace would produce strings that look right and carry no metadata, and the first thing you would lose is the channel check that Part 1 spent a section on. Auto-generated measurement names that embed the bus are re-derived; names you chose yourself are left alone.
 """
 
 # %%
@@ -927,13 +730,9 @@ print("measurement handle, renamed: ", renamed.measurement_handles()[0].name)
 
 # %% [markdown]
 r"""
-The `.qp` text of the renamed program still says `q[0].flux`, because the path form is structural.
-The schema section carries the naming pattern and the resolved string is derived from it, so the
-file stays portable and only the driver ever sees `flux_q0`.
+The `.qp` text of the renamed program still says `q[0].flux`, because the path form is structural. The schema section carries the naming pattern and the resolved string is derived from it, so the file stays portable and only the driver ever sees `flux_q0`.
 
-**Waveforms** change with a `WaveformLibrary`. The string aliases in the program (`"saturation"`,
-`"readout"`, `"weights"`) are the calibration seam from Part 3: the program says which pulse, the
-library says what that pulse is on this chip. Resolution runs in three tiers, most specific first:
+**Waveforms** change with a `WaveformLibrary`. The string aliases in the program (`"saturation"`, `"readout"`, `"weights"`) are the calibration seam from Part 3: the program says which pulse, the library says what that pulse is on this chip. Resolution runs in three tiers, most specific first:
 
 | Tier | Key | Use it for |
 |---|---|---|
@@ -941,11 +740,7 @@ library says what that pulse is on this chip. Resolution runs in three tiers, mo
 | family | `(element, kind, name)` | every qubit's readout tone |
 | global | `(name,)` | integration weights, markers |
 
-The library is a separate artifact with its own `.wfl` text format, and it is deliberately not
-inside the `.qp` file. The program is the experiment and changes when you change the experiment.
-The library is the calibration and changes every morning. Two lifetimes, two files, and the diff
-of either one tells you something true. Merge them and neither diff means anything, because a
-recalibration and a redesign look identical in the log.
+The library is a separate artifact with its own `.wfl` text format, and it is deliberately not inside the `.qp` file. The program is the experiment and changes when you change the experiment. The library is the calibration and changes every morning. Two lifetimes, two files, and the diff of either one tells you something true. Merge them and neither diff means anything, because a recalibration and a redesign look identical in the log.
 """
 
 # %%
@@ -961,26 +756,13 @@ print("round-trips:", qp.WaveformLibrary.loads(library.dumps()).dumps() == libra
 
 # %% [markdown]
 r"""
-`program.with_waveforms(library)` returns a copy with the aliases replaced, re-running the
-channel-type check on every replacement (an IQ pair on a single-channel bus is still an error). The
-same library resolves against the *renamed* program with no edits, because the tiers are keyed on
-the schema coordinate and not on the bus string.
+`program.with_waveforms(library)` returns a copy with the aliases replaced, re-running the channel-type check on every replacement (an IQ pair on a single-channel bus is still an error). The same library resolves against the *renamed* program with no edits, because the tiers are keyed on the schema coordinate and not on the bus string.
 
-Binding is a step you take, not something `execute()` does for you. The reference platform never
-looks at a pulse, so every program in this notebook ran happily with `"saturation"` left as a
-string. A real platform has to turn that alias into samples before it can upload anything, which is
-why the port ends with `with_waveforms` and not with a hopeful `run`.
+Binding is a step you take, not something `execute()` does for you. The reference platform never looks at a pulse, so every program in this notebook ran happily with `"saturation"` left as a string. A real platform has to turn that alias into samples before it can upload anything, which is why the port ends with `with_waveforms` and not with a hopeful `run`.
 
-Order matters once a program has fragments. `with_waveforms` walks the body and does not follow a
-`call` into the fragment it names, so an alias written inside a fragment body stays a string and
-nothing says so. Every fragment in Part 4 holds a concrete pulse, so those programs bind as they
-stand. The moment an alias moves into a fragment body, the binding step becomes
-`program.expand().with_waveforms(library)`. `rebind` carries no such catch, because it expands
-first whenever the program has fragments at all.
+Order matters once a program has fragments. `with_waveforms` walks the body and does not follow a `call` into the fragment it names, so an alias written inside a fragment body stays a string and nothing says so. Every fragment in Part 4 holds a concrete pulse, so those programs bind as they stand. The moment an alias moves into a fragment body, the binding step becomes `program.expand().with_waveforms(library)`. `rebind` carries no such catch, because it expands first whenever the program has fragments at all.
 
-Run the bound program and fit it, and the sweet spot comes back where rack A found it. That is the
-end of the port. New bus names, pulse shapes supplied from a file, the same program, the same
-answer.
+Run the bound program and fit it, and the sweet spot comes back where rack A found it. That is the end of the port. New bus names, pulse shapes supplied from a file, the same program, the same answer.
 """
 
 # %%
@@ -994,17 +776,9 @@ print("moved to q1, nothing to use:", play_line(moved.with_waveforms(library)))
 
 # %% [markdown]
 r"""
-The two halves are independent only when the port is a rename. Rebinding onto a different qubit
-moves the bus out from under its library entry, and the exact entry registered for `q[0].drive` does
-not follow it. The alias falls through to the family entry, or stays a bare string when there is no
-family entry either, as `"saturation"` does above. The behavior is correct, since q1 is a different
-qubit with a different saturation tone, but it does mean that moving an experiment onto another
-qubit and recalibrating it are one step rather than two.
+The two halves are independent only when the port is a rename. Rebinding onto a different qubit moves the bus out from under its library entry, and the exact entry registered for `q[0].drive` does not follow it. The alias falls through to the family entry, or stays a bare string when there is no family entry either, as `"saturation"` does above. The behavior is correct, since q1 is a different qubit with a different saturation tone, but it does mean that moving an experiment onto another qubit and recalibrating it are one step rather than two.
 
-One more property of `rebind` is worth carrying out of this section. Whether a measurement name was
-auto-allocated or supplied by you is in-memory state the `.qp` format does not record, so rebinding
-a program you loaded from a file treats every name as yours and leaves it stale. Rebind before
-serializing, not after loading.
+One more property of `rebind` is worth carrying out of this section. Whether a measurement name was auto-allocated or supplied by you is in-memory state the `.qp` format does not record, so rebinding a program you loaded from a file treats every name as yours and leaves it stale. Rebind before serializing, not after loading.
 """
 
 # %%
@@ -1027,19 +801,14 @@ print("same populations:", bool(np.allclose(pop, ported_pop)))
 r"""
 ### 🧩 Exercise 5.1: port the two-dimensional arc
 
-The `arc` program from 5.5 has the shape of the Part 3 experiment: a slow bias loop on the outside,
-a fast frequency scan inside it. Take it to rack B:
+The `arc` program from 5.5 has the shape of the Part 3 experiment: a slow bias loop on the outside, a fast frequency scan inside it. Take it to rack B:
 
 1. Rebind it to the `drive_q0` naming convention with `BusNaming("{kind}_{element}{index}")`.
 2. Print the bus strings before and after, to prove the names changed.
 3. Validate the ported program against `caps` and compare the diagnostic codes to the original's.
-4. Run `qp.optimize(ported_arc, caps)` and check whether the result differs from what went in. Say
-   in a comment which diagnostic told you in advance that it would not.
+4. Run `qp.optimize(ported_arc, caps)` and check whether the result differs from what went in. Say in a comment which diagnostic told you in advance that it would not.
 
-The point is the third step. Renaming buses must not change what a rack thinks of the program,
-because the validator routes on the schema coordinate, not on the string. If the two lists of codes
-ever came out different, `rebind` would be doing something to the program beyond renaming, and every
-port in this section would be suspect.
+The point is the third step. Renaming buses must not change what a rack thinks of the program, because the validator routes on the schema coordinate, not on the string. If the two lists of codes ever came out different, `rebind` would be doing something to the program beyond renaming, and every port in this section would be suspect.
 """
 
 # %% solution
@@ -1070,26 +839,12 @@ print(qp.explain(ported_arc, caps))
 r"""
 ## Recap and what is next
 
-- A platform declares tokens for what it implements, limits for how much of it, and predicates for
-  rules that depend on how a value is used. Every token is checked against the slot it routes to
-  (one bus, or the platform), and every slot splits into a real-time half and a host half.
-- `qp.validate` never raises. It returns diagnostics and an `ExecutionPlan`, and the caller decides
-  what an error means. `qp.explain` draws the same plan as a tree with the domain of every node.
-- The DSL has no syntax for "hardware loop" and "software loop", because that is the rack's
-  decision, not the experiment's. The `forced-host` warning is where the rack tells you what it
-  decided, and the cost of ignoring it is roughly a hundred times your run time.
-- `qp.optimize` applies the rewrite the plan suggests. A bare `program.sync()` broadcasts across
-  every bus, which drags the operation host-side and blocks the rewrite. Name the buses you mean.
-- Rack B is a real pair of instruments, and `qprogram-qblox` and `qprogram-qdac` publish the
-  profiles that describe them. A published profile lists what a box implements rather than what the
-  language knows, so it refused `op.set_offset` on the flux line and turned the mixed loop into an
-  error. On that rack `qp.optimize` is not a speed fix, it is the step that makes the program legal.
-- Porting splits in two: `rebind` moves bus references structurally, `WaveformLibrary` supplies the
-  numbers per bus. The program stays the same file, and the calibration lives in its own `.wfl`. A
-  third change joins them when the new rack drives a line with a different class of instrument, and
-  then the operation itself has to change.
+- A platform declares tokens for what it implements, limits for how much of it, and predicates for rules that depend on how a value is used. Every token is checked against the slot it routes to (one bus, or the platform), and every slot splits into a real-time half and a host half.
+- `qp.validate` never raises. It returns diagnostics and an `ExecutionPlan`, and the caller decides what an error means. `qp.explain` draws the same plan as a tree with the domain of every node.
+- The DSL has no syntax for "hardware loop" and "software loop", because that is the rack's decision, not the experiment's. The `forced-host` warning is where the rack tells you what it decided, and the cost of ignoring it is roughly a hundred times your run time.
+- `qp.optimize` applies the rewrite the plan suggests. A bare `program.sync()` broadcasts across every bus, which drags the operation host-side and blocks the rewrite. Name the buses you mean.
+- Rack B is a real pair of instruments, and `qprogram-qblox` and `qprogram-qdac` publish the profiles that describe them. A published profile lists what a box implements rather than what the language knows, so it refused `op.set_offset` on the flux line and turned the mixed loop into an error. On that rack `qp.optimize` is not a speed fix, it is the step that makes the program legal.
+- Porting splits in two: `rebind` moves bus references structurally, `WaveformLibrary` supplies the numbers per bus. The program stays the same file, and the calibration lives in its own `.wfl`. A third change joins them when the new rack drives a line with a different class of instrument, and then the operation itself has to change.
 
-Part 6 goes the other way. Instead of asking what a platform supports, you add to the language:
-your own waveform, your own sweep source, and a vendor namespace with its own operation and its own
-capability token, all registered from a notebook cell.
+Part 6 goes the other way. Instead of asking what a platform supports, you add to the language: your own waveform, your own sweep source, and a vendor namespace with its own operation and its own capability token, all registered from a notebook cell.
 """

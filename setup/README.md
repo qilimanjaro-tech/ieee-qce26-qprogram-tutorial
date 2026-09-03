@@ -1,22 +1,16 @@
 # Setup: *Programming a Superconducting Qubit* (QCE 2026)
 
-Please install **before the session** and run `notebooks/00_setup.ipynb`. It is a pass/fail check: if
-its last cell draws a curve with a sharp dip near 7.2 GHz, you are ready.
+Please install **before the session** and run `notebooks/00_setup.ipynb`. It is a pass/fail check: if its last cell draws a curve with a sharp dip near 7.2 GHz, you are ready.
 
-You have two options, **local** or **Google Colab**. Either is fine; pick whichever you prefer.
-Nothing in this tutorial talks to hardware, so there is no lab access to arrange and no credentials
-to collect.
+You have two options, **local** or **Google Colab**. Either is fine; pick whichever you prefer. Nothing in this tutorial talks to hardware, so there is no lab access to arrange and no credentials to collect.
 
-> **QProgram 0.1.0 is pre-release.** It is an alpha library and the tutorial is pinned to that exact
-> version, along with the two vendor extension packages Parts 5 and 6 read. All three are on PyPI.
-> Pinning matters more than usual here, because an alpha library is allowed to move under you.
+> **QProgram 0.1.0 is pre-release.** It is an alpha library and the tutorial is pinned to that exact version, along with the two vendor extension packages Parts 5 and 6 read. All three are on PyPI. Pinning matters more than usual here, because an alpha library is allowed to move under you.
 
 ---
 
 ## Option A: local install
 
-QProgram is pure Python. Its only hard dependencies are numpy and xarray, there is nothing to
-compile, and it installs the same way on Windows, macOS, and Linux.
+QProgram is pure Python. Its only hard dependencies are numpy and xarray, there is nothing to compile, and it installs the same way on Windows, macOS, and Linux.
 
 **Requirements:** Python **3.11, 3.12, 3.13, or 3.14**. Check with `python --version`.
 
@@ -34,8 +28,7 @@ pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 sc
 jupyter lab
 ```
 
-The `0.1.0` tag is what the notebooks are verified against. To track the source instead, each
-distribution installs from its own repository:
+The `0.1.0` tag is what the notebooks are verified against. To track the source instead, each distribution installs from its own repository:
 
 ```bash
 pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.1.0" scipy jupyterlab
@@ -43,8 +36,7 @@ pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.
 
 ### A2: with uv
 
-[uv](https://docs.astral.sh/uv/) handles the Python version for you and downloads a supported
-interpreter if yours is too old:
+[uv](https://docs.astral.sh/uv/) handles the Python version for you and downloads a supported interpreter if yours is too old:
 
 ```bash
 uv venv --python 3.13
@@ -57,30 +49,18 @@ jupyter lab
 
 ## Extras: what the base install leaves out
 
-`pip install qprogram` gives you the whole DSL: the builder, the AST, sweeps, fragments, capability
-validation, the `.qp` text format, and the reference simulator. Two optional **extras** add the
-pieces this tutorial and your editor want, in brackets after the package name:
+`pip install qprogram` gives you the whole DSL: the builder, the AST, sweeps, fragments, capability validation, the `.qp` text format, and the reference simulator. Two optional **extras** add the pieces this tutorial and your editor want, in brackets after the package name:
 
 | Extra | Adds | Used for |
 |-------|------|----------|
 | `viz` | matplotlib | every figure in the tutorial. `result.plot(...)` draws a measurement and `waveform.plot()` draws an envelope, and both need it. Install it. |
 | `lsp` | pygls | `python -m qprogram.lsp serve`, the language server behind the VS Code extension. Optional, mentioned in Part 6. |
 
-`python -m qprogram.lsp check file.qp` and `python -m qprogram.lsp explain file.qp` need **no** extra:
-they run on the base install and print JSON diagnostics or the execution plan. Only `serve` needs
-`lsp`.
+`python -m qprogram.lsp check file.qp` and `python -m qprogram.lsp explain file.qp` need **no** extra: they run on the base install and print JSON diagnostics or the execution plan. Only `serve` needs `lsp`.
 
-**The two vendor packages are separate distributions, not extras.** `qprogram-qblox` and
-`qprogram-qdac` add operations, capability profiles, and serialization for a Qblox cluster and a
-QDevil QDAC. Neither talks to an instrument and neither pulls in a vendor SDK. Their only dependency
-is `qprogram` itself, so they cost an import and nothing else. Part 5 builds a rack out of the two
-published profiles and Part 6 reads their packaging, which is why the install lines above include
-them. Parts 0 to 4 never touch either one.
+**The two vendor packages are separate distributions, not extras.** `qprogram-qblox` and `qprogram-qdac` add operations, capability profiles, and serialization for a Qblox cluster and a QDevil QDAC. Neither talks to an instrument and neither pulls in a vendor SDK. Their only dependency is `qprogram` itself, so they cost an import and nothing else. Part 5 builds a rack out of the two published profiles and Part 6 reads their packaging, which is why the install lines above include them. Parts 0 to 4 never touch either one.
 
-**scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing,
-`scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, and the
-capstone in Part 6. The library draws the data; scipy works out what the data means. Install it
-alongside QProgram:
+**scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing, `scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, and the capstone in Part 6. The library draws the data; scipy works out what the data means. Install it alongside QProgram:
 
 ```bash
 pip install "qprogram[viz]==0.1.0" scipy
@@ -90,23 +70,19 @@ pip install "qprogram[viz]==0.1.0" scipy
 
 ## Option B: Google Colab (no local setup, needs internet)
 
-Every notebook starts with a **"Run me first"** cell that installs QProgram when it is missing. On
-Colab:
+Every notebook starts with a **"Run me first"** cell that installs QProgram when it is missing. On Colab:
 
 1. Open the notebook in Colab (File > Upload notebook, or use the links we send).
 2. Run the first cell. It takes well under a minute.
 3. Continue normally.
 
-That same first cell is a no-op locally, so the notebooks are identical in both environments. Colab's
-default runtime is inside the supported Python range; if it ever is not, use Runtime > Change runtime
-type.
+That same first cell is a no-op locally, so the notebooks are identical in both environments. Colab's default runtime is inside the supported Python range; if it ever is not, use Runtime > Change runtime type.
 
 ---
 
 ## Verify your environment
 
-Run this anywhere (a notebook cell, or `python -c`). It builds a resonator scan, runs it on the
-reference simulator, and round-trips it through the `.qp` text format:
+Run this anywhere (a notebook cell, or `python -c`). It builds a resonator scan, runs it on the reference simulator, and round-trips it through the `.qp` text format:
 
 ```python
 from importlib.metadata import version
@@ -129,11 +105,7 @@ print(result.get(m0).dims)                                 # ('ro_freq', 'IQ')
 print(qp.loads(qp.dumps(program)).body == program.body)     # True
 ```
 
-Three lines of expected output. The version is read through `importlib.metadata` rather than through
-`qprogram.__version__`, because the attribute reports a `0.0.0` placeholder when the package is
-imported from a source tree with no installed metadata, while `importlib.metadata.version` raises
-there instead of reporting a wrong number in silence. `notebooks/00_setup.ipynb` does all of this
-plus the plot.
+Three lines of expected output. The version is read through `importlib.metadata` rather than through `qprogram.__version__`, because the attribute reports a `0.0.0` placeholder when the package is imported from a source tree with no installed metadata, while `importlib.metadata.version` raises there instead of reporting a wrong number in silence. `notebooks/00_setup.ipynb` does all of this plus the plot.
 
 ---
 

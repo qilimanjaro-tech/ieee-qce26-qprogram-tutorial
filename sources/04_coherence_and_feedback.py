@@ -2,11 +2,9 @@
 r"""
 # 04 · Coherence, single shots, and feedback
 
-Part 3 fitted a pi pulse from a Rabi scan. Everything here needs that one tool. Once you can put
-the qubit in $|1\rangle$ on demand, you can ask how long it stays there.
+Part 3 fitted a pi pulse from a Rabi scan. Everything here needs that one tool. Once you can put the qubit in $|1\rangle$ on demand, you can ask how long it stays there.
 
-This part measures the three numbers that go on every device datasheet, then stops averaging and
-looks at individual shots, then uses one shot to decide what the program does next:
+This part measures the three numbers that go on every device datasheet, then stops averaging and looks at individual shots, then uses one shot to decide what the program does next:
 
 - **T1**, energy relaxation, from an inversion recovery scan.
 - **T2\***, dephasing, from a Ramsey fringe with a deliberately detuned drive.
@@ -14,8 +12,7 @@ looks at individual shots, then uses one shot to decide what the program does ne
 - **Single-shot readout**: two blobs in the IQ plane, a threshold, and the error it costs you.
 - **Active reset**: measure, and fire a pi pulse only if the qubit came up hot.
 
-Three QProgram features arrive because these experiments need them: **fragments** (reusable pulse
-blocks), the three **measurement fields**, and **conditionals** driven by a measured state.
+Three QProgram features arrive because these experiments need them: **fragments** (reusable pulse blocks), the three **measurement fields**, and **conditionals** driven by a measured state.
 """
 
 # %%
@@ -41,15 +38,9 @@ print("qprogram", version("qprogram"))
 r"""
 ## 4.0 The device under test
 
-Same simulated chip as the other parts, same numbers. `DEVICE` holds the truth the fits have to
-recover: `q0_T1`, `q0_T2star`, and `q0_T2echo`. The measurement models read the whole dict, because
-they stand in for the fridge.
+Same simulated chip as the other parts, same numbers. `DEVICE` holds the truth the fits have to recover: `q0_T1`, `q0_T2star`, and `q0_T2echo`. The measurement models read the whole dict, because they stand in for the fridge.
 
-The programs read two of its entries, and both are numbers a real experiment would already have on
-hand: `q0_f01`, which Part 3's two-tone scan measured, and `q0_a_pi`, which its Rabi fit recovered
-to about 0.2 percent. Taking the device values rather than carrying the fitted ones across notebooks
-keeps this one runnable on its own. `DETUNING` is a deliberate mistake. The drive sits 400 kHz above
-the qubit, so the Ramsey fringe has something to show.
+The programs read two of its entries, and both are numbers a real experiment would already have on hand: `q0_f01`, which Part 3's two-tone scan measured, and `q0_a_pi`, which its Rabi fit recovered to about 0.2 percent. Taking the device values rather than carrying the fitted ones across notebooks keeps this one runnable on its own. `DETUNING` is a deliberate mistake. The drive sits 400 kHz above the qubit, so the Ramsey fringe has something to show.
 """
 
 # %%
@@ -89,29 +80,15 @@ print("truth to recover:", {k: v for k, v in DEVICE.items() if k.startswith("q0_
 r"""
 ## 4.1 Fragments: the same three moves, a different middle
 
-Every experiment in this part is the same shape. Put the qubit somewhere. Wait. Read it out. Only
-the middle changes, and the three middles are one pi pulse, two pi/2 pulses, and two pi/2 pulses
-with a pi in between.
+Every experiment in this part is the same shape. Put the qubit somewhere. Wait. Read it out. Only the middle changes, and the three middles are one pi pulse, two pi/2 pulses, and two pi/2 pulses with a pi in between.
 
-Copy-pasting the pulse lines into three programs is how calibration code rots. Someone fixes the
-DRAG `beta` in two of them and forgets the third, and a week later two experiments disagree for a
-reason nobody can find. A `Fragment` is a named, parameterized sub-program. Write the pulse once,
-call it everywhere.
+Copy-pasting the pulse lines into three programs is how calibration code rots. Someone fixes the DRAG `beta` in two of them and forgets the third, and a week later two experiments disagree for a reason nobody can find. A `Fragment` is a named, parameterized sub-program. Write the pulse once, call it everywhere.
 
 Three rules for the `@fragment` decorator:
 
-- The **first argument is the builder**. Every other argument becomes a `Parameter`, in order, and
-  the fragment's name is the function's name.
-- Parameters are **untyped placeholders**. A parameter can stand for a number, a bus, or a
-  waveform; what you pass at the call site decides. `x90` below puts one in arithmetic
-  (`amp / 2`), and `drive` goes straight into a bus position.
-- The body runs **once, at decoration time**, to record the AST. A Python `if` inside it is
-  evaluated then, not per call. This is a template, not a function you call at runtime. The
-  consequence worth knowing before you need it is that a repeat count cannot be a parameter. A
-  Python `for` inside a fragment body is a code generator that runs at decoration and writes its
-  copies into the definition, so a train of four pulses and a train of eight are two fragments in
-  the file rather than one fragment called twice. What varies per call site is the parameters,
-  and the structure is not one of them.
+- The **first argument is the builder**. Every other argument becomes a `Parameter`, in order, and the fragment's name is the function's name.
+- Parameters are **untyped placeholders**. A parameter can stand for a number, a bus, or a waveform; what you pass at the call site decides. `x90` below puts one in arithmetic (`amp / 2`), and `drive` goes straight into a bus position.
+- The body runs **once, at decoration time**, to record the AST. A Python `if` inside it is evaluated then, not per call. This is a template, not a function you call at runtime. The consequence worth knowing before you need it is that a repeat count cannot be a parameter. A Python `for` inside a fragment body is a code generator that runs at decoration and writes its copies into the definition, so a train of four pulses and a train of eight are two fragments in the file rather than one fragment called twice. What varies per call site is the parameters, and the structure is not one of them.
 """
 
 # %%
@@ -137,23 +114,11 @@ print(qp.dumps(demo))
 
 # %% [markdown]
 r"""
-Two things to read off that text. Definitions come out as `fragment` sections before `body:`, and
-call sites stay call sites: `x180(q[0].drive, 0.62)` is one AST node, not an inlined copy. The
-expression survives too, as `IQDrag(amplitude=(amp / 2), ...)`.
+Two things to read off that text. Definitions come out as `fragment` sections before `body:`, and call sites stay call sites: `x180(q[0].drive, 0.62)` is one AST node, not an inlined copy. The expression survives too, as `IQDrag(amplitude=(amp / 2), ...)`.
 
-`expand()` is the lowering. It returns a new program with every call replaced by a plain `block:`
-holding the substituted body. Validation and execution do this for you, so you rarely call it,
-but it is the thing to print when you want to see what a compiler will get. Substitution puts the
-bound value where the parameter was and stops there, so the expanded pi/2 pulse reads
-`amplitude=(0.62 / 2)`. The arithmetic is still described rather than folded, so a compiler can
-decide where to evaluate it.
+`expand()` is the lowering. It returns a new program with every call replaced by a plain `block:` holding the substituted body. Validation and execution do this for you, so you rarely call it, but it is the thing to print when you want to see what a compiler will get. Substitution puts the bound value where the parameter was and stops there, so the expanded pi/2 pulse reads `amplitude=(0.62 / 2)`. The arithmetic is still described rather than folded, so a compiler can decide where to evaluate it.
 
-Measurements inside a fragment come with one catch, and the cell after next shows it. A
-measurement's auto-generated name normally embeds its bus (`q0/readout/m0`). Inside a fragment the
-bus is still a parameter, so there is no bus to embed and the name is a plain `m0`. Repeated calls
-get suffixed at expansion (`m0`, `m0_2`) so nothing collides. The handle also lives inside the
-fragment, not in your notebook, so `measurement_handles()` on the host program shows nothing until
-you expand.
+Measurements inside a fragment come with one catch, and the cell after next shows it. A measurement's auto-generated name normally embeds its bus (`q0/readout/m0`). Inside a fragment the bus is still a parameter, so there is no bus to embed and the name is a plain `m0`. Repeated calls get suffixed at expansion (`m0`, `m0_2`) so nothing collides. The handle also lives inside the fragment, not in your notebook, so `measurement_handles()` on the host program shows nothing until you expand.
 """
 
 # %%
@@ -181,46 +146,21 @@ print("handles after expand: ", [h.name for h in read_demo.expand().measurement_
 
 # %% [markdown]
 r"""
-Fragments carry the pulses, `measure` stays in the host program. That way the handle stays an
-ordinary Python variable and `result.get(m)` reads the way you wrote it. Every experiment below
-follows that rule.
+Fragments carry the pulses, `measure` stays in the host program. That way the handle stays an ordinary Python variable and `result.get(m)` reads the way you wrote it. Every experiment below follows that rule.
 
 ## 4.2 T1: inversion recovery
 
-The first middle is the shortest one. Excite the qubit, wait, look. Sweep the wait and the
-excited-state population decays as
+The first middle is the shortest one. Excite the qubit, wait, look. Sweep the wait and the excited-state population decays as
 
 $$P_1(t) = e^{-t/T_1}.$$
 
-$T_1$ is energy leaving the qubit and not coming back, and where it goes decides what you can do
-about it. Some of it goes down the readout line. The resonator couples to the qubit on one side and
-to a 50 ohm transmission line leading out of the fridge on the other, so the qubit has a path to the
-outside world through it, and that channel, Purcell decay, contributes a rate $\kappa (g/\Delta)^2$.
-Put this chip's numbers in and that channel alone predicts 16 microseconds, shorter than the 18 in
-`DEVICE` and therefore impossible, since no single loss channel can be faster than the total. It is
-the same over-large $g$ Part 1 backed out of $\chi$, showing up a second time. On a real datasheet
-that is the moment you go back and remeasure something, and the arithmetic that catches it costs
-thirty seconds. Real chips insert a bandpass filter between resonator and line, tuned to pass the
-resonator frequency and present a high impedance at the qubit frequency, and that filter buys back
-an order of magnitude.
+$T_1$ is energy leaving the qubit and not coming back, and where it goes decides what you can do about it. Some of it goes down the readout line. The resonator couples to the qubit on one side and to a 50 ohm transmission line leading out of the fridge on the other, so the qubit has a path to the outside world through it, and that channel, Purcell decay, contributes a rate $\kappa (g/\Delta)^2$. Put this chip's numbers in and that channel alone predicts 16 microseconds, shorter than the 18 in `DEVICE` and therefore impossible, since no single loss channel can be faster than the total. It is the same over-large $g$ Part 1 backed out of $\chi$, showing up a second time. On a real datasheet that is the moment you go back and remeasure something, and the arithmetic that catches it costs thirty seconds. Real chips insert a bandpass filter between resonator and line, tuned to pass the resonator frequency and present a high impedance at the qubit frequency, and that filter buys back an order of magnitude.
 
-The rest goes into the materials and past the shielding. Two-level defects in the amorphous oxides
-at the junction and at the metal interfaces absorb energy at whatever frequency they happen to sit
-at, nobody controls where they sit, and they move. A qubit measured hourly for a day will show
-$T_1$ wandering by a factor of two as defects drift in and out of resonance with it, so a single
-$T_1$ number is a snapshot and the honest form is a histogram. Quasiparticles and stray radiation
-account for most of what is left, and both are fought with shielding and filtering rather than with
-design.
+The rest goes into the materials and past the shielding. Two-level defects in the amorphous oxides at the junction and at the metal interfaces absorb energy at whatever frequency they happen to sit at, nobody controls where they sit, and they move. A qubit measured hourly for a day will show $T_1$ wandering by a factor of two as defects drift in and out of resonance with it, so a single $T_1$ number is a snapshot and the honest form is a histogram. Quasiparticles and stray radiation account for most of what is left, and both are fought with shielding and filtering rather than with design.
 
-The sweep below runs to 60 microseconds, a bit over three $T_1$, and both ends of that range cost
-something. Stop at one $T_1$ and the exponential's amplitude and time constant become degenerate, so
-the fit returns a large error bar on both. Run to five and the last third of your points are
-measuring the noise floor at some cost in fridge time. Three to four is the usual compromise.
+The sweep below runs to 60 microseconds, a bit over three $T_1$, and both ends of that range cost something. Stop at one $T_1$ and the exponential's amplitude and time constant become degenerate, so the fit returns a large error bar on both. Run to five and the last third of your points are measuring the noise floor at some cost in fridge time. Three to four is the usual compromise.
 
-One warning before any of it, and it applies to the whole part. **The reference executor has no
-timing model.** `wait` and `sync` change nothing about the numbers that come back. The delay shows
-up in the result only because the measurement model reads `env["delay"]`, and `env` is the dict of
-currently bound loop variables. The program is real, the loop is real, the physics is a lambda.
+One warning before any of it, and it applies to the whole part. **The reference executor has no timing model.** `wait` and `sync` change nothing about the numbers that come back. The delay shows up in the result only because the measurement model reads `env["delay"]`, and `env` is the dict of currently bound loop variables. The program is real, the loop is real, the physics is a lambda.
 """
 
 # %%
@@ -244,17 +184,12 @@ print("measurement:", m_t1.name)
 r"""
 The model plays the part of the qubit and of the readout chain. Two callables:
 
-- `p_excited` is the probability that a shot is classified as $|1\rangle$. It drives the `state`
-  field.
-- `response` is the noiseless IQ point. A dispersive readout puts $|0\rangle$ and $|1\rangle$ at
-  two places in the IQ plane, and the average over shots lands on the line between them, at the
-  fraction given by the population. `blob` computes exactly that.
+- `p_excited` is the probability that a shot is classified as $|1\rangle$. It drives the `state` field.
+- `response` is the noiseless IQ point. A dispersive readout puts $|0\rangle$ and $|1\rangle$ at two places in the IQ plane, and the average over shots lands on the line between them, at the fraction given by the population. `blob` computes exactly that.
 
-`noise=0.4` is per-shot gaussian noise on each quadrature, so the averaged IQ point carries the
-shot noise you would actually fight in the lab.
+`noise=0.4` is per-shot gaussian noise on each quadrature, so the averaged IQ point carries the shot noise you would actually fight in the lab.
 
-`average(shots=400)` adds no dimension to the result. The `state` field comes back as the fraction
-of shots classified as excited. The population itself, one number per delay.
+`average(shots=400)` adds no dimension to the result. The `state` field comes back as the fraction of shots classified as excited. The population itself, one number per delay.
 """
 
 # %%
@@ -289,16 +224,9 @@ print("first three points:", np.round(population.values[:3], 3))
 
 # %% [markdown]
 r"""
-Fit the exponential, then draw both. `result.plot` takes the handle and the field, works out from
-the shape that a one-dimensional sweep wants a line, and hands back the `Axes` it drew on, so the
-fit is one more call on the object that comes back. `markers=True` earns its place on a 41-point
-sweep, where the points are the measurement and the line between them is interpolation.
+Fit the exponential, then draw both. `result.plot` takes the handle and the field, works out from the shape that a one-dimensional sweep wants a line, and hands back the `Axes` it drew on, so the fit is one more call on the object that comes back. `markers=True` earns its place on a 41-point sweep, where the points are the measurement and the line between them is interpolation.
 
-The delays are stored in nanoseconds and nobody reads a $T_1$ that way, so `coords=` restates the
-axis in microseconds and `value=` names the y axis. Both halves of the restatement travel together,
-the new unit and the arithmetic that earns it. The consequence is the one thing to remember about
-drawing on top, and the fit shows it. Divide it by 1000 as well, because everything you hand the
-returned axes is in the figure's units rather than the array's.
+The delays are stored in nanoseconds and nobody reads a $T_1$ that way, so `coords=` restates the axis in microseconds and `value=` names the y axis. Both halves of the restatement travel together, the new unit and the arithmetic that earns it. The consequence is the one thing to remember about drawing on top, and the fit shows it. Divide it by 1000 as well, because everything you hand the returned axes is in the figure's units rather than the array's.
 """
 
 # %%
@@ -326,36 +254,17 @@ ax.legend(fontsize=8)
 r"""
 ## 4.3 Ramsey: T2\* and the frequency you got wrong
 
-$T_1$ does not care what your drive frequency is. Dephasing does, and it is a different failure.
-Relaxation loses the energy; dephasing keeps the energy and loses the clock. A qubit on the equator
-of the Bloch sphere is a phase, and that phase advances at the difference between the qubit's
-frequency and your drive's. Let the qubit's frequency wander and the phase wanders with it, and
-after a while you no longer know where on the equator you are.
+$T_1$ does not care what your drive frequency is. Dephasing does, and it is a different failure. Relaxation loses the energy; dephasing keeps the energy and loses the clock. A qubit on the equator of the Bloch sphere is a phase, and that phase advances at the difference between the qubit's frequency and your drive's. Let the qubit's frequency wander and the phase wanders with it, and after a while you no longer know where on the equator you are.
 
-What makes it wander is a list worth carrying around. Flux noise with a $1/f$ spectrum, coming from
-unpaired spins on the metal surfaces, and the reason the sweet spot in Part 3 matters so much.
-Photon shot noise in the readout resonator, since every stray photon Stark-shifts the qubit by
-$2\chi$. Charge noise, which the transmon was invented to suppress and which it suppresses
-exponentially, so it rarely dominates any more. And the same two-level defects that eat $T_1$,
-coupling dispersively instead of resonantly.
+What makes it wander is a list worth carrying around. Flux noise with a $1/f$ spectrum, coming from unpaired spins on the metal surfaces, and the reason the sweet spot in Part 3 matters so much. Photon shot noise in the readout resonator, since every stray photon Stark-shifts the qubit by $2\chi$. Charge noise, which the transmon was invented to suppress and which it suppresses exponentially, so it rarely dominates any more. And the same two-level defects that eat $T_1$, coupling dispersively instead of resonantly.
 
-Same three moves, second middle. Two pi/2 pulses with a gap: the first one puts the qubit on the
-equator, it precesses at the difference between your drive frequency and the qubit, and the second
-one turns that accumulated phase into a population. The result is a fringe at the detuning, dying
-out at the dephasing time:
+Same three moves, second middle. Two pi/2 pulses with a gap: the first one puts the qubit on the equator, it precesses at the difference between your drive frequency and the qubit, and the second one turns that accumulated phase into a population. The result is a fringe at the detuning, dying out at the dephasing time:
 
 $$P_1(t) = \tfrac{1}{2}\left(1 + \cos(2\pi \delta t)\right) e^{-t/T_2^*}.$$
 
-The drive is set 400 kHz high on purpose (`DRIVE_FREQ`), and detuning on purpose is the standard
-way to run this. Sit exactly on resonance and the fringe stops oscillating, leaving a monotone decay
-that any slow drift can imitate and from which you learn nothing about your frequency error. Detune
-by a known amount and you get a carrier: the fit now has an oscillation to lock onto, the decay
-envelope separates cleanly from the drift, and the fringe frequency you measure is your frequency
-error directly.
+The drive is set 400 kHz high on purpose (`DRIVE_FREQ`), and detuning on purpose is the standard way to run this. Sit exactly on resonance and the fringe stops oscillating, leaving a monotone decay that any slow drift can imitate and from which you learn nothing about your frequency error. Detune by a known amount and you get a carrier: the fit now has an oscillation to lock onto, the decay envelope separates cleanly from the drift, and the fringe frequency you measure is your frequency error directly.
 
-Pick the detuning so that several periods fit inside $T_2^*$. Here 400 kHz gives a 2.5 us period
-against a 9 us envelope, so about four fringes survive, and the sweep steps 125 ns for twenty points
-per period. Too slow and you see one lonely oscillation. Too fast and you alias.
+Pick the detuning so that several periods fit inside $T_2^*$. Here 400 kHz gives a 2.5 us period against a 9 us envelope, so about four fringes survive, and the sweep steps 125 ns for twenty points per period. Too slow and you see one lonely oscillation. Too fast and you alias.
 """
 
 # %%
@@ -385,28 +294,15 @@ print(f"{len(r_delays)} points, {r_delays[-1] / 1000:.0f} us long, {fringe.dims}
 
 # %% [markdown]
 r"""
-Four parameters to fit: amplitude, $T_2^*$, the fringe frequency, and a phase. A least-squares fit
-of a cosine needs a decent starting frequency or it walks into a local minimum, so take that guess
-from the spectrum of the data instead of typing a number. An FFT of the fringe costs nothing and
-lands within one bin of the answer every time, and the habit generalises to any oscillating fit you
-will ever run.
+Four parameters to fit: amplitude, $T_2^*$, the fringe frequency, and a phase. A least-squares fit of a cosine needs a decent starting frequency or it walks into a local minimum, so take that guess from the spectrum of the data instead of typing a number. An FFT of the fringe costs nothing and lands within one bin of the answer every time, and the habit generalises to any oscillating fit you will ever run.
 
-Note the fit function has no constant offset. In this model both the fringe and the mean decay
-with the same time constant, so the curve relaxes to zero rather than to one half. Fit the model
-you believe in, not the one you memorised.
+Note the fit function has no constant offset. In this model both the fringe and the mean decay with the same time constant, so the curve relaxes to zero rather than to one half. Fit the model you believe in, not the one you memorised.
 
-The fringe frequency is the practical output. It is the error in your drive frequency, and
-subtracting it is how a qubit gets tuned up. Run Ramsey, correct, run it again with a longer sweep
-and a smaller residual detuning, and each round buys you roughly the ratio of the two sweep lengths
-in precision. Two or three rounds gets a transmon to within a kilohertz, and then you stop, because
-the qubit will have moved by more than that before you finish writing it down.
+The fringe frequency is the practical output. It is the error in your drive frequency, and subtracting it is how a qubit gets tuned up. Run Ramsey, correct, run it again with a longer sweep and a smaller residual detuning, and each round buys you roughly the ratio of the two sweep lengths in precision. Two or three rounds gets a transmon to within a kilohertz, and then you stop, because the qubit will have moved by more than that before you finish writing it down.
 
-A lab person will ask about one caveat. A single Ramsey gives the *magnitude* of the detuning, not
-its sign, because $\cos$ is even. You get the sign by moving the drive a known amount and seeing
-whether the fringe speeds up or slows down.
+A lab person will ask about one caveat. A single Ramsey gives the *magnitude* of the detuning, not its sign, because $\cos$ is even. You get the sign by moving the drive a known amount and seeing whether the fringe speeds up or slows down.
 
-The figure is the T1 figure with a different middle in it, down to the restated axis. 161 points
-is dense enough that the markers want to be small, which `Style` takes as `markersize`.
+The figure is the T1 figure with a different middle in it, down to the restated axis. 161 points is dense enough that the markers want to be small, which `Style` takes as `markersize`.
 """
 
 # %%
@@ -446,28 +342,15 @@ print(f"residual error {(corrected - DEVICE['q0_f01']) / 1e3:+.1f} kHz")
 r"""
 ## 4.4 Hahn echo: refocusing the slow noise
 
-$T_2^*$ mixes two things that are not the same. Real decoherence, and the fact that the qubit
-frequency is a little different on every shot because something slow is drifting under you. Average
-a few hundred shots and the second one looks exactly like the first, because a phase that is
-slightly wrong in a different direction each time washes out just as thoroughly as a phase that was
-genuinely destroyed.
+$T_2^*$ mixes two things that are not the same. Real decoherence, and the fact that the qubit frequency is a little different on every shot because something slow is drifting under you. Average a few hundred shots and the second one looks exactly like the first, because a phase that is slightly wrong in a different direction each time washes out just as thoroughly as a phase that was genuinely destroyed.
 
-A pi pulse in the middle of the delay separates them. It flips the Bloch vector about the drive
-axis, so whatever phase the qubit picked up in the first half gets subtracted during the second. A
-frequency offset that held still across the whole sequence cancels exactly. One that changed
-halfway through does not. What survives the refocusing is $T_2$, and it is longer than $T_2^*$:
+A pi pulse in the middle of the delay separates them. It flips the Bloch vector about the drive axis, so whatever phase the qubit picked up in the first half gets subtracted during the second. A frequency offset that held still across the whole sequence cancels exactly. One that changed halfway through does not. What survives the refocusing is $T_2$, and it is longer than $T_2^*$:
 
 $$P_1(t) = \tfrac{1}{2} + \tfrac{1}{2} e^{-t/T_2}.$$
 
-Third middle, and the pieces are all in hand. x90, wait $t/2$, x180, wait $t/2$, x90, built from the
-two fragments of 4.1 and from `wait` with an expression, since `delay / 2` is a perfectly good
-duration and serializes as `wait q[0].drive (delay / 2)`.
+Third middle, and the pieces are all in hand. x90, wait $t/2$, x180, wait $t/2$, x90, built from the two fragments of 4.1 and from `wait` with an expression, since `delay / 2` is a perfectly good duration and serializes as `wait q[0].drive (delay / 2)`.
 
-One fitting decision is worth making on purpose. Fix the offset at 0.5 rather than fitting it. With
-the detuning refocused the curve relaxes to the fully mixed value, and you know that number without
-measuring it. Leave it free and it trades against `tau`, the two come out about 90 percent
-anti-correlated, and the error bar on $T_2$ roughly triples for nothing. Pinning what you know is
-not cheating, it is how you get a number you can quote.
+One fitting decision is worth making on purpose. Fix the offset at 0.5 rather than fitting it. With the detuning refocused the curve relaxes to the fully mixed value, and you know that number without measuring it. Leave it free and it trades against `tau`, the two come out about 90 percent anti-correlated, and the error bar on $T_2$ roughly triples for nothing. Pinning what you know is not cheating, it is how you get a number you can quote.
 """
 
 # %%
@@ -505,10 +388,7 @@ print(f"fitted T2 = {t2_fit / 1000:.2f} us   true = {DEVICE['q0_T2echo'] / 1000:
 
 # %% [markdown]
 r"""
-Plot it, then put the three numbers next to each other. The ordering $T_2^* < T_2 < 2T_1$ is the
-sanity check you run before believing any of it, and it follows from arithmetic rather than from
-agreement among labs, so a set that violates either bound is a bug in the analysis and not a
-discovery. Finding out at this point costs you five minutes rather than a paper.
+Plot it, then put the three numbers next to each other. The ordering $T_2^* < T_2 < 2T_1$ is the sanity check you run before believing any of it, and it follows from arithmetic rather than from agreement among labs, so a set that violates either bound is a bug in the analysis and not a discovery. Finding out at this point costs you five minutes rather than a paper.
 """
 
 # %%
@@ -544,9 +424,7 @@ print(f"T2* < T2 < 2*T1 holds: {t2star_fit < t2_fit < 2 * t1_fit}")
 r"""
 ## 4.5 The three measurement fields
 
-The T1 program asked for all three fields:
-`fields=(MF.STATE, MF.IQ, MF.RAW)`. One `measure` call, three arrays, three shapes. `field=`
-picks one.
+The T1 program asked for all three fields: `fields=(MF.STATE, MF.IQ, MF.RAW)`. One `measure` call, three arrays, three shapes. `field=` picks one.
 
 | field | shape | what it is |
 |---|---|---|
@@ -554,24 +432,11 @@ picks one.
 | `MF.STATE` | `(*sweeps)` | classified 0/1 per shot, averaged into a population. |
 | `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots. |
 
-They are three points along one pipeline, and each one throws something away. `raw` is the ADC
-stream, which you ask for when you are debugging the readout itself. It is how you see the resonator
-ringing up, how you find out that your pulse is longer than your acquisition window, and how you
-compute optimal integration weights. Multiply it by the weights and sum, and you have `iq`. Compare
-`iq` to a threshold, and you have `state`. Every step down that list is smaller and less
-recoverable, so ask for `raw` while you are commissioning a readout and stop asking for it once it
-works, because the data volume is a hundred times larger.
+They are three points along one pipeline, and each one throws something away. `raw` is the ADC stream, which you ask for when you are debugging the readout itself. It is how you see the resonator ringing up, how you find out that your pulse is longer than your acquisition window, and how you compute optimal integration weights. Multiply it by the weights and sum, and you have `iq`. Compare `iq` to a threshold, and you have `state`. Every step down that list is smaller and less recoverable, so ask for `raw` while you are commissioning a readout and stop asking for it once it works, because the data volume is a hundred times larger.
 
-`result.get(m)` defaults to `MF.IQ` and raises `KeyError` for a field the measurement never
-requested. It never substitutes a different array instead, because a `state` array returned where
-the caller expected IQ would look like data all the way downstream.
+`result.get(m)` defaults to `MF.IQ` and raises `KeyError` for a field the measurement never requested. It never substitutes a different array instead, because a `state` array returned where the caller expected IQ would look like data all the way downstream.
 
-The `time` axis of a `raw` array is the model's `raw_samples`, read once at the start of the run,
-which is where the 16 in the shape below comes from. A model that simulates no ADC leaves the
-attribute off entirely and `MeasurementSample.raw` keeps its empty default, so the two hand-written
-models later in this notebook declare neither. A model that does produce traces has every one
-checked against `raw_samples`, and a mismatch names the measurement, the shape received, and the
-shape expected rather than broadcasting quietly to the wrong answer.
+The `time` axis of a `raw` array is the model's `raw_samples`, read once at the start of the run, which is where the 16 in the shape below comes from. A model that simulates no ADC leaves the attribute off entirely and `MeasurementSample.raw` keeps its empty default, so the two hand-written models later in this notebook declare neither. A model that does produce traces has every one checked against `raw_samples`, and a mismatch names the measurement, the shape received, and the shape expected rather than broadcasting quietly to the wrong answer.
 """
 
 # %%
@@ -588,17 +453,11 @@ except KeyError as exc:
 
 # %% [markdown]
 r"""
-`state` and `iq` are two views of the same shots. The classifier already collapsed each shot to a
-0 or a 1, so `state` is the population directly. `iq` needs projecting onto the line between the
-two readout blobs before it means anything, and it carries the shot noise of the integration.
+`state` and `iq` are two views of the same shots. The classifier already collapsed each shot to a 0 or a 1, so `state` is the population directly. `iq` needs projecting onto the line between the two readout blobs before it means anything, and it carries the shot noise of the integration.
 
-Both recover T1 to better than 2 percent. The state fit is the closer one here, because
-classification has already thrown away the noise the projection still has to average over.
+Both recover T1 to better than 2 percent. The state fit is the closer one here, because classification has already thrown away the noise the projection still has to average over.
 
-Drawing them together is the case the composable axes were built for. The `state` field is a
-measurement the result can draw on its own, the projection is arithmetic you did afterwards that no
-result could have known was a measurement, and the second goes on the axes the first returned with
-an ordinary `ax.plot`.
+Drawing them together is the case the composable axes were built for. The `state` field is a measurement the result can draw on its own, the projection is arithmetic you did afterwards that no result could have known was a measurement, and the second goes on the axes the first returned with an ordinary `ax.plot`.
 """
 
 # %%
@@ -627,43 +486,24 @@ ax.legend(fontsize=8)
 r"""
 ## 4.6 Single-shot readout
 
-Where do the two clouds come from? The resonator sits at $f_r - \chi$ when the qubit is in
-$|0\rangle$ and $f_r + \chi$ when it is in $|1\rangle$. Park a tone between them and the field that
-comes back out has a different amplitude and a different phase in the two cases, so the integrated
-IQ point lands in one of two places. The distance $d$ between them grows with the number of photons
-you put in and with $2\chi/\kappa$, the ratio Part 1 worked out. The width $\sigma$ of each cloud is
-the amplifier chain's noise divided by the square root of the integration time, so it shrinks the
-longer you look and shrinks a lot if you can afford a parametric amplifier in front of the HEMT.
+Where do the two clouds come from? The resonator sits at $f_r - \chi$ when the qubit is in $|0\rangle$ and $f_r + \chi$ when it is in $|1\rangle$. Park a tone between them and the field that comes back out has a different amplitude and a different phase in the two cases, so the integrated IQ point lands in one of two places. The distance $d$ between them grows with the number of photons you put in and with $2\chi/\kappa$, the ratio Part 1 worked out. The width $\sigma$ of each cloud is the amplifier chain's noise divided by the square root of the integration time, so it shrinks the longer you look and shrinks a lot if you can afford a parametric amplifier in front of the HEMT.
 
-Readout fidelity is the ratio of those two numbers and nothing else. Put a threshold halfway between
-the clouds and count the shots that land on the wrong side. The cell that does the counting also
-prints the separation in units of $\sigma$, because the two travel together.
+Readout fidelity is the ratio of those two numbers and nothing else. Put a threshold halfway between the clouds and count the shots that land on the wrong side. The cell that does the counting also prints the separation in units of $\sigma$, because the two travel together.
 
-To see the shots themselves you have to stop averaging them. `average(shots)` throws the individual
-shots away and hands you the mean, so make the shot index a **sweep variable** and drop the average:
+To see the shots themselves you have to stop averaging them. `average(shots)` throws the individual shots away and hands you the mean, so make the shot index a **sweep variable** and drop the average:
 
 ```python
 with program.sweep(shot, qp.Range(0, 599, 1)):
     ...
 ```
 
-The loop runs the sequence once per point, so every point holds exactly one shot, and the result
-array gets a `shot` dimension of length 600. Nothing reads the variable, and that is fine. A sweep
-variable that no operation uses still drives its loop. A sequencer does exactly this when you ask it
-to stream every acquisition instead of accumulating.
+The loop runs the sequence once per point, so every point holds exactly one shot, and the result array gets a `shot` dimension of length 600. Nothing reads the variable, and that is fine. A sweep variable that no operation uses still drives its loop. A sequencer does exactly this when you ask it to stream every acquisition instead of accumulating.
 
-`qp.Repeat` from Part 2 looks like the shorter way to write this and it is not. It multiplies a
-source's points rather than adding an axis. `qp.Repeat(qp.Values([0, 1]), times=4)` sweeps `0 1 0 1
-0 1 0 1`, eight points on one flattened dimension whose coordinates give no way to tell the four
-repetitions of a preparation apart. A shot dimension has to come from a loop of its own, and the
-sweep above is that loop.
+`qp.Repeat` from Part 2 looks like the shorter way to write this and it is not. It multiplies a source's points rather than adding an axis. `qp.Repeat(qp.Values([0, 1]), times=4)` sweeps `0 1 0 1 0 1 0 1`, eight points on one flattened dimension whose coordinates give no way to tell the four repetitions of a preparation apart. A shot dimension has to come from a loop of its own, and the sweep above is that loop.
 
-The model changes too. Averaged IQ was one point on a line; single shots are two clouds, and `sigma`
-is the parameter that decides whether this readout works.
+The model changes too. Averaged IQ was one point on a line; single shots are two clouds, and `sigma` is the parameter that decides whether this readout works.
 
-Two programs, 600 single shots each. One reads out the qubit as it sits, the other puts a pi pulse
-in front. The 2 percent that come out the wrong way in each are preparation error, and realistic.
-A real pi pulse is never perfect and a real qubit is never perfectly cold.
+Two programs, 600 single shots each. One reads out the qubit as it sits, the other puts a pi pulse in front. The 2 percent that come out the wrong way in each are preparation error, and realistic. A real pi pulse is never perfect and a real qubit is never perfectly cold.
 """
 
 # %%
@@ -720,16 +560,9 @@ print(f"prepared wrong: {int(truth[:600].sum())} cold shots hot, {int(600 - trut
 
 # %% [markdown]
 r"""
-`kind="scatter"` is the one figure the shape never implies, since plotting I against Q is a choice
-no dimension count makes for you. It puts I on one axis and Q on the other and flattens everything
-else into the cloud, which here is the 600-point shot axis.
+`kind="scatter"` is the one figure the shape never implies, since plotting I against Q is a choice no dimension count makes for you. It puts I on one axis and Q on the other and flattens everything else into the cloud, which here is the 600-point shot axis.
 
-Two clouds means two calls. The first makes the axes, the second draws on it through `target=`, and
-a palette rotated by one slot keeps the two from sharing a hue. The legend labels go on afterwards,
-because the two runs are separate results and neither one knows the other exists. A scatter also
-refuses `value=Quantity(label=...)` outright, and the message explains itself. Its two axes are I
-and Q and already name themselves, so one label across both would hide which is which. A name for
-the figure goes in `title=` instead.
+Two clouds means two calls. The first makes the axes, the second draws on it through `target=`, and a palette rotated by one slot keeps the two from sharing a hue. The legend labels go on afterwards, because the two runs are separate results and neither one knows the other exists. A scatter also refuses `value=Quantity(label=...)` outright, and the message explains itself. Its two axes are I and Q and already name themselves, so one label across both would hide which is which. A name for the figure goes in `title=` instead.
 """
 
 # %%
@@ -743,32 +576,18 @@ ax.legend()
 
 # %% [markdown]
 r"""
-To turn a shot into a bit, project onto the line joining the two cloud centres and threshold at
-the midpoint. The centres come from the data, not from the model. This is a calibration, and it is
-the one you redo whenever the readout drifts.
+To turn a shot into a bit, project onto the line joining the two cloud centres and threshold at the midpoint. The centres come from the data, not from the model. This is a calibration, and it is the one you redo whenever the readout drifts.
 
-The midpoint is the right threshold here because both clouds have the same width and you prepared
-each one equally often. On a real device neither holds for long. The excited cloud grows a tail
-toward the ground cloud, because a qubit that relaxes partway through the integration window
-contributes a point somewhere in between, and the optimal threshold slides toward $|0\rangle$ to
-compensate. Anyone quoting a fidelity from a midpoint threshold on a device with $T_1$ comparable to
-the readout length is leaving a little on the table.
+The midpoint is the right threshold here because both clouds have the same width and you prepared each one equally often. On a real device neither holds for long. The excited cloud grows a tail toward the ground cloud, because a qubit that relaxes partway through the integration window contributes a point somewhere in between, and the optimal threshold slides toward $|0\rangle$ to compensate. Anyone quoting a fidelity from a midpoint threshold on a device with $T_1$ comparable to the readout length is leaving a little on the table.
 
 Two error numbers come out of this, and they are not the same thing:
 
-- The **measured** error: the threshold decision against what you prepared. That is all the lab
-  has, and it charges readout for the preparation error too.
-- The **assignment** error: the threshold decision against the state each shot was really in. The
-  simulator knows, so you can price the readout on its own.
+- The **measured** error: the threshold decision against what you prepared. That is all the lab has, and it charges readout for the preparation error too.
+- The **assignment** error: the threshold decision against the state each shot was really in. The simulator knows, so you can price the readout on its own.
 
-The gap between them is the preparation error you saw above. If you ever quote a readout fidelity
-without saying which of the two numbers it is, someone will misuse it, and the usual direction of
-the misuse is a vendor quoting assignment fidelity next to a competitor's measured fidelity.
+The gap between them is the preparation error you saw above. If you ever quote a readout fidelity without saying which of the two numbers it is, someone will misuse it, and the usual direction of the misuse is a vendor quoting assignment fidelity next to a competitor's measured fidelity.
 
-The histogram is the one figure in this notebook the result cannot draw. Its x axis is a projection
-you computed from two runs and its y axis is a bin count, so nothing on either result says those
-numbers belong in one picture. Hand-rolled axes are the right answer exactly there, and the
-threshold and the two gaussians go on them the same way the fits went on the axes above.
+The histogram is the one figure in this notebook the result cannot draw. Its x axis is a projection you computed from two runs and its y axis is a bin count, so nothing on either result says those numbers belong in one picture. Hand-rolled axes are the right answer exactly there, and the threshold and the two gaussians go on them the same way the fits went on the axes above.
 """
 
 # %%
@@ -805,21 +624,11 @@ ax.legend(fontsize=8)
 r"""
 ## 4.7 Active reset: using a shot to decide
 
-A qubit does not start cold, and waiting for it to get there is the slowest thing in a run. Passive
-reset idles for several $T_1$ before every shot, which on this chip is most of the fridge time you
-are paying for. Active reset measures instead and fires a pi pulse only if the qubit came up
-excited, turning a wait into a decision.
+A qubit does not start cold, and waiting for it to get there is the slowest thing in a run. Passive reset idles for several $T_1$ before every shot, which on this chip is most of the fridge time you are paying for. Active reset measures instead and fires a pi pulse only if the qubit came up excited, turning a wait into a decision.
 
-One aside on why the qubit is warm at all. A transmon at 4.85 GHz in perfect thermal equilibrium
-with a 20 mK stage would sit at $e^{-hf/k_BT}$, or $10^{-5}$, and nobody has ever measured that.
-Real devices come in at an effective temperature of 40 to 60 mK, giving a residual excited
-population of half a percent to two percent, and the gap is stray infrared, imperfect filtering, and
-hot electrons in the ground plane. The model below uses 18 percent, which corresponds to about 135
-mK and is hotter than any device you would keep. It is set that high so the effect is unmistakable
-in 400 shots.
+One aside on why the qubit is warm at all. A transmon at 4.85 GHz in perfect thermal equilibrium with a 20 mK stage would sit at $e^{-hf/k_BT}$, or $10^{-5}$, and nobody has ever measured that. Real devices come in at an effective temperature of 40 to 60 mK, giving a residual excited population of half a percent to two percent, and the gap is stray infrared, imperfect filtering, and hot electrons in the ground plane. The model below uses 18 percent, which corresponds to about 135 mK and is hotter than any device you would keep. It is set that high so the effect is unmistakable in 400 shots.
 
-`if_` / `elif_` / `else_` are context managers, and they chain exactly like Python's. The
-condition is a **measurement-state predicate**, nothing wider yet:
+`if_` / `elif_` / `else_` are context managers, and they chain exactly like Python's. The condition is a **measurement-state predicate**, nothing wider yet:
 
 | shape | reads as |
 |---|---|
@@ -828,22 +637,11 @@ condition is a **measurement-state predicate**, nothing wider yet:
 | `m1.state == m2.state` | two measurements agreed |
 | `qp.eq(m.state, 0)`, `qp.ne(m.state, 1)` | the helper forms, for building conditions programmatically |
 
-The narrowness is deliberate rather than unfinished. A condition inside a sequence has to be
-evaluated by an FPGA between one pulse and the next, in tens of nanoseconds, while the qubit is
-still coherent. Comparing one classified bit against a constant fits in that budget. Arbitrary
-arithmetic does not, and a language that let you write it would be promising something no rack can
-deliver.
+The narrowness is deliberate rather than unfinished. A condition inside a sequence has to be evaluated by an FPGA between one pulse and the next, in tens of nanoseconds, while the qubit is still coherent. Comparing one classified bit against a constant fits in that budget. Arbitrary arithmetic does not, and a language that let you write it would be promising something no rack can deliver.
 
-Three rules, enforced in two places. The condition has to be a measurement-state predicate. Pass
-anything else and the builder raises on the spot. `elif_` and `else_` have to come **immediately**
-after their arm, because anything appended in between closes the chain, and that raises too. The
-third one waits for `validate`. Every measurement you reference must have asked for `MF.STATE`, and
-a condition on a classification nobody computed is a diagnostic rather than a guess. `qp.simulate`
-validates before it executes, so such a program raises `UnsupportedOperationError` instead of
-branching.
+Three rules, enforced in two places. The condition has to be a measurement-state predicate. Pass anything else and the builder raises on the spot. `elif_` and `else_` have to come **immediately** after their arm, because anything appended in between closes the chain, and that raises too. The third one waits for `validate`. Every measurement you reference must have asked for `MF.STATE`, and a condition on a classification nobody computed is a diagnostic rather than a guess. `qp.simulate` validates before it executes, so such a program raises `UnsupportedOperationError` instead of branching.
 
-There is no `and` or `or` of two conditions. `qp.and_(a, b)` inside an `if_` raises and names what
-it got, so a compound test becomes a second `if_` nested inside the arm.
+There is no `and` or `or` of two conditions. `qp.and_(a, b)` inside an `if_` raises and names what it got, so a compound test becomes a second `if_` nested inside the arm.
 """
 
 # %%
@@ -864,13 +662,9 @@ except qp.ValidationError as exc:
 
 # %% [markdown]
 r"""
-Now the fake qubit. The reference executor does not simulate the pi pulse, so the model has to
-keep the bookkeeping itself: a fresh shot starts hot with probability `p_hot`, and the *second*
-measurement of a shot happens after the reset attempt, which lands the qubit in the ground state
-unless the pulse missed.
+Now the fake qubit. The reference executor does not simulate the pi pulse, so the model has to keep the bookkeeping itself: a fresh shot starts hot with probability `p_hot`, and the *second* measurement of a shot happens after the reset attempt, which lands the qubit in the ground state unless the pulse missed.
 
-The model is a stand-in, and the only one in this section. The program, the conditional, the NaN
-handling, and the arithmetic at the end are the real thing.
+The model is a stand-in, and the only one in this section. The program, the conditional, the NaN handling, and the arithmetic at the end are the real thing.
 """
 
 # %%
@@ -902,12 +696,7 @@ print("shot 0, second look:", peek_model.sample("q0/readout", {"shot": 0.0}).sta
 
 # %% [markdown]
 r"""
-One more piece of the result contract before the exercise. **A measurement inside a conditional
-arm holds NaN wherever the arm did not run.** The averaging is count-based. No executions, no
-mean. That is the honest answer rather than a zero, because a zero would be indistinguishable from a
-measurement that ran and came back cold, and any downstream average would quietly include shots that
-never happened. With single shots on the sweep axis it is easy to see, and it tells you which shots
-took which branch.
+One more piece of the result contract before the exercise. **A measurement inside a conditional arm holds NaN wherever the arm did not run.** The averaging is count-based. No executions, no mean. That is the honest answer rather than a zero, because a zero would be indistinguishable from a measurement that ran and came back cold, and any downstream average would quietly include shots that never happened. With single shots on the sweep axis it is easy to see, and it tells you which shots took which branch.
 """
 
 # %%
@@ -929,24 +718,16 @@ print("arm ran on", int(np.isfinite(peek_result.get(verify, field=MF.STATE).valu
 r"""
 ### 🧩 Exercise 4.1: active reset, before and after
 
-Everything so far you have written before in some other form. Reading a measurement outcome back
-into the control flow you have not, so this one is yours to build. Run the reset experiment on 400
-single shots and report the excited-state population before and after.
+Everything so far you have written before in some other form. Reading a measurement outcome back into the control flow you have not, so this one is yours to build. Run the reset experiment on 400 single shots and report the excited-state population before and after.
 
 1. One variable `shot`, swept with `qp.Range(0, 399, 1)`, no `average`.
 2. `check = program.measure(..., name="check", fields=(MF.STATE,))`.
 3. `with program.if_(check.state == 1):` call `x180`, `sync`, and measure again as `"verify"`.
-4. `with program.else_():` wait out the pi pulse the other arm plays, `program.wait(q[0].drive,
-   40)`. Nothing in the language requires a second arm and the reference executor times neither, but
-   on hardware an arm that holds a bus longer than its sibling shifts everything after the branch,
-   and a `sync` after the chain settles that.
+4. `with program.else_():` wait out the pi pulse the other arm plays, `program.wait(q[0].drive, 40)`. Nothing in the language requires a second arm and the reference executor times neither, but on hardware an arm that holds a bus longer than its sibling shifts everything after the branch, and a `sync` after the chain settles that.
 5. Run it with `ResetModel()` and pull both state arrays.
-6. The population before is the mean of `check`. For the population after, remember the NaN.
-   A cold shot never entered the arm, so its outcome after the reset attempt is what `check`
-   already said, and `np.where(np.isnan(verify), check, verify)` is the whole calculation.
+6. The population before is the mean of `check`. For the population after, remember the NaN. A cold shot never entered the arm, so its outcome after the reset attempt is what `check` already said, and `np.where(np.isnan(verify), check, verify)` is the whole calculation.
 
-Expect roughly 18 percent before and 1 percent after: the residual is the shots where the pi pulse
-missed. Call the program `reset`, because the cell after your solution prints its `.qp` text.
+Expect roughly 18 percent before and 1 percent after: the residual is the shots where the pi pulse missed. Call the program `reset`, because the cell after your solution prints its `.qp` text.
 """
 
 # %% solution
@@ -990,35 +771,19 @@ print(qp.dumps(reset))
 
 # %% [markdown]
 r"""
-Read that text once more. The feedback is in the file. `if check.state == 1:` is a statement in a
-portable text format, not a vendor call, and that is the point of putting it in the language: the
-same intent used to be spelled `program.<vendor>.active_reset(...)`, which locked the experiment
-to one rack. A platform with a hand-tuned reset choreography can still recognise the pattern at
-compile time and lower it to whatever its sequencer does best.
+Read that text once more. The feedback is in the file. `if check.state == 1:` is a statement in a portable text format, not a vendor call, and that is the point of putting it in the language: the same intent used to be spelled `program.<vendor>.active_reset(...)`, which locked the experiment to one rack. A platform with a hand-tuned reset choreography can still recognise the pattern at compile time and lower it to whatever its sequencer does best.
 """
 
 # %% [markdown]
 r"""
 ## Recap and what is next
 
-- A **fragment** is a pulse block with parameters. `@fragment` records the body once, `call`
-  appends a node, `expand()` inlines it. Keep `measure` in the host program so the handle stays an
-  ordinary variable.
-- **T1, T2\*, T2** all came out of the same three moves with a different middle, and all three
-  fits landed within a couple of percent of the device. $T_1$ is energy leaving, mostly through the
-  resonator and into the oxides. $T_2^*$ adds every source of frequency wander on top, and the echo
-  removes whatever is slower than the sequence.
-- The fringe frequency from Ramsey is the correction to your drive frequency. Detuning on purpose is
-  how you get a carrier to lock the fit onto instead of a bare decay.
-- One `measure` produces up to three **fields**, and they are one pipeline. `raw` is the ADC trace,
-  weight and sum it for `iq`, threshold that for `state`. Ask for the widest one while commissioning
-  and the narrowest one forever after.
-- Every figure here but the histogram came out of `result.plot(...)`, with the fit, the reference
-  line, the second series, and the legend labels added to the `Axes` it returned.
-- Dropping `average` and sweeping a **shot index** gives you single shots, the data a threshold gets
-  calibrated on. Separation over cloud width is the whole story.
-- **Feedback** is `if_(handle.state == 1)`, with NaN in the arm that did not run, and it
-  serializes into the `.qp` file like any other statement.
-- Everything so far assumed one rack that can do all of it. Part 5 takes these exact programs to a
-  machine where the flux line has no sequencer, and lets the platform tell you what it can run.
+- A **fragment** is a pulse block with parameters. `@fragment` records the body once, `call` appends a node, `expand()` inlines it. Keep `measure` in the host program so the handle stays an ordinary variable.
+- **T1, T2\*, T2** all came out of the same three moves with a different middle, and all three fits landed within a couple of percent of the device. $T_1$ is energy leaving, mostly through the resonator and into the oxides. $T_2^*$ adds every source of frequency wander on top, and the echo removes whatever is slower than the sequence.
+- The fringe frequency from Ramsey is the correction to your drive frequency. Detuning on purpose is how you get a carrier to lock the fit onto instead of a bare decay.
+- One `measure` produces up to three **fields**, and they are one pipeline. `raw` is the ADC trace, weight and sum it for `iq`, threshold that for `state`. Ask for the widest one while commissioning and the narrowest one forever after.
+- Every figure here but the histogram came out of `result.plot(...)`, with the fit, the reference line, the second series, and the legend labels added to the `Axes` it returned.
+- Dropping `average` and sweeping a **shot index** gives you single shots, the data a threshold gets calibrated on. Separation over cloud width is the whole story.
+- **Feedback** is `if_(handle.state == 1)`, with NaN in the arm that did not run, and it serializes into the `.qp` file like any other statement.
+- Everything so far assumed one rack that can do all of it. Part 5 takes these exact programs to a machine where the flux line has no sequencer, and lets the platform tell you what it can run.
 """
