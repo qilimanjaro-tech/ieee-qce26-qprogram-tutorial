@@ -2,9 +2,9 @@
 
 A [Marp](https://marp.app/) deck, written in Markdown. **The concepts live here.** The deck opens with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes a voltage, what a measurement really returns, and what decoherence costs, then argues why any of that needs a language of its own. Only after all of that does QProgram appear. The notebooks in [`../notebooks/`](../notebooks/) carry the code and explain the experiments; they leave the background to these slides.
 
-Seventy-two slides, roughly in four movements: logistics, the foundations block, the QProgram block, then two to five slides per tutorial part. Ten diagrams carry the structure.
+One hundred and eighteen slides, in four movements: logistics, the foundations block, the QProgram block, then nine to sixteen slides per tutorial part. Ten diagrams carry the structure.
 
-Every content slide carries at least one concrete thing, a number, a formula, a `.qp` excerpt, or a diff, and the speaker carries the rest. A slide that is five compressed claims competes with the person talking over it, so `tools/check_style.py` applies its sentence-shape budgets to this file and to the deck as well as to `sources/*.py`.
+One claim per slide, in a title of two to five plain words, under a body of three to five one-line bullets and at most one block: a figure, a code excerpt, a table, an output block, or a formula. Roughly forty words of prose is the working budget and fifty-five is the ceiling, because a slide that says everything leaves the speaker reading it aloud. Numbers belong in the tables, the code and the fit outputs rather than inside a sentence, and `tools/check_style.py` applies its sentence-shape budgets to this file and to the deck as well as to `sources/*.py`.
 
 One rule of that checker matters while editing the deck. A paragraph is written on one line and never hard wrapped, because Marp Core turns a soft line break into a forced one, so a wrapped paragraph stops reflowing to the slide width and breaks wherever the author's editor happened to break it. `python tools/unwrap.py slides/qprogram_tutorial.md` fixes a file that picked up wraps.
 
@@ -14,24 +14,24 @@ One rule of that checker matters while editing the deck. A paragraph is written 
 
 | Diagram | Shows | Slide |
 |---|---|---|
-| `transmon.svg` | the circuit, the cosine well, and the ladder that crowds as you climb | Two circuit elements, and the ladder that falls out |
-| `rack.svg` | the signal chain, rack to fridge to chip and back | From a gate to a voltage and back |
-| `fridge.svg` | the stages, attenuation going down and amplification coming up | The fridge, stage by stage |
-| `rotation.svg` | carrier phase as the axis, envelope area as the angle | The two knobs, drawn |
-| `dispersive.svg` | two dips $2\chi$ apart, the chain after the chip, and the IQ clouds | The measurement chain, end to end |
-| `buses.svg` | instrument ports to bus names to chip, and what each bus kind accepts | A bus is one signal path |
+| `transmon.svg` | the circuit, the cosine well, and the ladder that crowds as you climb | The transmon |
+| `rack.svg` | the signal chain, rack to fridge to chip and back | The control rack |
+| `fridge.svg` | the stages, attenuation going down and amplification coming up | The fridge |
+| `rotation.svg` | carrier phase as the axis, envelope area as the angle | Axis and angle |
+| `dispersive.svg` | two dips $2\chi$ apart, the chain after the chip, and the IQ clouds | The readout chain |
+| `buses.svg` | instrument ports to bus names to chip, and what each bus kind accepts | One signal path |
 | `stack.svg` | the software layers, script to instruments | The architecture |
-| `timing.svg` | per-bus cursors, and what `sync` does about them | Part 1: every bus keeps its own clock |
-| `anatomy.svg` | a Rabi program as a tree | Anatomy of a Rabi program |
-| `plan.svg` | the real-time versus host-side split | One program, two domains |
+| `timing.svg` | per-bus cursors, and what `sync` does about them | One clock per bus |
+| `anatomy.svg` | a Rabi program as a tree | Anatomy of a program |
+| `plan.svg` | the real-time versus host-side split | Two domains |
 
-The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token.
+The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token, which Part 5 introduces and nothing before it mentions.
 
 ### Diagrams worth adding
 
 One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
 
-- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two qubits, one gate" is currently carried by four bullets, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans a real chevron, so the figure could come out of there.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans a real chevron, so the figure could come out of there.
 
 An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated shots with a fitted threshold, and a schematic version would be strictly worse. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted.
 
