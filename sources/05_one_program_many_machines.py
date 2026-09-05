@@ -825,9 +825,10 @@ Port the two-dimensional `arc` program from 5.5 to rack B. It has the shape of t
 1. Rebind it to the `drive_q0` naming convention with `BusNaming("{kind}_{element}{index}")`.
 2. Print the bus strings before and after, to prove the names changed.
 3. Validate the ported program against `caps` and compare the diagnostic codes to the original's.
-4. Run `qp.optimize(ported_arc, caps)` and check whether the result differs from what went in. Say in a comment which diagnostic told you in advance that it would not.
+4. Print `qp.explain(ported_arc, caps)` and find the bias sweep in the domain column.
+5. Run `qp.optimize(ported_arc, caps)` and check whether the result differs from what went in. Say in a comment which diagnostic told you in advance that it would not.
 
-The third step is the point. Renaming buses must not change what a rack thinks of the program, because the validator routes on the schema coordinate and not on the string. If the two lists of codes differed, `rebind` would be doing more than renaming, and every port here would be suspect.
+The comparison in step 3 is the point. Renaming buses must not change what a rack thinks of the program, because the validator routes on the schema coordinate and not on the string. If the two lists of codes differed, `rebind` would be doing more than renaming, and every port here would be suspect.
 """
 
 # %% solution

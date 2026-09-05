@@ -310,7 +310,7 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <h2 id="drag">DRAG</h2>
 <p><span is="marp-span" data-auto-scaling="downscale-only" class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>Q</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo><mi>β</mi><mtext> </mtext><mover accent="true"><mi>I</mi><mo>˙</mo></mover><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">Q(t) = \beta\,\dot{I}(t)
 </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">Q</span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.1702em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9202em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0785em;">I</span></span><span style="top:-3.2523em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.0278em;"><span class="mord">˙</span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span></span></span></span></span></p><ul>
-<li>DRAG adds a second quadrature alongside the envelope you play.</li>
+<li>DRAG adds a second envelope on the quadrature 90 degrees from the one you play.</li>
 <li>Its shape is the derivative of the in-phase envelope.</li>
 <li>It cancels the leading transfer into <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">∣</mi><mn>2</mn><mo stretchy="false">⟩</mo></mrow><annotation encoding="application/x-tex">|2\rangle</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">∣2</span><span class="mclose">⟩</span></span></span></span> and the phase error left behind.</li>
 <li>First order gives <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>β</mi><mo>≈</mo><mn>1</mn><mi mathvariant="normal">/</mi><mi mathvariant="normal">∣</mi><mi>α</mi><mi mathvariant="normal">∣</mi></mrow><annotation encoding="application/x-tex">\beta \approx 1/|\alpha|</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1/∣</span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mord">∣</span></span></span></span>, and <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>β</mi></mrow><annotation encoding="application/x-tex">\beta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span></span></span></span> is calibrated per qubit.</li>
@@ -352,7 +352,8 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 </tbody>
 </table>
 <ul>
-<li>The flux route drags a qubit off its sweet spot, the microwave route moves neither.</li>
+<li>The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.</li>
+<li>The microwave route moves neither qubit.</li>
 <li>Two-qubit error runs five to ten times single-qubit error.</li>
 <li>Each pair is calibrated by a two-dimensional scan, amplitude against duration.</li>
 </ul>
@@ -681,7 +682,7 @@ m0 = program.measure(q[<span class="hljs-number">0</span>].readout, readout_puls
 </code></pre>
 <ul>
 <li>Four blocks nest, and nesting in the file is nesting in the result.</li>
-<li><code>sweep</code> adds a dimension, <code>average</code> takes one away.</li>
+<li><code>sweep</code> adds a dimension, <code>average</code> adds none.</li>
 <li><code>if_</code> reads a measurement outcome inside the shot.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -742,10 +743,11 @@ reloaded = qp.load(<span class="hljs-string">&quot;first_readout.qp&quot;</span>
     play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
     wait q[0].drive 4
   sync q[0].drive q[0].readout
-  measure q[0].readout &quot;readout&quot; &quot;weights&quot; name=&quot;q0/readout/m0&quot; fields=[&quot;state&quot;, &quot;iq&quot;]
+  measure q[0].readout IQPair(...) IQPair(...) name=&quot;q0/readout/m0&quot; fields=[&quot;state&quot;, &quot;iq&quot;]
 </code></pre>
 <ul>
 <li>Prepare on the drive bus, hold at a barrier, then read on the readout bus.</li>
+<li>The two <code>IQPair</code>s are the readout tone and the integration weights, written out in full.</li>
 <li>Each call appends exactly one node, and <code>body.walk()</code> hands them back in order.</li>
 <li>The tree is now in memory, and nothing has reached the rack.</li>
 </ul>
@@ -844,7 +846,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="59" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="59" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="anatomy-of-a-program">Anatomy of a program</h2>
 <p><img src="img/anatomy.svg" alt="" style="height:430px;" /></p>
-<p class="cap"><code>sweep</code> creates an axis, <code>average</code> collapses one, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
+<p class="cap"><code>sweep</code> creates an axis, <code>average</code> creates none, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="60" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="60" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
@@ -906,7 +908,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 <h2 id="averaging">Averaging</h2>
 <ul>
 <li><code>average(shots)</code> repeats the body and hands back the mean.</li>
-<li>It is the one block that removes a dimension instead of adding one.</li>
+<li>It is the one block that adds no dimension, where every <code>sweep</code> around it does.</li>
 <li>Amplifier noise and projection noise both fall as <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><msqrt><mi>N</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{N}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.1767em;vertical-align:-0.25em;"></span><span class="mord">1/</span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9267em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord mathnormal" style="margin-right:0.109em;">N</span></span></span><span style="top:-2.8867em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
 c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
 c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
@@ -1045,6 +1047,7 @@ a_pi true   : 0.6200                error:    -0.39%
 <p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Fit the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> amplitude from the rising branch of the Rabi curve, instead of halving the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</p>
 </blockquote>
 <ul>
+<li>Refit the points up to the maximum with the model written in terms of <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>a</mi><mn>90</mn></msub></mrow><annotation encoding="application/x-tex">a_{90}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">90</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>.</li>
 <li>A <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> pulse is usually taken as half the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</li>
 <li>On a real drive line, the measured value can differ by percent.</li>
 </ul>
@@ -1103,7 +1106,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 </code></pre>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" data-class="divider" lang="en-US" class="divider" data-marpit-pagination="77" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;--class:divider;" data-marpit-pagination-total="118" data-size="16:9"><p class="kicker">Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" data-class="divider" lang="en-US" class="divider" data-marpit-pagination="77" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;--class:divider;" data-marpit-pagination-total="118" data-size="16:9"><p class="kicker">Session 2 · Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
 <h1 id="coherence-and-feedback">Coherence and feedback</h1>
 <h3 id="t1-ramsey-echo-single-shots-and-active-reset">T1, Ramsey, echo, single shots, and active reset</h3>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>

@@ -294,7 +294,7 @@ $$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
 
 $$Q(t) = \beta\,\dot{I}(t)$$
 
-- DRAG adds a second quadrature alongside the envelope you play.
+- DRAG adds a second envelope on the quadrature 90 degrees from the one you play.
 - Its shape is the derivative of the in-phase envelope.
 - It cancels the leading transfer into $|2\rangle$ and the phase error left behind.
 - First order gives $\beta \approx 1/|\alpha|$, and $\beta$ is calibrated per qubit.
@@ -319,7 +319,8 @@ Two qubits interact through a coupling, and a gate is an interval where you let 
 | **flux** | push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
 | **all-microwave** | drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
 
-- The flux route drags a qubit off its sweet spot, the microwave route moves neither.
+- The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.
+- The microwave route moves neither qubit.
 - Two-qubit error runs five to ten times single-qubit error.
 - Each pair is calibrated by a two-dimensional scan, amplitude against duration.
 
@@ -564,7 +565,7 @@ with program.if_(m0.state == 1):             # a branch on a classified bit
 ```
 
 - Four blocks nest, and nesting in the file is nesting in the result.
-- `sweep` adds a dimension, `average` takes one away.
+- `sweep` adds a dimension, `average` adds none.
 - `if_` reads a measurement outcome inside the shot.
 
 ---
@@ -632,10 +633,11 @@ body:
     play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
     wait q[0].drive 4
   sync q[0].drive q[0].readout
-  measure q[0].readout "readout" "weights" name="q0/readout/m0" fields=["state", "iq"]
+  measure q[0].readout IQPair(...) IQPair(...) name="q0/readout/m0" fields=["state", "iq"]
 ```
 
 - Prepare on the drive bus, hold at a barrier, then read on the readout bus.
+- The two `IQPair`s are the readout tone and the integration weights, written out in full.
 - Each call appends exactly one node, and `body.walk()` hands them back in order.
 - The tree is now in memory, and nothing has reached the rack.
 
@@ -745,7 +747,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 ![h:430](img/anatomy.svg)
 
-<p class="cap"><code>sweep</code> creates an axis, <code>average</code> collapses one, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
+<p class="cap"><code>sweep</code> creates an axis, <code>average</code> creates none, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
 
 ---
 
@@ -783,7 +785,7 @@ with program.average(shots=200):
 ## Averaging
 
 - `average(shots)` repeats the body and hands back the mean.
-- It is the one block that removes a dimension instead of adding one.
+- It is the one block that adds no dimension, where every `sweep` around it does.
 - Amplifier noise and projection noise both fall as $1/\sqrt{N}$.
 - Halving the noise therefore costs four times the measurement time.
 
@@ -916,6 +918,7 @@ a_pi true   : 0.6200                error:    -0.39%
 
 > 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
 
+- Refit the points up to the maximum with the model written in terms of $a_{90}$.
 - A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
 - On a real drive line, the measured value can differ by percent.
 
@@ -967,7 +970,7 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 <!-- _class: divider -->
 
-<p class="kicker">Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
+<p class="kicker">Session 2 · Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
 
 # Coherence and feedback
 

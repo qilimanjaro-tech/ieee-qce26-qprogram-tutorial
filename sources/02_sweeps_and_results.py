@@ -704,7 +704,7 @@ Scan both readout resonators in one lockstep pass. Qubit 1 has its own readout r
 
 1. Declare `f0` and `f1` and sweep them in parallel with `sweep(f0, ...) | sweep(f1, ...)`. Give each a 41-point `Linspace` over its own 10 MHz band (`7.195` to `7.205` GHz, and `7.345` to `7.355` GHz). Use `shots=100`.
 2. Inside the loop, `set_frequency` on each readout bus and `measure` both. You get two handles.
-3. Write one response function for both resonators. It receives `bus`, so it can pick which frequency and which centre to use. `q1_fr` is in `DEVICE`.
+3. Write one response function for both resonators. It receives `bus`, so it can pick which frequency and which centre to use. `q1_fr` is in `DEVICE`, and no linewidth for qubit 1 is, so let `q0_kappa` stand in for both.
 4. Print the dims of each record and the dip frequency each one found, then write a comment explaining why there is one dimension of length 41 here and not a 41 x 41 grid.
 5. Draw each record with `result.plot(handle, channels="magnitude")`. Both records live on the same `"f0|f1"` dimension, so the default reads `f0` below and `f1` above. The q0 record wants that order and the q1 record wants `x="f1"`. Restate the drawn axes into GHz with `coords=`, and note that a `coords=` key naming an axis the figure does not draw raises.
 """
