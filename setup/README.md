@@ -31,7 +31,10 @@ jupyter lab
 The `0.1.0` tag is what the notebooks are verified against. To track the source instead, each distribution installs from its own repository:
 
 ```bash
-pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.1.0" scipy jupyterlab
+pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.1.0" \
+            "qprogram-qblox @ git+https://github.com/qilimanjaro-tech/qprogram-qblox@0.1.0" \
+            "qprogram-qdac @ git+https://github.com/qilimanjaro-tech/qprogram-qdac@0.1.0" \
+            scipy jupyterlab
 ```
 
 ### A2: with uv
@@ -60,7 +63,7 @@ jupyter lab
 
 **The two vendor packages are separate distributions, not extras.** `qprogram-qblox` and `qprogram-qdac` add operations, capability profiles, and serialization for a Qblox cluster and a QDevil QDAC. Neither talks to an instrument and neither pulls in a vendor SDK. Their only dependency is `qprogram` itself, so they cost an import and nothing else. Part 5 builds a rack out of the two published profiles and Part 6 reads their packaging, which is why the install lines above include them. Parts 0 to 4 never touch either one.
 
-**scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing, `scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, and the capstone in Part 6. The library draws the data; scipy works out what the data means. Install it alongside QProgram:
+**scipy is not a QProgram dependency.** The tutorial uses it for exactly one thing, `scipy.optimize.curve_fit`: the Lorentzian and Rabi fits in Part 3, the decay fits in Part 4, the sweet-spot fit in Part 5, and the capstone in Part 6. The library draws the data; scipy works out what the data means. Install it alongside QProgram:
 
 ```bash
 pip install "qprogram[viz]==0.1.0" scipy
@@ -118,7 +121,7 @@ Three lines of expected output. The version is read through `importlib.metadata`
 | `pip` picks an old resolver or fails on the extras syntax | Upgrade pip first: `pip install -U pip`. Keep the quotes around `"qprogram[viz]==0.1.0"`; some shells eat the brackets. |
 | `python --version` is 3.10 or older | Make a fresh environment on a supported interpreter: `uv venv --python 3.13`. On Colab: Runtime > Change runtime type. |
 | `ModuleNotFoundError: No module named 'matplotlib'` | The `viz` extra is missing: `pip install "qprogram[viz]"`. |
-| `ModuleNotFoundError: No module named 'scipy'` | `pip install scipy`. Parts 3, 4, and 6 fit curves. |
+| `ModuleNotFoundError: No module named 'scipy'` | `pip install scipy`. Parts 3, 4, 5, and 6 fit curves. |
 | `python -m qprogram.lsp serve` fails to import | The `lsp` extra is missing: `pip install "qprogram[lsp]"`. The `check` and `explain` modes do not need it. |
 | Plots stay invisible | matplotlib is inline by default in a notebook kernel, so check you are in a kernel and not running the file as a script. The notebooks deliberately carry no `%matplotlib` magic. |
 | A figure comes with `<Axes: ...>` printed beside it | `result.plot(...)` returns the axes it drew on, and a notebook prints the last value of a cell. Bind it (`ax = result.plot(m0)`) or end the line with a semicolon. |

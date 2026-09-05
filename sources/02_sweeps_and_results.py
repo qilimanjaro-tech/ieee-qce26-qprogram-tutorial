@@ -171,7 +171,7 @@ Every source declares a `KIND`, either `"linear"` or `"arbitrary"`, and a capabi
 
 `"linear"` is a promise about the values. Point $i$ is exactly `start + step * i`, so a sequencer can run the loop out of a hardware register, incrementing a frequency word per iteration, with nothing uploaded and no control computer in the loop.
 
-`"arbitrary"` means the values are a list, and a list has to reach the instrument somehow. The platform either uploads it as a table, which costs sequencer memory, or steps it from the host, one round trip per point. Both are slower. Part 5 reads a real capability descriptor and tells you which of the two you landed in.
+`"arbitrary"` means the values are a list, and a list has to reach the instrument somehow. The platform either uploads it as a table, which costs sequencer memory, or steps it from the host, one round trip per point. Both are slower. Part 5 reads a real capability descriptor and prints which domain each loop ended up in.
 
 `Values` is arbitrary **even when the numbers you pass are evenly spaced**, because a list of floats proves nothing about its own regularity. If your sweep really is a ramp, say `Range` or `Linspace`.
 
@@ -478,7 +478,7 @@ The label and the units ride out alongside the id and land on the coordinate as 
 r"""
 ### Three ways to name a record
 
-`get` accepts three spellings of the same question. A handle is the one to prefer, because it says what it means and survives a reordering of the program. A plain name string selects the same record, and you reach for that form when the handle objects are gone, as Part 5 does after a `.qp` round trip. An integer is positional sugar for declaration order. `bus=` narrows the candidates first, so `get(0, bus=q[1].readout)` means the first measurement on that bus. `plot` takes all three spellings too.
+`get` accepts three spellings of the same question. A handle is the one to prefer, because it says what it means and survives a reordering of the program. A plain name string selects the same record, and you reach for that form when the handle objects are gone, after loading a program back from a `.qp` file in a session that never built it. An integer is positional sugar for declaration order. `bus=` narrows the candidates first, so `get(0, bus=q[1].readout)` means the first measurement on that bus. `plot` takes all three spellings too.
 
 `result.get(handle)` defaults to `field=MF.IQ`. Ask for a field the measurement never requested and you get a `KeyError`, including the default, so a state-only measurement needs `field=MF.STATE` spelled out.
 """
@@ -514,7 +514,7 @@ Part 1 backed out $g \approx 190$ MHz for this chip. The limit is about 37 photo
 r"""
 ### Choosing a readout power
 
-The map is how you choose a readout power, and the choice squeezes from both sides. More photons means more signal, and signal-to-noise per shot grows with the square root of the photon number. But the information lives in the $2\chi$ pull, and the pull is the thing punchout destroys. So you park a few decibels below the crossover, with enough photons to separate the two states in one shot and few enough that there are still two states to separate.
+The map is how you choose a readout power, and the choice squeezes from both sides. More photons means more signal, and signal-to-noise per shot grows with the square root of the photon number. But the information lives in the $2\chi$ pull, and the pull is the thing punchout destroys. So you park a few decibels below the crossover, with enough photons to separate the two states in one shot and few enough that there are still two states to separate. On this chip the pull has halved by 0.35 in DAC units, which puts the 0.2 that Part 1 wrote into `readout_pulse` about 5 dB under the crossover. Every readout from here to the capstone plays at that amplitude, and this map is the scan that justifies it.
 """
 
 # %% [markdown]

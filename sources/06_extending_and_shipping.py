@@ -89,6 +89,10 @@ schema = BusSchema.flux_tunable_transmon()
 q = schema.q
 PI = IQDrag(amplitude=DEVICE["q0_a_pi"], duration=40, sigma=10, beta=0.1)
 X90 = IQDrag(amplitude=DEVICE["q0_a_pi"] / 2, duration=40, sigma=10, beta=0.1)
+# Seed carriers. Steps 1 and 2 of the capstone measure both and rebind them, the same way
+# steps 3 replaces the seed pulses above.
+RO_FREQ = DEVICE["q0_fr"]
+DRIVE_FREQ = DEVICE["q0_f01"]
 
 print("buses on this chip:", [q[0].drive, q[0].readout, q[0].flux])
 print(f"pi pulse: IQDrag amplitude {PI.amplitude}, duration {PI.duration} ns")
@@ -219,18 +223,23 @@ print(qp.dumps(demo))
 # The middles of the four experiments that need one: ordinary functions of the program and the swept
 # variable, which is all `sweep_program` asks for.
 def spec_tone(program, freq):
+    program.set_frequency(q[0].readout, RO_FREQ)  # step 1 measured this
     program.set_frequency(q[0].drive, freq)
     program.play(q[0].drive, IQPair(Square(0.05, 2000), Square(0.0, 2000)))
     program.sync()
 
 
 def t1_pulses(program, delay):
+    program.set_frequency(q[0].readout, RO_FREQ)
+    program.set_frequency(q[0].drive, DRIVE_FREQ)  # step 2 measured this
     program.play(q[0].drive, PI)
     program.wait(q[0].drive, delay)
     program.sync()
 
 
 def ramsey_pulses(program, delay):
+    program.set_frequency(q[0].readout, RO_FREQ)
+    program.set_frequency(q[0].drive, DRIVE_FREQ + DETUNING)  # off resonance on purpose
     program.play(q[0].drive, X90)
     program.wait(q[0].drive, delay)
     program.play(q[0].drive, X90)
@@ -238,6 +247,8 @@ def ramsey_pulses(program, delay):
 
 
 def echo_pulses(program, delay):
+    program.set_frequency(q[0].readout, RO_FREQ)
+    program.set_frequency(q[0].drive, DRIVE_FREQ)  # on resonance, the pi pulse does the refocusing
     program.play(q[0].drive, X90)
     program.wait(q[0].drive, delay / 2)
     program.play(q[0].drive, PI)  # the pi pulse that refocuses the detuning
@@ -861,11 +872,13 @@ Seven steps, in the order a real chip gets brought up, each one a program saved 
 5. **Ramsey.** Two pi/2 pulses with a deliberate detuning, which gives T2\* and the frequency error.
 6. **Hahn echo.** A pi pulse in the middle refocuses the detuning, which gives T2.
 7. **Active reset.** Measure, and play a pi pulse only if the qubit came back excited.
+
+Single-shot readout is the one row of the bring-up table with no step of its own here. The reference executor classifies for you, so there is no threshold to fit, and Part 4 is where that calibration lives. On hardware it would sit between step 6 and step 7, because active reset cannot branch on a bit nobody calibrated.
 """
 
 # %% [markdown]
 r"""
-Steps 4 to 6 drive with the pi pulse step 3 just fitted, not with the seed pulse from the top of the notebook. Feeding each step into the next is the reason to run a bring-up as one script rather than cell by cell, where step 5 picks up whichever version of step 3 last ran.
+Every step after the first two runs on the carriers those two measured. `RO_FREQ` parks the readout where step 1 found the resonator, `DRIVE_FREQ` is the carrier step 2 fitted, and steps 4 to 6 drive with the pi pulse step 3 produced rather than the seed pulse from the top of the notebook. Feeding each step into the next is the reason to run a bring-up as one script rather than cell by cell, where step 5 picks up whichever version of step 3 last ran.
 
 The delays in steps 4 to 6 change the result only because the measurement model reads `env["delay"]`. The reference executor has no timing model. On hardware the delay is the physics; here it is an argument.
 """
@@ -881,16 +894,23 @@ f_r, _, _, _ = step(
     channels="magnitude", measured="Readout magnitude",
 )
 CAL["f_r (GHz)"] = (f_r / 1e9, DEVICE["q0_fr"] / 1e9)
+RO_FREQ = f_r  # every scan from here parks the readout where step 1 found it
 
 f_01, _, _, _ = step(
     "02_qubit", "drive_freq", qp.Linspace(4.84e9, 4.86e9, 81), spec_tone,
     qp.MockMeasurementModel(p_excited=p_spec, seed=12), peak, p0=(4.85e9, 1e6, 0.45, 0.0),
 )
 CAL["f_01 (GHz)"] = (f_01 / 1e9, DEVICE["q0_f01"] / 1e9)
+DRIVE_FREQ = f_01  # and every drive tone from here uses the carrier step 2 found
+
+def rabi_pulse(program, amp):
+    program.set_frequency(q[0].readout, RO_FREQ)
+    program.set_frequency(q[0].drive, DRIVE_FREQ)
+    program.play(q[0].drive, IQDrag(amp, 40, 10, 0.1))
+
 
 (a_pi,) = step(
-    "03_rabi", "amp", qp.Linspace(0.0, 1.0, 41),
-    lambda program, amp: program.play(q[0].drive, IQDrag(amp, 40, 10, 0.1)),
+    "03_rabi", "amp", qp.Linspace(0.0, 1.0, 41), rabi_pulse,
     qp.MockMeasurementModel(p_excited=p_rabi, seed=13), rabi, p0=(0.5,),
 )
 CAL["a_pi (DAC)"] = (a_pi, DEVICE["q0_a_pi"])
@@ -914,6 +934,8 @@ print(f"T1 {T1 / 1000:.2f} us, T2* {T2star / 1000:.2f} us, T2 echo {T2echo / 100
 
 reset = qp.QProgram(label="07_reset", schema=schema)
 with reset.average(shots=1000):
+    reset.set_frequency(q[0].readout, RO_FREQ)
+    reset.set_frequency(q[0].drive, DRIVE_FREQ)
     checked = reset.measure(q[0].readout, "readout", "weights", name="check", fields=(MF.STATE,))
     with reset.if_(checked.state == 1):
         reset.play(q[0].drive, PI)
@@ -946,7 +968,7 @@ library.save(OUT / "calibration.wfl")
 print(f"{'quantity':<18}{'measured':>12}{'true':>12}{'error':>9}")
 for name, (measured, truth) in CAL.items():
     print(f"{name:<18}{measured:>12.4f}{truth:>12.4f}{100 * abs(measured - truth) / abs(truth):>8.1f}%")
-print(f"\nartifacts in {OUT.resolve()}:")
+print(f"\nartifacts in {OUT}:")
 print(" ", sorted(p.name for p in OUT.iterdir()))
 
 fig, axes = plt.subplots(2, 3, figsize=(12, 5.5))

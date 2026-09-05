@@ -261,7 +261,7 @@ ax.legend(fontsize=8)
 r"""
 ### Where the energy goes
 
-Some of it goes down the readout line, since the resonator couples to the qubit on one side and to a 50 ohm line out of the fridge on the other. That channel, Purcell decay, runs at $\kappa (g/\Delta)^2$, and this chip's numbers put it alone at 16 microseconds, shorter than the 18 in `DEVICE` and therefore impossible. It is the same over-large $g$ Part 1 backed out of $\chi$. Real chips put a bandpass filter between resonator and line, which buys back an order of magnitude.
+Some of it goes down the readout line, since the resonator couples to the qubit on one side and to a 50 ohm line out of the fridge on the other. That channel, Purcell decay, runs at $2\pi\kappa (g/\Delta)^2$ for a linewidth $\kappa$ in hertz, and this chip's numbers put it alone at 16 microseconds, shorter than the 18 in `DEVICE` and therefore impossible. It is the same over-large $g$ Part 1 backed out of $\chi$. Real chips put a bandpass filter between resonator and line, which buys back an order of magnitude.
 
 The rest goes into the materials. Two-level defects in the amorphous oxides absorb at whatever frequency they sit at, and they drift in and out of resonance with the qubit, so $T_1$ remeasured often enough wanders by a factor of two and is reported as a histogram rather than one number. Quasiparticles and stray radiation take the remainder, both fought with shielding rather than design.
 """
@@ -694,7 +694,7 @@ A qubit does not start cold, and waiting for it to get there is the slowest thin
 r"""
 ### Why the qubit is warm
 
-A transmon at 4.85 GHz in thermal equilibrium with a 20 mK stage would sit at $e^{-hf/k_BT}$, and nobody has ever measured that. Real devices come in at an effective temperature of 40 to 60 mK, a residual excited population of a percent or two. The gap is stray infrared, imperfect filtering, and hot electrons in the ground plane. The model below uses 18 percent, hotter than any device you would keep, so the effect is unmistakable.
+A transmon at 4.85 GHz in thermal equilibrium with a 10 mK stage would sit at $e^{-hf/k_BT}$, and nobody has ever measured that. Real devices come in at an effective temperature of 40 to 60 mK, a residual excited population of a percent or two. The gap is stray infrared, imperfect filtering, and hot electrons in the ground plane. The model below uses 18 percent, hotter than any device you would keep, so the effect is unmistakable.
 """
 
 # %% [markdown]
@@ -803,9 +803,9 @@ Run the reset experiment on 400 single shots and report the excited-state popula
 3. `with program.if_(check.state == 1):` call `x180`, `sync`, and measure again as `"verify"`.
 4. `with program.else_():` wait out the pi pulse the other arm plays, `program.wait(q[0].drive, 40)`. Nothing requires a second arm, but on hardware an arm that holds a bus longer than its sibling shifts everything after the branch.
 5. Run it with `ResetModel()` and pull both state arrays.
-6. The population before is the mean of `check`. For the population after, remember the NaN: a cold shot never entered the arm, so its outcome is the one `check` already reported, and `np.where(np.isnan(verify), check, verify)` is the whole calculation.
+6. The population before is the mean of `check`. For the population after, remember the NaN: a cold shot never entered the arm, so its outcome is the one `check` already reported, and `np.where(np.isnan(verified), before, verified)` is the whole calculation, once you have pulled both arrays out.
 
-Expect roughly 18 percent before and 1 percent after, the residual being the shots where the pi pulse missed. Call the program `reset`, because the cell after your solution prints its `.qp` text.
+Expect roughly 18 percent before and 1 percent after, the residual being the shots where the pi pulse missed. Call the program `reset` and finish with `print(qp.dumps(reset))`, because the paragraph after this one reads that text.
 """
 
 # %% solution
@@ -829,6 +829,8 @@ after = np.where(np.isnan(verified), before, verified)
 print(f"reset fired on {int(np.isfinite(verified).sum())} of {len(before)} shots")
 print(f"population before reset = {100 * before.mean():.1f}%")
 print(f"population after reset  = {100 * after.mean():.1f}%")
+print()
+print(qp.dumps(reset))
 
 # %% stub
 # TODO: active reset on 400 single shots.
@@ -841,11 +843,9 @@ print(f"population after reset  = {100 * after.mean():.1f}%")
 # 6) reset_result = qp.simulate(reset, model=ResetModel())
 # 7) before = ...get(check, field=MF.STATE).values; verified = ...get(verify, ...).values
 # 8) after = np.where(np.isnan(verified), before, verified)
+# 9) print(qp.dumps(reset))
 #
 # Print both populations. Expect about 18% before and 1% after.
-
-# %%
-print(qp.dumps(reset))
 
 # %% [markdown]
 r"""
@@ -870,5 +870,5 @@ r"""
 r"""
 ## Next
 
-Part 5 takes these exact programs to a machine where the flux line has no sequencer, and asks what has to change before they run.
+Part 5 takes this calibration to a machine where the flux line has no sequencer, and asks what has to change before it runs. The program it ports is the flux arc from Part 3, because that is the one whose outer loop the new rack cannot execute.
 """

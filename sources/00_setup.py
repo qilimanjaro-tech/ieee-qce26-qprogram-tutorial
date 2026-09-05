@@ -6,7 +6,7 @@ r"""
 
 Nothing here talks to hardware. QProgram ships a pure-Python reference platform, so every experiment in this tutorial runs on your laptop. JupyterLab, VS Code, and Google Colab all work.
 
-- **Local:** `pip install "qprogram[viz]" scipy` (Python 3.11 to 3.14), then run the cells below.
+- **Local:** `pip install "qprogram[viz]==0.1.0" scipy` (Python 3.11 to 3.14), then run the cells below.
 - **Colab:** run the cells top to bottom. The second one installs what is missing.
 """
 
@@ -28,7 +28,7 @@ A superconducting qubit arrives from the fab as a chip with three wires on it an
 
 The third column is a chain, not a list of nice-to-haves. The rows run in the order printed and in no other, because each experiment is pointed by the answer the one above it returned. A qubit scan needs a working readout to see anything at all, a Rabi needs a qubit frequency to drive, a coherence curve needs a $\pi$ pulse to prepare the state it then watches decay. Get the first row wrong and the other six are measuring the wrong thing without telling you.
 
-The library arrives at the same pace, one problem at a time. Sweeps show up when you have to step a frequency. Averaging shows up when one shot turns out to be nothing but noise. Conditionals show up when a measurement has to change what the program does next. The last two parts change the question and take a finished calibration to a rack that is wired differently, to find out what a machine has to agree to before it will run your program.
+The library arrives at the same pace, one problem at a time. Sweeps show up when you have to step a frequency. Averaging shows up when one shot turns out to be nothing but noise. Conditionals show up when a measurement has to change what the program does next. The last two parts change the question. Part 5 takes a finished calibration to a rack that is wired differently, to find out what a machine has to agree to before it will run your program, and Part 6 adds to the language itself and ships the result as one file.
 
 Six checks follow, each printing one line you can read at a glance. The last one draws the picture that says the whole stack works.
 """
@@ -55,16 +55,17 @@ else:
 r"""
 ## Check 2: install QProgram
 
-With a supported interpreter the next cell does nothing at all if QProgram is already installed, and installs it otherwise, which is the case on a fresh Colab runtime. The `viz` extra pulls in matplotlib for the plots. `scipy` is not a QProgram dependency; the tutorial uses it to fit the curves you measure. Parts 5 and 6 also read two vendor extension packages, `qprogram-qblox` and `qprogram-qdac`, and their own first cells install them. Neither drives an instrument.
+With a supported interpreter the next cell does nothing at all if QProgram and SciPy are already installed, and installs them otherwise, which is the case on a fresh Colab runtime. The `viz` extra pulls in matplotlib for the plots. `scipy` is not a QProgram dependency, and the tutorial uses it to fit the curves you measure from Part 3 on, so the cell checks for it here rather than letting Part 3 be where you find out. Parts 5 and 6 also read two vendor extension packages, `qprogram-qblox` and `qprogram-qdac`, and their own first cells install them. Neither drives an instrument.
 
 One note on spelling before the imports start. The QProgram documentation writes a single import, `import qprogram as qp`, and reaches the rest through it, as in `qp.BusSchema.transmon()`, `qp.waveforms.IQDrag(...)`, and `qp.MeasurementField.IQ`. These notebooks import the names they use most often directly instead, so a cell stays short enough to read on a projected screen. Both spellings reach the same objects, so `BusSchema` in a cell here and `qp.BusSchema` on an example page are one class.
 """
 
 # %%
-# Run me first. A no-op when qprogram is already installed, an install when it is not
+# Run me first. A no-op when both are already installed, an install when either is missing
 # (a fresh Google Colab runtime, for example).
 try:
     import qprogram  # noqa: F401
+    import scipy  # noqa: F401
 except ImportError:
     import subprocess
     import sys
@@ -74,10 +75,11 @@ except ImportError:
         check=True,
     )
     import qprogram  # noqa: F401
+    import scipy  # noqa: F401
 
 from importlib.metadata import version
 
-print("qprogram", version("qprogram"))
+print("qprogram", version("qprogram"), "| scipy", version("scipy"))
 
 # %% [markdown]
 r"""
@@ -128,7 +130,7 @@ Where the numbers come from is up to you. A `MeasurementModel` is asked for one 
 
 $$S_{21}(f) = 1 - \frac{0.9}{1 + i\,\delta}, \qquad \delta = \frac{f - f_r}{\kappa/2}$$
 
-with $f_r$ = 7.20 GHz and $\kappa$ = 1.5 MHz. Two facts hide in that second number. A 7.2 GHz resonance 1.5 MHz wide has a loaded quality factor of 4800, and it fills and empties in about $1/\kappa$, or 106 ns. Both matter later. The quality factor sets how sharply the resonance moves when the qubit changes state, and the fill time is the reason a readout pulse is measured in microseconds rather than nanoseconds, since you have to wait for the resonator to reach steady state before the light coming back means anything.
+with $f_r$ = 7.20 GHz and $\kappa$ = 1.5 MHz. Two facts hide in that second number. A 7.2 GHz resonance 1.5 MHz wide has a loaded quality factor of 4800, and it fills and empties in about $1/2\pi\kappa$, or 106 ns. Both matter later. The quality factor sets how sharply the resonance moves when the qubit changes state, and the fill time is the reason a readout pulse is measured in microseconds rather than nanoseconds, since you have to wait for the resonator to reach steady state before the light coming back means anything.
 """
 
 # %%

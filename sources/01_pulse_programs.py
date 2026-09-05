@@ -116,7 +116,7 @@ The two qubit states pull the resonator apart by $2\chi$, and $\kappa$ is how wi
 
 $$2\chi/\kappa = 2.4$$
 
-Too small and the two Lorentzians overlap, and no amount of averaging separates them. Too large and the tone you park between them barely enters the cavity. Information per photon peaks near $2\chi \approx \kappa$, so this chip is a little over-separated, trading signal for cleanliness. The same linewidth fixes the cavity fill time at $1/\kappa \approx 106$ ns, and the readout pulse below is 2000 ns rather than 200 for that reason.
+Too small and the two Lorentzians overlap, and no amount of averaging separates them. Too large and the tone you park between them barely enters the cavity. Information per photon peaks near $2\chi \approx \kappa$, so this chip is a little over-separated, trading signal for cleanliness. The same linewidth fixes the cavity fill time at $1/2\pi\kappa \approx 106$ ns, and the readout pulse below is 2000 ns rather than 200 for that reason.
 """
 
 # %% [markdown]
@@ -365,7 +365,7 @@ r"""
 
 Both programs above played an envelope without ever saying what an envelope is. A waveform is a pure-data description of one. It knows nothing about hardware, and it can be built, compared, and drawn with no program around it.
 
-Three methods carry the whole contract. `envelope(resolution=1)` returns the samples as a numpy array, `get_duration()` returns nanoseconds, and `plot()` draws the envelope and hands back the matplotlib `Axes` it drew on. Reach for `plot()` whenever the goal is to look at a shape. The gallery below needs a row of six panels, so it opens the row with matplotlib and hands each panel to a waveform through `target=`. Part 2 passes the same argument to `result.plot`.
+Three methods carry the whole contract. `envelope(resolution=1)` returns the samples as a numpy array, `get_duration()` returns nanoseconds, and `plot()` draws the envelope and hands back the matplotlib `Axes` it drew on. Reach for `plot()` whenever the goal is to look at a shape. The gallery below needs a row of six panels, so it opens the row with matplotlib and hands each panel to a waveform through `target=`. Part 4 passes the same argument to `result.plot`, to put two clouds of single shots on one axes.
 """
 
 # %% [markdown]
@@ -482,7 +482,7 @@ The worse version costs people data. A script with a literal amplitude in it cla
 
 `play` and `measure` also accept a **string alias** instead of a waveform. The program then says which pulse it wants, and the numbers arrive later from `with_waveforms`. Version the sequence, keep the amplitudes elsewhere. A program with an unbound alias cannot silently claim a stale calibration, because it does not carry one.
 
-Part 3 fits a real pi pulse and binds it this way, and Part 5 replaces the plain dict below with a `WaveformLibrary` that resolves a name differently per bus.
+Part 3 fits a real pi pulse and binds it this way, and replaces the plain dict below with a `WaveformLibrary` that resolves a name differently per bus.
 """
 
 # %%
@@ -567,7 +567,7 @@ qp.save(drive_program, path)
 text = path.read_text()
 
 reloaded = qp.load(path)
-print("wrote:", path.resolve(), f"({len(text.splitlines())} lines)")
+print("wrote:", path, f"({len(text.splitlines())} lines)")
 print("same structure:", reloaded.body == drive_program.body)
 print("same text back:", qp.dumps(reloaded) == text)
 

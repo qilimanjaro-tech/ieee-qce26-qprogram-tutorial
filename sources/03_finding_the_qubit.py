@@ -266,7 +266,7 @@ plt.show()
 r"""
 ## 3.2 Rabi
 
-You now know where the qubit is, to a fifth of a linewidth. The next question is how much amplitude a 40 ns pulse needs to rotate the state by $\pi$, and the scan that answers it sets the drive to the frequency you just fitted.
+You now know where the qubit is, to a few percent of a linewidth. The next question is how much amplitude a 40 ns pulse needs to rotate the state by $\pi$, and the scan that answers it sets the drive to the frequency you just fitted.
 
 A resonant drive rotates the Bloch vector about an axis in the equatorial plane at a rate set by the amplitude. Hold the shape and the duration fixed and the angle turned is proportional to the amplitude. The population after a rotation by $\theta$ is $\sin^2(\theta/2)$, so sweeping amplitude sweeps through $\theta = \pi$ and the first maximum is the pi pulse. The ceiling is 1 here rather than 0.45, because a coherent rotation can put everything in $|1\rangle$ and a saturated transition cannot.
 """
@@ -396,7 +396,7 @@ r"""
 
 A calibrated gate, in this stack, is a waveform object with numbers in it.
 
-`PI_PULSE` flips the qubit. `X90_PULSE` takes it to the equator and is the workhorse of Part 4, where Ramsey needs two and the echo needs two with a pi pulse between. Both are plain `IQDrag` instances, so they compare by structure and a calibration set is diffable. The amplitude is rounded to four decimals, already finer than the 0.002 the fit knows it to.
+`PI_PULSE` flips the qubit. `X90_PULSE` takes it to the equator and is the workhorse of Part 4, where Ramsey needs two and the echo needs two with a pi pulse between. Both are plain `IQDrag` instances, so they compare by structure and a calibration set is diffable. The amplitude is rounded to four decimals, already finer than the 0.002 the fit knows it to. `beta` is 0.1 here rather than the 0.15 Part 1 played with, and neither number came from a measurement. The amplitude is the only thing in these two objects that a fit produced.
 
 Halving `a_pi` for the x90 assumes the response is exactly $\sin^2$. On this simulated chip it is, by construction. On a real one the DAC and the amplifier chain are not perfectly linear, and a shorter effective rotation samples the envelope differently. Exercise 3.1 measures the pi/2 amplitude instead.
 """

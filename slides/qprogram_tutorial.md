@@ -112,19 +112,19 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 ## Follow along
 
-- **Local**: `pip install "qprogram[viz]" scipy`, Python 3.11 to 3.14.
+- **Local**: `pip install "qprogram[viz]==0.1.0" scipy`, Python 3.11 to 3.14.
 - **Colab**: the first cell of each notebook installs what is missing.
+- Parts 5 and 6 add two vendor packages, and their own first cells install them.
 - No hardware and no cloud account, since the reference platform ships in the wheel.
-- Open and run `notebooks/00_setup.ipynb` now.
-- Its last cell draws a resonator dip near 7.2 GHz.
+- Open and run `notebooks/00_setup.ipynb` now. Its last cell draws a dip near 7.2 GHz.
 
 ---
 
 ## How we work
 
 - The slides are the map, and the notebooks are the work.
-- Each part is a short concept, a live code-along, then one 🧩 exercise.
-- `notebooks/` holds blank `# TODO` cells, `notebooks/solutions/` holds the answers.
+- Each part is a short concept, a live code-along, and one 🧩 exercise.
+- `notebooks/` holds the `# TODO` cells with the steps written out, `notebooks/solutions/` the answers.
 - Interrupt me, above all with a lab story that contradicts the slide.
 
 ---
@@ -418,11 +418,11 @@ Every fit you run has to land on these, and a circuit carries none of them.
 A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply this.
 
 ```text
-40 ns DRAG envelope,  IQ pair,  carrier 4.8501 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
+40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
 ```
 
 - Nothing in `X(q0)` names a line, a carrier, or an envelope.
-- Each of these numbers came out of its own scan.
+- The carrier and the amplitude came out of their own scans, and the rest are choices.
 - They drift, so the scans are run again.
 
 ---
@@ -501,6 +501,7 @@ m0 = program.measure(q[0].readout, readout_pulse, weights)
 
 - A program is a label, a schema, and the calls you append.
 - `BusSchema.transmon()` gives each qubit a drive line and a readout line.
+- `readout_pulse` and `weights` are envelopes, and a string alias can stand in for either.
 - Without a schema, bus names are plain strings and nothing is checked.
 
 ---
@@ -911,6 +912,15 @@ a_pi true   : 0.6200                error:    -0.39%
 
 ---
 
+## Exercise 3.1
+
+> 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
+
+- A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
+- On a real drive line, the measured value can differ by percent.
+
+---
+
 ## The waveform library
 
 - The library resolves each alias per bus, in three tiers, most specific first.
@@ -952,15 +962,6 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
       for arc_freq in Linspace(start=4300000000.0, stop=4900000000.0, num=61):
         set_frequency q[0].drive arc_freq
 ```
-
----
-
-## Exercise 3.1
-
-> 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
-
-- A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
-- On a real drive line, the measured value can differ by percent.
 
 ---
 
@@ -1116,7 +1117,7 @@ population before reset = 18.5%     population after reset = 1.0%
 
 - One `shot` variable swept with `qp.Range(0, 399, 1)`, and no `average`.
 - `check` asks for `state`, and the excited arm calls `x180` then measures again.
-- Recover the population with `np.where(np.isnan(verify), check, verify)`.
+- Recover the population with `np.where(np.isnan(verified), before, verified)`.
 
 ---
 
@@ -1470,6 +1471,17 @@ qblox = "qprogram_qblox"
 
 ---
 
+## Exercise 6.1
+
+> 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
+
+- Register the token `measure.fields.counts`.
+- Measure with `fields=("counts", MF.STATE)` and print the `.qp` body.
+- Validate against the reference platform, then against a rack without the token.
+- Read the counts back and say why they are zero.
+
+---
+
 ## The calibration diff
 
 ```diff
@@ -1504,17 +1516,6 @@ $ python -m qprogram.lsp check rabi_hand_edited.qp   (exit 1)
 
 ---
 
-## Exercise 6.1
-
-> 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
-
-- Register the token `measure.fields.counts`.
-- Measure with `fields=("counts", MF.STATE)` and print the `.qp` body.
-- Validate against the reference platform, then against a rack without the token.
-- Read the counts back and say why they are zero.
-
----
-
 ## The capstone
 
 ```
@@ -1531,7 +1532,7 @@ T2 echo (us)           15.8509     16.0000     0.9%
 - Each step consumes the answer measured by the one before it.
 - T1, Ramsey and echo drive with the $\pi$ pulse that Rabi fitted.
 - The run leaves a `.qp` per step plus one `calibration.wfl`.
-- Six primitives under all of it, assembled into one tree and run by a swappable platform.
+- The six requirements from the opening under all of it, in one tree, run by a swappable platform.
 
 ---
 

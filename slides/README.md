@@ -2,7 +2,7 @@
 
 A [Marp](https://marp.app/) deck, written in Markdown. **The concepts live here.** The deck opens with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes a voltage, what a measurement really returns, and what decoherence costs, then argues why any of that needs a language of its own. Only after all of that does QProgram appear. The notebooks in [`../notebooks/`](../notebooks/) carry the code and explain the experiments; they leave the background to these slides.
 
-One hundred and eighteen slides, in four movements: logistics, the foundations block, the QProgram block, then nine to sixteen slides per tutorial part. Ten diagrams carry the structure.
+One hundred and eighteen slides, in four movements: logistics, the foundations block, the QProgram block, then nine to seventeen slides per tutorial part. Ten diagrams carry the structure.
 
 One claim per slide, in a title of two to five plain words, under a body of three to five one-line bullets and at most one block: a figure, a code excerpt, a table, an output block, or a formula. Roughly forty words of prose is the working budget and fifty-five is the ceiling, because a slide that says everything leaves the speaker reading it aloud. Numbers belong in the tables, the code and the fit outputs rather than inside a sentence, and `tools/check_style.py` applies its sentence-shape budgets to this file and to the deck as well as to `sources/*.py`.
 
@@ -31,9 +31,9 @@ The first five exist because most of the room writes circuits and has never seen
 
 One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
 
-- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans a real chevron, so the figure could come out of there.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans the flux-amplitude cut of one, so the figure could start there.
 
-An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated shots with a fitted threshold, and a schematic version would be strictly worse. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted.
+An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated shots with a threshold taken from the data, and a schematic version would be strictly worse. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted.
 
 ## Where the diagrams live
 
