@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -186,7 +187,13 @@ def write(path: Path, notebook: dict) -> None:
 
 
 def execute(path: Path, timeout: int = 900) -> None:
-    """Run a notebook in place with nbconvert."""
+    """Run a notebook in place with nbconvert.
+
+    `MPLBACKEND` is stripped from the child environment on purpose. A non-interactive backend
+    inherited from the shell turns every `plt.show()` into a warning and embeds no figure, so a
+    whole set of notebooks can ship with the pictures missing and nothing failing.
+    """
+    env = {key: value for key, value in os.environ.items() if key != "MPLBACKEND"}
     subprocess.run(  # noqa: S603
         [
             sys.executable,
@@ -200,6 +207,17 @@ def execute(path: Path, timeout: int = 900) -> None:
             str(path),
         ],
         check=True,
+        env=env,
+    )
+
+
+def count_figures(notebook: dict) -> int:
+    """How many outputs carry an image. Zero after an execute means the backend was wrong."""
+    return sum(
+        1
+        for cell in notebook["cells"]
+        for output in cell.get("outputs", [])
+        if any(key.startswith("image/") for key in output.get("data", {}))
     )
 
 
@@ -237,7 +255,10 @@ def main(argv: list[str] | None = None) -> int:
             execute(solution)
             done = json.loads(solution.read_text(encoding="utf-8"))
             write(attendee, carry_outputs(done, to_notebook(cells, "stub")))
-            print(f"  executed and copied outputs into notebooks/{name}")
+            figures = count_figures(done)
+            print(f"  executed ({figures} figures) and copied outputs into notebooks/{name}")
+            if not figures:
+                print(f"  WARNING: {name} embedded no figures; check MPLBACKEND", file=sys.stderr)
 
     return 0
 
