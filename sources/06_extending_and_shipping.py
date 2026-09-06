@@ -353,7 +353,7 @@ Registration is global and keyed by class name, so each of the three registratio
 r"""
 ### A custom waveform
 
-Flux-activated two-qubit gates want a pulse that starts and ends at zero. Part 1 explained why: a flux line through a fridge is a filter with long time constants, so a step left at the end of a pulse comes back as a slow tail, and the next gate runs on a chip the previous gate detuned.
+Flux-activated two-qubit gates want a pulse that starts and ends at zero. The reason is the line rather than the gate. A flux line through a fridge is a filter with long time constants, so a step left at the end of a pulse comes back as a slow tail, and the next gate runs on a chip the previous gate detuned.
 
 A half sine is zero at both endpoints and takes one parameter. Its slope there is not zero, so it is continuous but not smooth, and labs chasing the last percent reach for a raised cosine. The DSL has a name for neither shape, though a vendor's compiler may well emit the half sine natively.
 

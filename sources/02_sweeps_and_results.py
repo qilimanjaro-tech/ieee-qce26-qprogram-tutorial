@@ -507,7 +507,7 @@ Dispersive readout works because the qubit and the resonator are coupled but far
 
 $$ n_{\text{crit}} = \frac{\Delta^2}{4g^2} $$
 
-Part 1 backed out $g \approx 190$ MHz for this chip. The limit is about 37 photons. Below it the resonator sits at $f_r + \chi$, pulled by the qubit. Drive the cavity harder and the pull washes out, and the resonator lands on its bare frequency $f_r$. The crossover is called punchout, and it is abrupt enough to be obvious in a 2D map.
+Inverting the $\chi$ of the opening, $\chi = (g^2/\Delta)(\alpha/(\Delta + \alpha))$ with $\alpha \approx -300$ MHz, backs out $g \approx 190$ MHz for this chip. The limit is about 37 photons. Below it the resonator sits at $f_r + \chi$, pulled by the qubit. Drive the cavity harder and the pull washes out, and the resonator lands on its bare frequency $f_r$. The crossover is called punchout, and it is abrupt enough to be obvious in a 2D map.
 """
 
 # %% [markdown]

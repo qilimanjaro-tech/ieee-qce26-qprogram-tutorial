@@ -106,7 +106,7 @@ The drive bus is an IQ channel, so the tone is an `IQPair`. A bare `Square` ther
 r"""
 ### The scan window
 
-The window is 20 MHz wide, so this scan assumes you already know `f01` to about that much, from the chip design or from a survey like the flux arc in 3.4. A weak tone leaves the line near its 2 MHz low-power width, and the step below puts several points across it. Part 1 derives that width from the much narrower coherence linewidth, power-broadened by the very tone you are using to see it.
+The window is 20 MHz wide, so this scan assumes you already know `f01` to about that much, from the chip design or from a survey like the flux arc in 3.4. A weak tone leaves the line near its 2 MHz low-power width, and the step below puts several points across it. That width is set by the drive rather than by the qubit, since a tone strong enough to produce any population at all also broadens the line it is measuring.
 """
 
 # %%
@@ -282,7 +282,7 @@ Both produce an oscillation and both are used. An amplitude sweep keeps the enve
 r"""
 ### A variable inside a waveform
 
-Two things in the program are new. The pulse is an `IQDrag`, the standard single-qubit envelope on a transmon, a Gaussian on I with its scaled derivative on Q, and Part 1 explains why the derivative is there. And the swept variable goes **inside the waveform**:
+Two things in the program are new. The pulse is an `IQDrag`, the standard single-qubit envelope on a transmon, a Gaussian on I with its scaled derivative on Q, and the opening explains why the derivative is there. And the swept variable goes **inside the waveform**:
 
 ```python
 program.play(q[0].drive, IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1))

@@ -261,7 +261,7 @@ ax.legend(fontsize=8)
 r"""
 ### Where the energy goes
 
-Some of it goes down the readout line, since the resonator couples to the qubit on one side and to a 50 ohm line out of the fridge on the other. That channel, Purcell decay, runs at $2\pi\kappa (g/\Delta)^2$ for a linewidth $\kappa$ in hertz, and this chip's numbers put it alone at 16 microseconds, shorter than the 18 in `DEVICE` and therefore impossible. It is the same over-large $g$ Part 1 backed out of $\chi$. Real chips put a bandpass filter between resonator and line, which buys back an order of magnitude.
+Some of it goes down the readout line, since the resonator couples to the qubit on one side and to a 50 ohm line out of the fridge on the other. That channel, Purcell decay, runs at $2\pi\kappa (g/\Delta)^2$ for a linewidth $\kappa$ in hertz, and this chip's numbers put it alone at 16 microseconds, shorter than the 18 in `DEVICE` and therefore impossible. It is the same over-large $g$ Part 2 backed out of $\chi$. Real chips put a bandpass filter between resonator and line, which buys back an order of magnitude.
 
 The rest goes into the materials. Two-level defects in the amorphous oxides absorb at whatever frequency they sit at, and they drift in and out of resonance with the qubit, so $T_1$ remeasured often enough wanders by a factor of two and is reported as a histogram rather than one number. Quasiparticles and stray radiation take the remainder, both fought with shielding rather than design.
 """
@@ -533,7 +533,7 @@ r"""
 
 Where do the two clouds come from? The resonator sits at $f_r - \chi$ when the qubit is in $|0\rangle$ and at $f_r + \chi$ when it is in $|1\rangle$. Park a tone between them and the returning field has a different amplitude and phase in the two cases, so the integrated IQ point lands in one of two places.
 
-The distance $d$ between them grows with the photon number and with $2\chi/\kappa$, the ratio Part 1 worked out. The width $\sigma$ of each cloud is amplifier noise over the square root of the integration time, so it shrinks the longer you look. Readout fidelity is the ratio of those two numbers and nothing else.
+The distance $d$ between them grows with the photon number and with $2\chi/\kappa$, the ratio the opening quotes at 2.4 for this chip. The width $\sigma$ of each cloud is amplifier noise over the square root of the integration time, so it shrinks the longer you look. Readout fidelity is the ratio of those two numbers and nothing else.
 """
 
 # %% [markdown]
