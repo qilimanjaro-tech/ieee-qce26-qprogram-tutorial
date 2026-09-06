@@ -50,7 +50,7 @@ r"""
 
 `DEVICE` holds the truth about the simulated chip. The measurement models read it because they play the part of the fridge, and the print statements read it to grade the fits. The programs use one number from it, `q0_fr`, and only because Part 2 measured that one already. Code destined for hardware would know none of them.
 
-Part 2 also left the readout pulse and the integration weights behind. The programs below name them as `"readout"` and `"weights"`, and the library in 3.3 is where the objects go.
+Part 1 built the readout pulse and the integration weights. The programs below name them as `"readout"` and `"weights"`, and the library in 3.3 is where the objects go.
 """
 
 # %%

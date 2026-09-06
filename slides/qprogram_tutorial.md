@@ -840,7 +840,7 @@ measurements: 25 against 1025 for the full map
 - Nested `with` statements are nested loops, so a two-deep nest is a grid.
 - `sweep(a) | sweep(b)` advances both on the same tick instead.
 - One dimension comes back carrying two coordinate arrays, a diagonal cut.
-- Unequal lengths raise on the `|` line, before anything runs.
+- Unequal lengths raise when the block opens, before anything runs.
 
 ---
 
