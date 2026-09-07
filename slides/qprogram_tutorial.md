@@ -123,8 +123,9 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 ## How we work
 
 - The slides are the map, and the notebooks are the work.
-- Each part is a short concept, a live code-along, and one 🧩 exercise.
-- `notebooks/` holds the `# TODO` cells with the steps written out, `notebooks/solutions/` the answers.
+- Two movements of concepts first, covered by no notebook.
+- Then one part per notebook, each a code-along and one 🧩 exercise.
+- `notebooks/` holds the `# TODO` cells, `notebooks/solutions/` the answers.
 - Interrupt me, above all with a lab story that contradicts the slide.
 
 ---
@@ -133,26 +134,33 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 | Part | Notebook | Topic | Time |
 |---|---|---|---|
-| | | opening, the chip, and the language | 25 min |
-| 1 | `01_introduction` | The program is data | 20 min |
-| 2 | `02_basics` | Sweeps, averaging, and results | 20 min |
-| 3 | `02_basics` | Finding the qubit | 25 min |
-| 4 | `03_advanced` | Coherence and feedback | 30 min |
-| 5 | `03_advanced` | Capabilities and plans | 30 min |
-| 6 | `03_advanced` | Extending the language | 20 min |
+| | | the chip, the rack, and why a language of its own | 40 min |
+| 1 | `01_introduction` | The program is data | 25 min |
+| 2 | `02_basics` | Variables, sweeps, and results | 25 min |
+| 3 | `03_advanced` | Fragments, feedback, extending, and the machine | 75 min |
 | | | questions and close | 10 min |
 
-Two sessions, and the break between them lands after Part 3. Three notebooks carry the code for all six parts, and the physics of the middle three is on these slides.
+Three notebooks, three parts, one 🧩 exercise each. The break between the two sessions lands after Part 2, so the whole of the second session is Part 3, whose six sections stand on their own and can be taken in any order.
 
 ---
 
 ## What you will build
 
-- a **pulse program** you can read, diff, save and load again (Part 1)
-- a **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** along its ridge (Parts 2 and 3)
-- **active reset**, where one measurement decides the next pulse (Part 4)
-- a **platform of your own**, and the **execution plan** a rack's capabilities produce (Part 5)
-- your **own waveform, sweep source, and vendor operation** (Part 6)
+- a **pulse program** you can read, save, load and diff (Part 1)
+- a **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** (Part 2)
+- **active reset**, one measurement deciding the next pulse
+- your **own waveform, sweep source, and vendor operation**
+- a **platform** of your own, and a rack's **execution plan** (all three in Part 3)
+
+---
+
+<!-- _class: divider -->
+
+<p class="kicker">Concepts · slides only</p>
+
+# The chip and the rack
+
+### What a gate has to become before an instrument can emit it
 
 ---
 
@@ -210,7 +218,18 @@ $$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
 - A 10 mK stage sits far below it.
 - The band is also where coax, circulators and generators can be bought.
 - Real devices sit warmer, at 40 to 60 mK, leaving about one percent excited.
-- Part 4 resets that population rather than waiting.
+- Part 3 resets that population rather than waiting for it.
+
+---
+
+## Tuning with flux
+
+- Split the junction into a loop of two and the effective $E_J$ becomes tunable.
+- A DC bias threads flux through that loop and moves $f_{01}$.
+- The curve is a square root of a cosine, and its flat top is the **sweet spot**.
+- There the slope against bias vanishes, so flux noise stops moving the frequency.
+
+$$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 ---
 
@@ -377,6 +396,16 @@ $$\varepsilon = \tfrac{1}{2}\,\mathrm{erfc}\!\left(\frac{d}{2\sqrt{2}\,\sigma}\r
 
 ---
 
+## How hard to read out
+
+$$n_{\text{crit}} = \frac{\Delta^2}{4g^2} \approx 37 \ \text{photons on this chip}$$
+
+- More photons separate the two clouds, so the temptation is to turn the tone up.
+- The dispersive approximation has a limit, and the limit is a photon number.
+- Below it the resonator reports the qubit, above it it sits on bare $f_r$ and reports nothing.
+
+---
+
 ## Coherence times
 
 | | this chip | what it measures |
@@ -389,6 +418,20 @@ $$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
 
 - Relaxation feeds half its rate into dephasing, so $T_2 \le 2T_1$ always.
 - Pure dephasing $T_\varphi$ is the rest, and the gap between the last two rows is its slow part.
+
+---
+
+## Three coherence experiments
+
+| experiment | the sequence | what it isolates |
+|---|---|---|
+| inversion recovery | $\pi$, wait, read | $T_1$, energy leaving and not coming back |
+| Ramsey | $\pi/2$, wait, $\pi/2$, read | $T_2^{*}$, and the drive frequency error as a fringe |
+| Hahn echo | $\pi/2$, wait, $\pi$, wait, $\pi/2$, read | $T_2$, with slow noise refocused |
+
+- Only the middle of the sequence changes, and that is why a **fragment** earns its place.
+- Ramsey runs deliberately off resonance, so the fringe rate reads out the frequency error.
+- Sweep out to about three time constants, since later points measure only noise.
 
 ---
 
@@ -419,7 +462,7 @@ Every fit you run has to land on these, and a circuit carries none of them.
 A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply this.
 
 ```text
-40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
+40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6200,  sigma 10 ns,  beta 0.15
 ```
 
 - Nothing in `X(q0)` names a line, a carrier, or an envelope.
@@ -435,6 +478,16 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 - Each scan consumes the answer from the one before it.
 - You cannot find the qubit before you can read it out.
 - You cannot fit a $\pi$ amplitude before you know where the qubit is.
+
+---
+
+<!-- _class: divider -->
+
+<p class="kicker">Concepts · slides only</p>
+
+# Why a language of its own
+
+### Six requirements, and what a vendor dialect does to them
 
 ---
 
@@ -486,24 +539,126 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 ---
 
+<!-- _class: divider -->
+
+<p class="kicker">Part 1 · notebooks/01_introduction.ipynb</p>
+
+# The program is data
+
+### The operations, the lines they run on, the shapes they play, and the file they save to
+
+---
+
 ## Creating a program
 
 ```python
 import qprogram as qp
-from qprogram.buses import BusSchema
 
-schema = BusSchema.transmon()
-q = schema.q
+first = qp.QProgram(label="first_program", description="One drive pulse on qubit 0.")
+first.set_frequency("q0/drive", 4.85e9)
+first.play("q0/drive", IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15))
 
-program = qp.QProgram(label="first_readout", schema=schema)
-program.set_frequency(q[0].readout, 7.2e9)
-m0 = program.measure(q[0].readout, readout_pulse, weights)
+print(qp.dumps(first))
+print(sorted(first.buses))        # ['q0/drive']
 ```
 
-- A program is a label, a schema, and the calls you append.
-- `BusSchema.transmon()` gives each qubit a drive line and a readout line.
-- `readout_pulse` and `weights` are envelopes, and a string alias can stand in for either.
-- Without a schema, bus names are plain strings and nothing is checked.
+- A program is a label, an optional description, an optional schema, and the calls you append.
+- Every call appends one typed node to a tree and sends nothing anywhere.
+- Bus names here are plain strings, which is legal and checks nothing.
+
+---
+
+## Operations
+
+The verbs are instrument actions rather than gates, and each call appends one node.
+
+| what it does | QProgram |
+|---|---|
+| output one pulse envelope | `play` |
+| output a pulse and integrate the return | `measure`, returns a handle |
+| idle one bus | `wait` |
+| bring buses to a common time | `sync` |
+| set the modulation frequency of a line | `set_frequency` |
+| set or zero the phase reference | `set_phase`, `reset_phase` |
+| scale the whole output path | `set_gain` |
+| write a DC level onto a line | `set_offset` |
+| write or read a platform setting | `set_parameter`, `get_parameter` |
+| invoke a named sub-program | `call` |
+
+---
+
+## Prepare and read
+
+```text
+body:
+  block:
+    set_frequency "q0/drive" 4850000000.0
+    set_gain "q0/drive" 1.0
+    reset_phase "q0/drive"
+    play "q0/drive" IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
+    wait "q0/drive" 4
+  set_frequency "q0/readout" 7200000000.0
+  sync "q0/drive" "q0/readout"
+  measure "q0/readout" IQZero(...) IQPair(...) name="m0" fields=["state", "iq"]
+```
+
+- Prepare on the drive bus, hold at a barrier, then read on the readout bus.
+- Durations are nanoseconds, frequencies hertz, phases radians, gain and offset dimensionless.
+- The two shapes on the `measure` are the readout tone and the integration weights.
+- Every bus here is a quoted string, legal and unchecked, and the next slides fix that.
+
+---
+
+## One clock per bus
+
+![h:430](img/timing.svg)
+
+<p class="cap">Each bus advances only when you write to it, so the readout can start during the drive.</p>
+
+---
+
+## The sync barrier
+
+```python
+program.sync(["q0/drive", "q0/readout"])   # hold both buses
+program.sync()                             # every bus in the program
+program.sync([])                           # raises, rather than guess
+```
+
+- A barrier holds every named bus until the furthest-ahead one has finished.
+- Without it you measure the pulse rather than the state.
+- The compiler turns that declaration into real timing on the sequencer.
+
+---
+
+## Measurement handles
+
+```python
+m0 = program.measure("q0/readout", readout_pulse, weights)
+
+print(m0.name)                              # m0
+print(m0 == qp.MeasurementHandle("m0"))     # True
+```
+
+- `measure` returns a handle, and the handle is only a name.
+- A schema-backed bus prefixes it, so the same call there gives `q0/readout/m0`.
+- Pass `name=` to choose one yourself, and a name already taken is refused.
+- `result.get(m0)` reads the data back after the run, and a handle rebuilt from a file still names it.
+
+---
+
+## Measurement fields
+
+| field | shape | what it is |
+|---|---|---|
+| `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots |
+| `MF.IQ` | `(*sweeps, IQ)` | integrated I and Q, the default |
+| `MF.STATE` | `(*sweeps)` | classified per shot, averaged into a population |
+
+- One `measure` call can ask for all three.
+- Multiply `raw` by the weights and sum to get `iq`.
+- Threshold `iq` and you get `state`.
+- `get` raises rather than substituting a field you never requested.
 
 ---
 
@@ -524,21 +679,23 @@ m0 = program.measure(q[0].readout, readout_pulse, weights)
 
 ---
 
-## Operations
+## Build-time checks
 
-The verbs are instrument actions, not gates.
+```python
+schema = BusSchema.flux_tunable_transmon()
+q = schema.q                      # every bus below is now a checked reference
 
-| what it does | QProgram |
-|---|---|
-| set the modulation frequency of the pulses | `set_frequency` |
-| set or zero the phase reference | `set_phase`, `reset_phase` |
-| scale the whole output path | `set_gain` |
-| offset the whole output path | `set_offset` |
-| output one pulse envelope | `play` |
-| idle a bus | `wait` |
-| bring buses to a common time | `sync` |
-| output a pulse, integrate the return, optionally classify it | `measure` |
-| repeat a block | `average`, `sweep` |
+program.play(q[0].drive, Square(amplitude=0.5, duration=40))
+-> Bus 'q0/drive' is an IQ channel but received a single-channel Waveform (Square).
+
+program.measure(q[0].drive, "readout", "weights")
+-> Bus 'q0/drive' does not support acquisition (acquires=False).
+```
+
+- A schema hands back a `BusRef`, still a string, carrying `channel` and `acquires`.
+- The schema types each operation against the bus it names.
+- `qp.ValidationError` raises at the call that made the mistake, not at run time.
+- Raw string bus names skip both checks, on purpose.
 
 ---
 
@@ -552,147 +709,19 @@ The verbs are instrument actions, not gates.
 
 ---
 
-## Blocks
-
-```python
-with program.block():                        # grouping, changes nothing
-    ...
-with program.average(shots=200):             # the shot loop
-    with program.sweep(freq, qp.Range(...)):  # one dimension per sweep
-        ...
-with program.if_(m0.state == 1):             # a branch on a classified bit
-    ...
-```
-
-- Four blocks nest, and nesting in the file is nesting in the result.
-- `sweep` adds a dimension, `average` adds none.
-- `if_` reads a measurement outcome inside the shot.
-
----
-
-## Measurement handles
-
-```python
-m0 = program.measure(q[0].readout, readout_pulse, weights)
-
-print(m0.name)                                       # q0/readout/m0
-print(m0 == qp.MeasurementHandle("q0/readout/m0"))   # True
-```
-
-- `measure` returns a handle, and the handle is only a name.
-- Names are allocated per bus unless you pass `name=`.
-- `result.get(m0)` reads the data back after the run.
-- A handle rebuilt from a file still names the same measurement.
-
----
-
-## The text form
-
-```python
-qp.save(program, "first_readout.qp")
-reloaded = qp.load("first_readout.qp")
-
-assert reloaded.body == program.body
-assert qp.loads(qp.dumps(program)).body == program.body
-```
-
-- `.qp` is one statement per line, with indentation for nesting.
-- Quoting is the type distinction, so a bare `q[0].readout` is a bus.
-- Nothing is truncated and nothing is implied.
-- It depends on no numpy version, no sidecar, and no database.
-
----
-
-## The simulator
-
-- `qp.simulate(program, model=...)` walks the tree in pure Python.
-- It models the shape: nesting, averaging, one record per `measure`.
-- It models no timing and no waveform physics, so `wait` changes no number.
-- The program and the analysis are byte-identical here and on hardware.
-
----
-
-<!-- _class: divider -->
-
-<p class="kicker">Part 1 · notebooks/01_introduction.ipynb</p>
-
-# The program is data
-
-### A readout pulse, a drive pulse, and the tree they build
-
----
-
-## Prepare and read
-
-```text
-body:
-  block:
-    set_frequency q[0].drive 4850000000.0
-    set_gain q[0].drive 1.0
-    reset_phase q[0].drive
-    play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
-    wait q[0].drive 4
-  sync q[0].drive q[0].readout
-  measure q[0].readout IQPair(...) IQPair(...) name="q0/readout/m0" fields=["state", "iq"]
-```
-
-- Prepare on the drive bus, hold at a barrier, then read on the readout bus.
-- The two `IQPair`s are the readout tone and the integration weights, written out in full.
-- Each call appends exactly one node, and `body.walk()` hands them back in order.
-- The tree is now in memory, and nothing has reached the rack.
-
----
-
-## Build-time checks
-
-```text
-scratch.play(q[0].drive, Square(amplitude=0.5, duration=40))
--> Bus 'q0/drive' is an IQ channel but received a single-channel Waveform (Square).
-
-scratch.measure(q[0].drive, "readout", "weights")
--> Bus 'q0/drive' does not support acquisition (acquires=False).
-```
-
-- The schema types each operation against the bus it names.
-- `qp.ValidationError` raises at the call that made the mistake, not at run time.
-- Raw string bus names skip both checks, on purpose.
-
----
-
-## One clock per bus
-
-![h:430](img/timing.svg)
-
-<p class="cap">Each bus advances only when you write to it, so the readout can start during the drive.</p>
-
----
-
-## The sync barrier
-
-```python
-program.sync([q[0].drive, q[0].readout])   # hold both buses
-program.sync()                             # every bus in the program
-program.sync([])                           # raises, rather than guess
-```
-
-- A barrier holds every named bus until the furthest-ahead one has finished.
-- Without it you measure the pulse rather than the state.
-- The compiler turns that declaration into real timing on the sequencer.
-
----
-
 ## Waveforms are data
 
 ```
-same shape:        True     # Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 8)
-one sigma apart:   False
-the pi pulse:      True
-distinct in a set: 2
+equal by structure: True      # Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 8)
+a + b concatenates: 20 ns     # into a Chained
+peak I:   0.6192
+peak |Q|: 0.0056              # the DRAG correction, from the concept slides
 ```
 
-- Waveforms compare and hash by structure, not by identity.
+- Waveforms compare and hash by structure rather than by identity.
 - So a program can report how many distinct envelopes it really plays.
-- On the pi pulse `get_Q()` peaks at 0.0056, the DRAG correction from the opening.
+- Two shapes add, and `a + b` is a `Chained` that plays one after the other.
+- An IQ shape hands back its two halves as ordinary single-channel waveforms.
 
 ---
 
@@ -705,16 +734,70 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 - `play(q[0].drive, "pi")` names a pulse instead of writing one down.
 - `with_waveforms(dict)` returns a new program with the numbers bound in.
-- An amplitude written into the script goes stale as the chip drifts.
-- Version the sequence, and keep the amplitudes in a file of their own.
+- An amplitude in the script goes stale, so keep amplitudes in a `qp.WaveformLibrary` of their own, resolved per bus.
+- `rebind` re-resolves every bus through a schema, so another rack's naming needs no find and replace.
+
+---
+
+## Plotting
+
+```python
+ax = waveform.plot()                          # one Axes back, per envelope
+ax_i, ax_q = pi_pulse.plot()                  # an IQ shape draws two panels
+waveform.plot(target=panel)                   # or draw onto a layout you opened
+
+ax = result.plot(m0, channels="magnitude", title="Resonator spectroscopy")
+ax.axvline(f_r, color="grey", ls=":")         # the fit and the truth go on top
+```
+
+- Every figure in the notebooks comes from the library, and none is hand-rolled matplotlib.
+- The call draws the data and hands back the `Axes`, so a reference line is one more call.
+- `result.plot` reads the array's shape: one swept dimension is a line, two are a heatmap.
+
+---
+
+## Blocks
+
+```python
+with program.block():                                  # grouping, changes nothing
+    ...
+with program.average(shots=200):                       # the shot loop, Part 2
+    with program.sweep(freq, qp.Range(...)):           # one dimension per sweep, Part 2
+        ...
+with program.sweep(a, ...) | program.sweep(b, ...):    # lockstep, Part 2
+    ...
+with program.if_(m0.state == 1):                       # a branch on a classified bit, Part 3
+    ...
+```
+
+- Five containers nest, and nesting in the file is nesting in the result.
+- `sweep` adds a dimension, `average` adds none, and a lockstep pair adds one between them.
+- `if_` reads a measurement outcome inside the shot, before the shot has finished.
+
+---
+
+## The text form
+
+```python
+qp.save(program, "out/prepare_and_read.qp")
+reloaded = qp.load("out/prepare_and_read.qp")
+
+assert reloaded.body == program.body
+assert qp.loads(qp.dumps(program)).body == program.body
+```
+
+- `.qp` is one statement per line, with indentation for nesting.
+- Quoting is the type distinction, so a bare `q[0].readout` is a bus.
+- Nothing is truncated and nothing is implied.
+- It depends on no numpy version, no sidecar, and no database.
 
 ---
 
 ## The file as a diff
 
 ```diff
--    play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
-+    play q[0].drive IQDrag(amplitude=0.31, duration=40, sigma=10, beta=0.15)
+-    play "q0/drive" IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
++    play "q0/drive" IQDrag(amplitude=0.31, duration=40, sigma=10, beta=0.15)
 ```
 
 - The `.qp` text is line oriented, so a retune shows up as one changed line.
@@ -723,12 +806,20 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 ---
 
+## The simulator
+
+- `qp.simulate(program, model=...)` walks the tree in pure Python.
+- It models the shape: nesting, averaging, one record per `measure`.
+- It models no timing and no waveform physics, so `wait` changes no number.
+- The program and the analysis are byte-identical here and on hardware.
+
+---
+
 ## Exercise 1.1
 
 > 🧩 Bias the flux line, prepare the qubit, read it out, and round-trip the program through a file.
 
-- One program: `set_offset` on the flux bus, `set_frequency` on the other two.
-- `sync` the drive and readout buses by name, then `measure`.
+- `set_offset` on the flux bus, `set_frequency` on the other two, then `sync` and `measure`.
 - Save it, load it back, and compare the two bodies.
 - Then measure the flux bus, and let the schema say why not.
 
@@ -738,9 +829,9 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 <p class="kicker">Part 2 · notebooks/02_basics.ipynb</p>
 
-# Sweeps and results
+# Variables, sweeps, and results
 
-### Resonator spectroscopy, then a punchout map
+### One swept variable, two of them nested, and two of them in lockstep
 
 ---
 
@@ -776,10 +867,29 @@ with program.average(shots=200):
 | `qp.Linspace(start, stop, num)` | linear | you know the point count |
 | `qp.Values(seq)` | arbitrary | you have a measured or calibrated list |
 | `qp.Logspace(start, stop, num)` | arbitrary | the axis spans decades |
+| `qp.File(path)` | arbitrary | the points live in a `.npy` beside the program |
+| `qp.Repeat`, `qp.Rotate`, `qp.Concat` | arbitrary | the order or the multiplicity is the choice |
 
+- Eight ship, and the last three take a source and hand back one, so they compose.
 - A linear source runs out of a sequencer register, with nothing uploaded.
-- An arbitrary source is a table, uploaded or stepped from the host.
-- `Values` stays arbitrary even when its numbers are evenly spaced.
+- An arbitrary source is a table, and `Values` stays arbitrary even when evenly spaced.
+
+---
+
+## The measurement model
+
+```python
+def s21(bus, env):
+    """Transmission past one resonator: a notch, 90 percent deep on resonance."""
+    delta = (env["ro_freq"] - F_READOUT) / (KAPPA / 2)
+    return 1.0 - 0.9 / (1.0 + 1j * delta)
+
+qp.simulate(program, model=qp.MockMeasurementModel(response=s21, noise=0.02, seed=7))
+```
+
+- The interpreter asks a model for one sample per shot, and nothing else in a run makes a number.
+- `env` holds every variable a loop currently binds, keyed by the id you declared.
+- Any object with a `sample(bus, env)` method does the job, so a model may carry state.
 
 ---
 
@@ -795,53 +905,86 @@ with program.average(shots=200):
 ## Resonator spectroscopy
 
 ```
-f_r    measured 7.200000 GHz    true 7.200000 GHz
-kappa  measured 1.509 MHz     true 1.500 MHz
+dims ('ro_freq', 'IQ')   shape (101, 2)
+dip at   7.200000 GHz
+true     7.200000 GHz
+the sweep steps 200 kHz, which bounds what an argmin can say
 ```
 
 - The resonator hangs off the feedline, so the trace dips on resonance.
-- $|S_{21}|$ is not a Lorentzian, so subtract the baseline and square it.
-- The result is a plain Lorentzian whose full width is $\kappa$.
+- A 20 MHz window in 200 kHz steps puts seven samples across a 1.5 MHz resonance.
+- `channels=` picks the quadrature pair, the magnitude, or the phase.
 - An argmin can never beat the step size you chose.
 
 ---
 
-## Punchout
+## Two tones
 
-$$n_{\text{crit}} = \frac{\Delta^2}{4g^2} \approx 37 \ \text{photons on this chip}$$
+- The qubit answers only through the resonator, so finding it takes two tones.
+- Park the readout in the dip, then sweep a second tone past $f_{01}$.
+- Where it hits the transition, the qubit spends part of its time excited.
+- Repeat that scan at a series of drive amplitudes and one line becomes a map.
 
-- The dispersive approximation has a validity limit, and it is a photon number.
-- Below the limit the resonator sits at $f_r + \chi$, above it on bare $f_r$.
-- A map of `ro_amp` against `ro_freq` shows where the crossover falls.
-- Park a few decibels below it to keep the two states apart.
+```text
+  average 200:
+    for drive_amp in Linspace(start=0.05, stop=0.3, num=21):
+      for drive_freq in Linspace(start=4830000000.0, stop=4870000000.0, num=41):
+        set_frequency q[0].drive drive_freq
+        play q[0].drive IQZero(envelope=Square(amplitude=drive_amp, duration=20000))
+        sync q[0].drive q[0].readout
+        measure q[0].readout "readout" "weights" name="q0/readout/m0" fields=["state"]
+```
+
+---
+
+## The saturation ceiling
+
+$$P_1(f, a) = \frac{1}{2}\,\frac{\Omega^2}{\Omega^2 + (f - f_{01})^2}, \qquad \Omega \propto a$$
+
+- A strong continuous drive balances excitation against decay, so the population saturates at one half.
+- A two-tone peak above that ceiling means the classifier is wrong.
+- The same formula broadens the line, and the full width is twice the rotation rate.
+- So the map shows the peak rising and the ridge widening at once.
 
 ---
 
 ## Labeled results
 
 ```
-dims ('ro_amp', 'ro_freq', 'IQ')   shape (25, 41, 2)   outermost sweep first
+one sweep, integrated:  dims ('ro_freq', 'IQ')                shape (101, 2)
+two sweeps, classified: dims ('drive_amp', 'drive_freq')      shape (21, 41)
 coordinate: {'long_name': 'Readout frequency', 'units': 'Hz'}
 ```
 
 - `result.get(m0)` hands back a labeled `xarray`, one record per `measure`.
-- Dimension names are the variable ids you chose, not positions.
-- `result.plot(m0)` picks a line or a heatmap from the shape and returns the `Axes`.
+- One dimension per enclosing sweep, outermost first, named after your variable ids.
+- The label and units you declared arrive on the coordinate, and every axis label comes from there.
+- `result.plot(m0)` picks a line or a heatmap from the shape and hands back the `Axes`.
 
 ---
 
 ## Lockstep sweeps
 
 ```
-dims:   ('ro_amp|ro_freq', 'IQ')   shape (25, 2)
-coords: ['ro_amp', 'ro_freq', 'IQ']
-measurements: 25 against 1025 for the full map
+dims:   ('drive_amp|drive_freq',)   shape (21,)
+coords: ['drive_amp', 'drive_freq']
+measurements: 21 against 861 for the full map
 ```
 
-- Nested `with` statements are nested loops, so a two-deep nest is a grid.
+- Nested `with` statements are nested loops, so a two-deep nest is a rectangle.
 - `sweep(a) | sweep(b)` advances both on the same tick instead.
-- One dimension comes back carrying two coordinate arrays, a diagonal cut.
-- Unequal lengths raise when the block opens, before anything runs.
+- One dimension comes back with two coordinate arrays, a diagonal cut through the map.
+- Walking the ridge costs 21 measurements against 861, and unequal lengths raise when the block opens.
+
+---
+
+## Rabi
+
+$$P(a) = \sin^2\!\left(\frac{\pi a}{2 a_\pi}\right)$$
+
+- Park the drive on resonance, fix the shape and the duration, then sweep the amplitude.
+- The angle follows the envelope area, so the population traces $\sin^2$ to a ceiling of one.
+- The top of that curve is the worst place to read $a_\pi$, and the half-way crossing is the steepest.
 
 ---
 
@@ -851,222 +994,33 @@ measurements: 25 against 1025 for the full map
 
 - The swept variable goes inside the `IQDrag`, not into an operation.
 - Read the half rotation off the rising branch, then double it.
-- An `argmax` on a flat maximum is worse than the grid; the crossing is not.
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Part 3 · notebooks/02_basics.ipynb</p>
+<p class="kicker">Session 2 · Part 3 · notebooks/03_advanced.ipynb</p>
 
-# Finding the qubit
+# Fragments, feedback, and the machine
 
-### Two-tone spectroscopy, Rabi, and the flux arc
-
----
-
-## Two tones
-
-- The qubit answers only through the resonator, so you need two tones.
-- Park the readout in the dip, and sweep a second tone past $f_{01}$.
-- On resonance the resonator moves by $2\chi$, and the parked tone falls off.
-
-```text
-    for drive_freq in Linspace(start=4840000000.0, stop=4860000000.0, num=81):
-      set_frequency q[0].readout 7200000000.0
-      set_frequency q[0].drive drive_freq
-      play q[0].drive IQPair(I=Square(amplitude=0.02, duration=4000), ...)
-      sync
-      measure q[0].readout "readout" "weights" fields=["state"]
-```
-
----
-
-## The saturation ceiling
-
-- A strong continuous drive balances excitation against decay.
-- The excited population then saturates, and the ceiling is 0.5.
-- The height of the peak tells you which scan you are looking at.
-- A two-tone peak above that ceiling means the classifier is wrong.
-
----
-
-## Rabi
-
-- Fix the shape and the duration, then sweep the drive amplitude.
-- The angle follows the envelope area, so the population traces $\sin^2$.
-- The first maximum is the $\pi$ pulse amplitude.
-- A coherent rotation is not a pumped steady state, so the ceiling is one.
-
-$$P(a) = P_0 + C \sin^2\!\left(\frac{\pi a}{2 a_\pi}\right)$$
-
----
-
-## The pi amplitude
-
-- Write the model in terms of $a_\pi$ rather than a generic sinusoid.
-- `curve_fit` then hands back an error bar on the number you want.
-- The same fit also returns contrast and floor, two health checks.
-
-```
-a_pi fitted : 0.6176 +/- 0.0022     contrast: 0.998   floor: 0.006
-a_pi true   : 0.6200                error:    -0.39%
-```
-
----
-
-## The waveform library
-
-- The library resolves each alias per bus, in three tiers, most specific first.
-- Exact is one bus, family every index of a kind, global everything.
-- It is its own text file, a `.wfl`, kept outside the `.qp` on purpose.
-- Two qubits never share a $\pi$ amplitude, so drive pulses go exact.
-
-```text
-#!WaveformLibrary 1.0
-"pi"  q[0].drive = IQDrag(amplitude=0.6176, duration=40, sigma=10, beta=0.1)
-"x90" q[0].drive = IQDrag(amplitude=0.3088, duration=40, sigma=10, beta=0.1)
-"readout" q[*].readout = IQPair(I=Square(amplitude=0.2, duration=2000), Q=Square(...))
-"weights" = IQPair(I=Square(amplitude=1.0, duration=2000), Q=Square(...))
-```
-
----
-
-## The flux arc
-
-- `BusSchema.flux_tunable_transmon()` gives each qubit a third line, a DC bias.
-- The bias threads flux through a SQUID loop and moves $f_{01}$.
-- The curve you measure is a square root of a cosine.
-- Its flat top is the sweet spot, where the slope against bias vanishes.
-
-$$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
-
----
-
-## Two loops
-
-- Two `for` loops, written identically, on boxes that share nothing.
-- The inner one retunes a source and fires a pulse, microseconds per step.
-- The outer one writes a DC level into a slow, filtered line.
-- The program never recorded which was which, and Part 5 settles it.
-
-```text
-    for bias in Linspace(start=-0.15, stop=0.25, num=25):
-      set_offset q[0].flux bias
-      for arc_freq in Linspace(start=4300000000.0, stop=4900000000.0, num=61):
-        set_frequency q[0].drive arc_freq
-```
-
----
-
-<!-- _class: divider -->
-
-<p class="kicker">Session 2 · Part 4 · notebooks/03_advanced.ipynb</p>
-
-# Coherence and feedback
-
-### T1, Ramsey, echo, single shots, and active reset
+### Six sections, each one standing on its own
 
 ---
 
 ## Fragments
 
-- Every experiment here is prepare, wait, read out.
-- Only the middle changes, so write the pulse once.
-- A `@fragment` is a named, parameterized sub-program.
-- Fragments carry the pulses, `measure` stays in the program.
+- The three coherence experiments are prepare, wait, read out, and only the middle changes.
+- So write the pulse once. A `@fragment` is a named, parameterized sub-program.
+- Its first argument is the fragment being built, and the rest are untyped parameters.
+- `expand()` inlines every call, so keep `measure` in the program where the handle stays yours.
 
 ```text
-fragment x180(drive, amp):
+fragment x_pulse(drive, amp):
   play drive IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1)
 
 body:
-  x180(q[0].drive, 0.62)
-```
-
----
-
-## T1
-
-- Invert the qubit with a $\pi$ pulse, wait, then read it out.
-- The excited population then decays exponentially with the wait.
-- Energy leaves through the readout line, oxide defects, and quasiparticles.
-- Sweep out to about three $T_1$, since later points only measure noise.
-
----
-
-## Ramsey
-
-- Two $\pi/2$ pulses, with the wait between them swept.
-- Park the drive off resonance on purpose, so fringes appear.
-- One fit reads the envelope and the fringe rate together.
-- The fringe rate is your drive frequency error, 400 kHz here by design.
-- Correct the drive by it and repeat, until the residual is under a kilohertz.
-
-$$P_1(t) = \tfrac{1}{2}\left(1 + \cos(2\pi \delta t)\right) e^{-t/T_2^*}$$
-
----
-
-## Hahn echo
-
-- $T_2^*$ mixes true decoherence with shot to shot drift.
-- A $\pi$ pulse halfway subtracts the phase of the first half.
-- Noise slower than the sequence refocuses, faster noise does not.
-- What survives is $T_2$, longer than $T_2^*$.
-
----
-
-## The three fits
-
-| | fitted | true |
-|---|---|---|
-| $T_1$ | 18.00 us | 18.00 us |
-| $T_2^{*}$ | 9.03 us | 9.00 us |
-| $T_2$ echo | 15.65 us | 16.00 us |
-
-- These are the three rows from the opening, now measured.
-- The ordering $T_2^* < T_2 < 2T_1$ has to hold.
-- A set that breaks it is a bug in the analysis.
-
----
-
-## Measurement fields
-
-| field | shape | what it is |
-|---|---|---|
-| `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots |
-| `MF.IQ` | `(*sweeps, IQ)` | integrated I and Q, the default |
-| `MF.STATE` | `(*sweeps)` | classified per shot, averaged into a population |
-
-- One `measure` call can ask for all three.
-- Multiply `raw` by the weights and sum to get `iq`.
-- Threshold `iq` and you get `state`.
-- `get` raises rather than substituting a field you never requested.
-
----
-
-## Single shots
-
-- `average` is the only thing collapsing the shots.
-- Drop it and make the shot index a sweep variable.
-- Each point then holds exactly one shot.
-- A sweep variable nothing reads still drives its loop.
-- Two clouds appear in the IQ plane, one per state.
-
----
-
-## Assignment error
-
-- Project each shot onto the line joining the clouds, then threshold.
-- Measured error includes the preparation error, not just the readout.
-- Assignment error isolates the readout, given the true state.
-- Error follows an erfc of separation over width, so it falls steeply.
-
-```
-blob separation  = 3.8 sigma
-threshold        = +1.101
-measured error   = 5.3%   (readout plus preparation)
-assignment error = 3.1%   (readout alone)
+  x_pulse("q0/drive", 0.5)
+  x_pulse("q0/drive", 0.25)
 ```
 
 ---
@@ -1079,39 +1033,179 @@ assignment error = 3.1%   (readout alone)
 - An FPGA evaluates it between one pulse and the next, in tens of nanoseconds.
 
 ```text
-  for shot in Range(start=0.0, stop=399.0, step=1.0):
-    measure q[0].readout "readout" "weights" name="check" fields=["state"]
-    if check.state == 1:
-      x180(q[0].drive, 0.62)
-      sync
-      measure q[0].readout "readout" "weights" name="verify" fields=["state"]
+  average 4000:
+    measure "q0/readout" "probe" "weights" name="before" fields=["state"]
+    if before.state == 1:
+      play "q0/drive" "pi"
     else:
-      wait q[0].drive 40
+      wait "q0/drive" 40
+    measure "q0/readout" "probe" "weights" name="after" fields=["state"]
 ```
 
 ---
 
 ## Active reset
 
-- Passive reset idles for several $T_1$ before every shot.
-- Active reset measures, then fires a $\pi$ pulse only if needed.
-- The arm that did not run holds `NaN`, never a zero.
-- The model starts the qubit hotter than any device you would keep.
+```
+excited before: 0.305   expected 0.300
+excited after:  0.029   expected 0.030
+```
 
-```
-reset fired on 74 of 400 shots
-population before reset = 18.5%     population after reset = 1.0%
-```
+- Passive reset idles for several $T_1$ before every shot, and active reset measures first.
+- The $\pi$ pulse then fires only on the shots that came back excited.
+- The arm that did not run holds `NaN` rather than a zero, so two arms combine.
 
 ---
 
-<!-- _class: divider -->
+## Three extension seams
 
-<p class="kicker">Part 5 · notebooks/03_advanced.ipynb</p>
+| you want | you write | you get for free |
+|---|---|---|
+| a pulse shape the DSL lacks | a `Waveform` subclass | serialization, structural equality, validation, plotting |
+| a sweep axis the DSL lacks | a `SweepSource` subclass | serialization, a capability token, length checks, coordinates |
+| an operation the DSL will never have | an `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a capability token |
 
-# One program, many machines
+- A language that cannot be extended gets forked, and a fork is not portable.
+- A capability token is a dotted name a rack can refuse the node by.
+- Serialization is read off your constructor, so the arguments have to be the state.
 
-### The same calibration, a different rack
+---
+
+## A custom waveform
+
+```python
+def resolved(v):
+    return v.evaluate_or_raise() if isinstance(v, qp.Expression) else v
+
+class HalfSine(qp.waveforms.Waveform):
+    def __init__(self, amplitude: float | qp.Expression, duration: int) -> None:
+        self.amplitude, self.duration = amplitude, duration
+    def envelope(self, resolution: int = 1) -> np.ndarray:
+        n = self.duration // resolution
+        return resolved(self.amplitude) * np.sin(np.pi * np.arange(n) / n)
+    def get_duration(self) -> int: return self.duration
+```
+
+- You owe two methods, `envelope(resolution)` and `get_duration()`.
+- `plot`, `area`, `peak_amplitude` and structural equality arrive from the base class.
+- Without `resolved` a swept amplitude reaches numpy and fails there.
+- `register_waveform` teaches the file format, and a token gives a rack a name to refuse it by.
+
+---
+
+## A custom sweep source
+
+```python
+@qp.register_sweep_source
+class Chebyshev(qp.SweepSource):
+    """Chebyshev nodes between two endpoints, so the points crowd towards the edges."""
+    KIND = "arbitrary"
+    TOKEN = "sweep.chebyshev"
+    def __init__(self, start: float, stop: float, num: int) -> None:
+        self.start, self.stop, self.num = start, stop, num
+    def length(self) -> int: return self.num
+    def values(self) -> np.ndarray:
+        unit = -np.cos(np.pi * (2 * np.arange(self.num) + 1) / (2 * self.num))
+        return self.start + (unit + 1) / 2 * (self.stop - self.start)
+```
+
+- `length()` is static, so a lockstep pair checks it before anything runs.
+- `KIND` declares linear or arbitrary, and a sequencer generates only the linear kind.
+- `values()` feeds the interpreter, the xarray coordinate, and `optimize`.
+- Registration puts `TOKEN` in the registry too, where a waveform needs a second call.
+
+---
+
+## A vendor operation
+
+```python
+class TwpaNamespace(qp.VendorNamespace):
+    def set_pump(self, bus: str, frequency: float) -> None:
+        self._append(SetPump(bus=bus, frequency=frequency))
+
+qp.QProgram.register_vendor("twpa", TwpaNamespace)
+qp.register_vendor_operation("twpa", "set_pump", SetPump)
+qp.register_capability_tokens("vendor.twpa.set_pump")
+qp.register_vendor_version("twpa", "0.1.0")
+```
+
+- `SetPump` is an `Operation` subclass, and it owes only `required_capabilities()`.
+- `register_vendor` makes `program.twpa` resolve on any `QProgram`.
+- `register_vendor_operation` teaches the writer and the parser.
+- `register_vendor_version` fixes the version the `require` line carries.
+
+---
+
+## One portable file
+
+```text
+#!QProgram 1.0
+
+require twpa 0.1
+
+body:
+  var flux_amp label="Flux amplitude" units="DAC units"
+
+  twpa.set_pump "q0/readout" 7900000000.0
+  average 200:
+    for flux_amp in Chebyshev(start=0.0, stop=0.5, num=21):
+      play "q0/flux" HalfSine(amplitude=flux_amp, duration=40)
+      sync "q0/flux" "q0/readout"
+      measure "q0/readout" "readout" "weights" name="m0" fields=["state"]
+```
+
+- The three seams of the last three slides, in one file, with no patch to the core.
+- The `require` line names the vendor and the version the file was written against.
+- A rack without `vendor.twpa.set_pump` marks that node `[--]`, as a diagnostic and not a syntax error.
+
+---
+
+## Entry points
+
+```toml
+[project.entry-points."qprogram.vendors"]
+qblox = "qprogram_qblox"
+```
+
+- The entry-point name is the vendor namespace, the value is the module.
+- A `require` line makes the loader import that module and register it.
+- Only the `qprogram.vendors` group is scanned.
+- A vendor nobody claims fails by name, naming the package to install.
+
+---
+
+## A published profile
+
+```text
+qprogram-base-v1   33 tokens, limits {}
+qblox-default-v1   31 tokens, limits {'min_wait_duration_ns': 4}
+qdac-default-v1    16 tokens, limits {'min_dwell_ns': 100}
+
+op.set_offset            qblox True  qdac False
+vendor.qdac.set_offset   qblox False qdac True
+waveform.iq              qblox True  qdac False
+```
+
+- A profile is a named, versioned bundle of tokens, limits and predicates that a package ships.
+- A Qblox sequencer output has an offset register, so it claims the core `op.set_offset`.
+- A QDAC channel is a slow chassis write, so it refuses that name and offers its own.
+
+---
+
+## Implementing a platform
+
+| member | what it answers |
+|---|---|
+| `get_bus_schema()` | which chip this rack is wired to |
+| `get_buses()` | the bus names it exposes |
+| `get_parameters(bus)`, `get_global_parameters()` | the knobs, per bus and platform wide |
+| `capabilities` | what it can and cannot run |
+| `execute(program)` | run it and return a `QProgramResult` |
+
+- Six abstract members, and `validate`, `plan` and `explain` arrive written off the descriptor.
+- By convention `execute` validates first and raises on an error diagnostic.
+- Between `execute` and the arrays the protocol says nothing. Lower, allocate, upload, arm, acquire.
+- That work is where a vendor's expertise lives.
 
 ---
 
@@ -1140,10 +1234,27 @@ population before reset = 18.5%     population after reset = 1.0%
 
 ---
 
+## Two loops
+
+- One loop steps a DC level onto a slow, filtered flux line, milliseconds per step.
+- Everything inside it retunes a source, fires a pulse and reads out, microseconds per step.
+- The program never recorded which is which, and the rest of this part settles it.
+
+```text
+  average 200:
+    for bias in Linspace(start=-0.05, stop=0.15, num=41):
+      set_offset q[0].flux bias
+      set_frequency q[0].drive 4850000000.0
+      play q[0].drive "pi"
+      sync q[0].drive q[0].readout
+      measure q[0].readout "probe" "weights" name="m0" fields=["state"]
+```
+
+---
+
 ## Tokens
 
 ```text
-Block          ['block.block']
 Average        ['block.average']
 Sweep          ['block.sweep', 'sweep.linear', 'sweep.linspace']
 SetOffset      ['expr.variable', 'op.set_offset']
@@ -1192,7 +1303,7 @@ caps = qp.PlatformCapabilities(
 
 ## rt and host
 
-- Every slot splits into an `rt` half and a `host` half.
+- Every slot splits into an `rt` half and a `host` half, the two **domains** a node can run in.
 - `rt` is the sequencer, `host` is the lab server.
 - Either half may be `None`, and a `None` is a statement about the wiring.
 - Rack B's flux slot has `rt=None`, so no loop there runs in hardware.
@@ -1284,164 +1395,23 @@ program.sync()                   # every bus, including the flux line
 
 - A limit is a hard wall, because sequencer loops run out of registers.
 - The validator reads four numeric limits, from loop nesting to the shortest legal wait.
-- A predicate is code, since it asks about two nodes at once.
-- A lab can add a predicate about its own wiring.
+- A predicate is code, and a lab writes one about its own wiring.
+- It yields a `Diagnostic` to refuse, or a `DomainConstraint` to move a loop host-side instead.
 
 ---
 
-## A stricter profile
+## The checker
 
-```text
-└─ average 200:                                 [rt|host]  i reorderable-averaging
-   └─ for bias in Linspace(-0.05, 0.15, 101):   [--]       !! mixed-domain
-      ├─ qdac.set_offset q[0].flux bias         [host]
-      ├─ play q[0].drive "saturation"           [rt]
-      └─ measure q[0].readout "readout" ...     [rt]
+```
+$ python -m qprogram.lsp check flux_sweep.qp   (exit 1)
+[{"line": 18, "end_line": 18, "severity": "error", "code": "parse-error",
+  "message": "Line 19: bus path 'q[0].drve' does not resolve against the
+  program schema: 'q' has no bus 'drve'. Available: drive, readout, flux"}]
 ```
 
-- A published profile lists what the box implements, not what the language knows.
-- `qdac-default-v1` refuses `op.set_offset`, so the write becomes `program.qdac.set_offset`, a vendor operation.
-- The same loop that only warned on rack B is now an error.
-- `qp.optimize` turns an illegal program into a legal one.
-
----
-
-## Rebind
-
-```text
-original: ['q0/drive', 'q0/flux', 'q0/readout']
-renamed:  ['drive_q0', 'flux_q0', 'readout_q0']
-moved:    ['q1/drive', 'q1/flux', 'q1/readout']
-```
-
-- `rebind` re-resolves every bus through the schema, so the refs stay typed.
-- Find and replace gives strings that look right and carry no metadata.
-- `elements=` moves the experiment to another qubit, and the handle follows.
-- The calibration lives in its own `.wfl`, so the two diffs stay separate.
-
----
-
-<!-- _class: divider -->
-
-<p class="kicker">Part 6 · notebooks/03_advanced.ipynb</p>
-
-# Extending and shipping
-
-### A waveform, a sweep source, a vendor operation, and one portable file
-
----
-
-## Three extension seams
-
-| you want | you write | you get for free |
-|---|---|---|
-| a pulse shape the DSL lacks | a `Waveform` subclass | serialization, structural equality, validation, plotting |
-| a sweep axis the DSL lacks | a `SweepSource` subclass | serialization, a token, lockstep length checks, coordinates |
-| an operation the DSL will never have | an `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a token |
-
-- A language that cannot be extended gets forked, and a fork is not portable.
-- Nothing in the core knows any vendor name.
-- Serialization is read off your constructor, so the arguments have to be the state.
-
----
-
-## A custom waveform
-
-```python
-@qp.register_waveform
-class HalfSine(Waveform):
-    def __init__(self, amplitude: float | qp.Expression, duration: int) -> None:
-        self.amplitude, self.duration = amplitude, duration
-    def envelope(self, resolution: int = 1) -> np.ndarray:
-        amplitude = self.amplitude
-        if isinstance(amplitude, qp.Expression):
-            amplitude = amplitude.evaluate_or_raise()
-        n = self.duration // resolution
-        return amplitude * np.sin(np.pi * np.arange(n) / n)
-    def get_duration(self) -> int: return self.duration
-```
-
-- You owe two methods, `envelope(resolution)` and `get_duration()`.
-- `plot`, `area`, `peak_amplitude` and `spectrum` arrive from the base class.
-- Without that branch a swept amplitude reaches numpy and fails there instead.
-- `register_waveform_token` gives the shape a token a rack can refuse.
-
----
-
-## A custom sweep source
-
-```python
-@qp.register_sweep_source
-class Chevron(qp.SweepSource):
-    KIND = "arbitrary"
-    TOKEN = "sweep.chevron"
-    def __init__(self, center: float, span: float, num: int) -> None:
-        self.center, self.span, self.num = center, span, num
-    def length(self) -> int: return self.num
-    def values(self):
-        return np.linspace(self.center - self.span / 2, self.center + self.span / 2, self.num)
-```
-
-- `length()` is static, so a parallel loop checks it before anything runs.
-- `KIND` declares linear or arbitrary, and a sequencer only ramps linear.
-- `values()` feeds the interpreter, the xarray coordinate, and `optimize`.
-- A callable answers none of the three, so it cannot be a source.
-
----
-
-## A vendor operation
-
-```python
-class FridgeNamespace(qp.VendorNamespace):
-    def set_attenuation(self, bus: str, db: float) -> None:
-        self._append(SetAttenuation(bus=bus, db=db))
-
-qp.QProgram.register_vendor("fridge", FridgeNamespace)
-qp.register_vendor_version("fridge", "0.1.0")
-qp.register_vendor_operation("fridge", "set_attenuation", SetAttenuation)
-qp.register_capability_tokens("vendor.fridge.set_attenuation")
-```
-
-- `register_vendor` makes `program.fridge` resolve on any `QProgram`.
-- `register_vendor_version` fixes the version the `require` line carries.
-- `register_vendor_operation` teaches the writer and the parser.
-- `register_capability_tokens` lets a rack say yes or no.
-
----
-
-## One portable file
-
-```text
-#!QProgram 1.0
-require fridge 0.1
-body:
-  var flux_amp label="Flux amplitude" units="DAC units"
-  fridge.set_attenuation q[0].drive 20.0
-  average 200:
-    for flux_amp in Chevron(center=0.42, span=0.2, num=21):
-      play q[0].flux HalfSine(amplitude=flux_amp, duration=40)
-      sync
-      measure q[0].readout "readout" "weights" fields=["state"]
-```
-
-- All three extensions in one file, with no patch to the core.
-- The `require` line names the vendor and the version the file was written against.
-- A rack without `vendor.fridge.set_attenuation` marks that node `[--]`.
-- The refusal is a diagnostic, not a syntax error.
-
----
-
-## Entry points
-
-```toml
-[project.entry-points."qprogram.vendors"]
-qblox = "qprogram_qblox"
-```
-
-- The entry-point name is the vendor namespace, the value is the module.
-- A `require` line makes the loader import that module and register it.
-- Only the `qprogram.vendors` group is scanned.
-- A vendor nobody claims fails by name, naming the package to install.
+- Point it at any `.qp`. This one is the flux sweep of a few slides back, saved with `qp.save`.
+- `check` parses with the production parser and validates against the reference platform.
+- Diagnostics come out as JSON and an error exits non-zero, so it fits a pre-commit hook.
 
 ---
 
@@ -1449,64 +1419,9 @@ qblox = "qprogram_qblox"
 
 > 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
 
-- Register the token `measure.fields.counts`.
-- Measure with `fields=("counts", MF.STATE)` and print the `.qp` body.
+- Register the token `measure.fields.counts`, then measure with `fields=("counts", MF.STATE)`.
 - Validate against the reference platform, then against a rack without the token.
 - Read the counts back and say why they are zero.
-
----
-
-## The calibration diff
-
-```diff
--  set_frequency q[0].readout 7200000000.0
-+  set_frequency q[0].readout 7200400000.0
--  average 200:
-+  average 400:
--    for amp in Linspace(start=0.0, stop=1.0, num=41):
-+    for amp in Linspace(start=0.0, stop=0.8, num=41):
-```
-
-- Two runs of the same Rabi experiment, saved as text.
-- The readout frequency was retuned, because the resonator moved.
-- The shot count doubled.
-- The amplitude range came down, because the $\pi$ pulse landed lower than expected.
-- `diff`, code review and `git blame` all work on a text file.
-
----
-
-## The checker
-
-```
-$ python -m qprogram.lsp check rabi_hand_edited.qp   (exit 1)
-  line 18: [error] parse-error: Line 18: bus path 'q[0].drve' does not resolve
-  against the program schema: 'q' has no bus 'drve'. Available: drive, readout, flux
-```
-
-- `check` parses with the production parser and validates against the reference platform.
-- Diagnostics come out as JSON, and an error exits non-zero.
-- It fits a pre-commit hook or a CI job, with no extra dependency.
-- The message names the buses the chip has, because the file declares its schema.
-
----
-
-## The capstone
-
-```
-quantity              measured        true    error
-f_r (GHz)               7.2000      7.2000     0.0%
-f_01 (GHz)              4.8500      4.8500     0.0%
-a_pi (DAC)              0.6191      0.6200     0.2%
-T1 (us)                17.8634     18.0000     0.8%
-T2* (us)                8.9410      9.0000     0.7%
-T2 echo (us)           15.8509     16.0000     0.9%
-```
-
-- Seven steps in order, resonator spectroscopy through to active reset.
-- Each step consumes the answer measured by the one before it.
-- T1, Ramsey and echo drive with the $\pi$ pulse that Rabi fitted.
-- The run leaves a `.qp` per step plus one `calibration.wfl`.
-- The six requirements from the opening under all of it, in one tree, run by a swappable platform.
 
 ---
 

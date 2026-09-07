@@ -183,11 +183,13 @@ print(qp.dumps(tiny).split("body:")[1].rstrip())
 
 # %% [markdown]
 r"""
-### The three spellings
+### The two spellings
 
-Leave the source out and `sweep` hands back a builder whose `from_*` methods make one for you. A bare list in the source position is a third spelling and means `qp.Values`.
+Leave the source out and `sweep` hands back a builder whose `from_*` methods make one for you instead.
 
-An unknown `from_<name>` resolves against the live sweep-source registry rather than a fixed list, so a source registered by a vendor extension gets its builder with no change to the core. All three spellings build the same node and write the same `.qp` line, so pick by what the call site is doing. Reach for `from_*` when you are typing the numbers out, and pass the object when the source is computed or when you want to read its properties.
+An unknown `from_<name>` resolves against the live sweep-source registry rather than a fixed list, so a source registered by a vendor extension gets its builder with no change to the core. Both spellings build the same node and write the same `.qp` line, so pick by what the call site is doing. Reach for `from_*` when you are typing the numbers out, and pass the object when the source is computed or when you want to read its properties.
+
+A bare list is refused rather than taken as a shorthand. A source has to answer its length and its kind before the program runs, and write itself back out to a file, and a list of floats does none of that.
 """
 
 # %%
@@ -196,13 +198,14 @@ g_fluent = fluent.variable("gain")
 with fluent.sweep(g_fluent).from_values([0.1, 0.2, 0.3]):
     fluent.set_gain(q[0].readout, g_fluent)
 
-bare = qp.QProgram(label="smallest_sweep", schema=schema)
-g_bare = bare.variable("gain")
-with bare.sweep(g_bare, [0.1, 0.2, 0.3]):  # a bare list means Values
-    bare.set_gain(q[0].readout, g_bare)
+print("same tree:", tiny.body == fluent.body)
+print("same text:", qp.dumps(tiny) == qp.dumps(fluent))
 
-print("same tree:", tiny.body == fluent.body == bare.body)
-print("same text:", qp.dumps(tiny) == qp.dumps(fluent) == qp.dumps(bare))
+try:
+    with tiny.sweep(gain, [0.1, 0.2, 0.3]):
+        pass
+except qp.ValidationError as exc:
+    print("\na bare list:", exc)
 
 # %% [markdown]
 r"""
@@ -770,7 +773,7 @@ r"""
 
 - A **variable** is a hole in the program, declared with `program.variable(id, label=..., units=...)`. The label and the units follow the data out and name the axes of every figure, so declaring them once is the whole of plot labeling.
 - **Arithmetic on a variable builds a tree and computes nothing.** The tree re-evaluates every iteration, it may go anywhere QProgram takes a number, and it reaches a pulse through a waveform's constructor.
-- A **sweep source** says how the variable moves, and a sweep has three spellings: a source object, a `from_*` builder, and a bare list meaning `qp.Values`. `qp.Range` and `qp.Linspace` are linear, so a sequencer can run them from a register, and everything else is arbitrary.
+- A **sweep source** says how the variable moves, and a sweep has two spellings: a source object, or a `from_*` builder. A bare list is refused, because a source answers its length and its kind before anything runs. `qp.Range` and `qp.Linspace` are linear, so a sequencer can run them from a register, and everything else is arbitrary.
 - **`average(shots)` adds no dimension.** It shrinks the noise on the integrated point, it turns the classified state from a 0 or a 1 into a population, and it still costs one of the sequencer's loop counters.
 - The **measurement model** is the only thing in a run that produces a number. `qp.MockMeasurementModel` covers most cases and any object with a `sample(bus, env)` method covers the rest.
 - **Results are xarray.** One dimension per enclosing sweep, outermost first, named after your variable ids, plus an `IQ` axis, plus one shared `"a|b"` dimension for a lockstep pair. `get` takes a handle, a name, or an integer, and `result.plot` picks a line for one swept dimension and a heatmap for two, then hands back the `Axes` your reference lines go on.

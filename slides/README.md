@@ -2,7 +2,9 @@
 
 A [Marp](https://marp.app/) deck, written in Markdown. **The concepts live here.** The deck opens with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes a voltage, what a measurement really returns, and what decoherence costs, then argues why any of that needs a language of its own. Only after all of that does QProgram appear. The notebooks in [`../notebooks/`](../notebooks/) carry the code and explain the experiments; they leave the background to these slides.
 
-One hundred and eighteen slides, in four movements: logistics, the foundations block, the QProgram block, then nine to seventeen slides per tutorial part. Ten diagrams carry the structure.
+One hundred and seven slides, in six movements, each opened by a divider slide except the first. Logistics is 7 slides. **The chip and the rack** is 31, and **Why a language of its own** is 6; both carry a `Concepts · slides only` kicker, because no notebook covers them. Then one movement per notebook: **Part 1** is 20, **Part 2** is 13, and **Part 3** is 28, each divider naming the notebook it belongs to. The close is 2. Ten diagrams carry the structure.
+
+The deck is built around the three notebooks, so a slide that walks through code lives in the part whose notebook runs that code, and a slide that carries physics with no notebook behind it lives in one of the two concept movements. That is the rule to apply when adding one. The break between the two sessions lands after Part 2, so the whole second session is Part 3.
 
 One claim per slide, in a title of two to five plain words, under a body of three to five one-line bullets and at most one block: a figure, a code excerpt, a table, an output block, or a formula. Roughly forty words of prose is the working budget and fifty-five is the ceiling, because a slide that says everything leaves the speaker reading it aloud. Numbers belong in the tables, the code and the fit outputs rather than inside a sentence, and `tools/check_style.py` applies its sentence-shape budgets to this file and to the deck as well as to `sources/*.py`.
 
@@ -25,13 +27,13 @@ One rule of that checker matters while editing the deck. A paragraph is written 
 | `anatomy.svg` | a Rabi program as a tree | Anatomy of a program |
 | `plan.svg` | the real-time versus host-side split | Two domains |
 
-The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token, which Part 5 introduces and nothing before it mentions.
+The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token, which Part 3 introduces and nothing before it mentions.
 
 ### Diagrams worth adding
 
 One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
 
-- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. No notebook draws one, so this figure has to be drawn rather than harvested.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in **The chip and the rack** with no picture behind it. No notebook draws one, so this figure has to be drawn rather than harvested.
 
 An IQ-plane schematic on its own is deliberately **not** drawn. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted, and a schematic of two clouds asserts a separation instead of showing one.
 
