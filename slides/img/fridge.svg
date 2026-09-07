@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 868" width="1600" height="868"
      role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
   <title>Why the fridge is built the way it is</title>
   <desc>The stages of a dilution refrigerator from room temperature down to the mixing chamber,
-  with the input line on the left and the output line on the right. Going down, attenuators throw
-  the signal away on purpose and re-thermalize the noise at every stage. Coming up, the amplifiers
-  are ordered coldest first, because the returning tone is only a few tens of photons.</desc>
+  with the input line on the left and the output line on the right. Going down, an attenuator at
+  the 4 K plate, the still and the mixing chamber throws the signal away on purpose and
+  re-thermalizes the noise it passes on to its own stage temperature. Coming up, the amplifiers are
+  ordered coldest first, a parametric amplifier and an isolator at 10 mK and a HEMT at 4 K, because
+  the returning tone is only a few tens of photons.</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
@@ -14,126 +16,88 @@
     </marker>
   </defs>
 
-  <rect width="1600" height="900" fill="#ffffff"/>
+  <rect width="1600" height="868" fill="#ffffff"/>
 
   <text x="40" y="52" font-size="32" font-weight="700" fill="#1c1c2e">Why the fridge is built the way it is</text>
-  <text x="40" y="84" font-size="22" fill="#6a6a82">every stage exists to keep room temperature from reaching the chip</text>
 
-  <!-- ============ stage 1: 300 K ============ -->
-  <rect x="270" y="104" width="730" height="92" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="148" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">300 K</text>
-  <text x="250" y="176" font-size="20" fill="#6a6a82" text-anchor="end">room temperature</text>
+  <g transform="translate(0,-32)">
 
-  <rect x="296" y="118" width="220" height="64" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="406" y="146" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">Generator, AWG</text>
-  <text x="406" y="172" font-size="20" fill="#6a6a82" text-anchor="middle">the tone starts</text>
+  <!-- column headers -->
+  <text x="430" y="126" font-size="23" font-weight="700" fill="#0f766e" text-anchor="middle">input line</text>
+  <text x="1210" y="126" font-size="23" font-weight="700" fill="#0f766e" text-anchor="middle">output line</text>
 
-  <text x="635" y="144" font-size="20" fill="#0b5c56" text-anchor="middle">milliwatts</text>
-  <text x="635" y="170" font-size="20" fill="#0b5c56" text-anchor="middle">leaving the rack</text>
+  <!-- ============ 300 K ============ -->
+  <rect x="200" y="144" width="1240" height="88" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="182" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">300 K</text>
+  <text x="180" y="210" font-size="20" fill="#6a6a82" text-anchor="end">room temperature</text>
 
-  <rect x="754" y="118" width="220" height="64" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="864" y="146" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">Room-temp amp</text>
-  <text x="864" y="172" font-size="20" fill="#6a6a82" text-anchor="middle">then the ADC</text>
+  <rect x="300" y="158" width="260" height="60" rx="10" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="430" y="196" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Generator, AWG</text>
 
-  <!-- ============ stage 2: 50 K ============ -->
-  <rect x="270" y="206" width="730" height="80" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="248" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">50 K</text>
-  <text x="250" y="276" font-size="20" fill="#6a6a82" text-anchor="end">shield</text>
+  <rect x="1080" y="158" width="260" height="60" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1210" y="196" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Digitizer</text>
 
-  <text x="420" y="240" font-size="21" font-weight="700" fill="#0b5c56">input line</text>
-  <text x="420" y="266" font-size="20" fill="#6a6a82">down to the chip</text>
-  <text x="848" y="240" font-size="21" font-weight="700" fill="#0b5c56" text-anchor="end">output line</text>
-  <text x="848" y="266" font-size="20" fill="#6a6a82" text-anchor="end">up to the ADC</text>
+  <!-- ============ 50 K ============ -->
+  <rect x="200" y="244" width="1240" height="62" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="276" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">50 K</text>
+  <text x="180" y="300" font-size="20" fill="#6a6a82" text-anchor="end">shield</text>
 
-  <!-- ============ stage 3: 4 K ============ -->
-  <rect x="270" y="296" width="730" height="104" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="342" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">4 K</text>
-  <text x="250" y="370" font-size="20" fill="#6a6a82" text-anchor="end">plate</text>
+  <!-- ============ 4 K ============ -->
+  <rect x="200" y="318" width="1240" height="88" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="356" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">4 K</text>
+  <text x="180" y="384" font-size="20" fill="#6a6a82" text-anchor="end">plate</text>
 
-  <rect x="296" y="312" width="220" height="72" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
-  <text x="406" y="342" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
-  <text x="406" y="370" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">20 dB</text>
+  <rect x="300" y="332" width="260" height="60" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="430" y="358" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
+  <text x="430" y="383" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">20 dB</text>
 
-  <rect x="754" y="312" width="220" height="72" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="864" y="342" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">HEMT</text>
-  <text x="864" y="370" font-size="20" fill="#6a6a82" text-anchor="middle">gain, some noise</text>
+  <rect x="1080" y="332" width="260" height="60" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1210" y="358" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">HEMT</text>
+  <text x="1210" y="383" font-size="20" fill="#6a6a82" text-anchor="middle">semiconductor amp</text>
 
-  <!-- ============ stage 4: 800 mK, the still ============ -->
-  <rect x="270" y="410" width="730" height="80" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="448" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">800 mK</text>
-  <text x="250" y="476" font-size="20" fill="#6a6a82" text-anchor="end">still</text>
+  <!-- ============ 800 mK ============ -->
+  <rect x="200" y="418" width="1240" height="82" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="454" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">800 mK</text>
+  <text x="180" y="480" font-size="20" fill="#6a6a82" text-anchor="end">still</text>
 
-  <rect x="296" y="418" width="220" height="60" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
-  <text x="406" y="444" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
-  <text x="406" y="470" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">10 dB</text>
+  <rect x="300" y="428" width="260" height="60" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="430" y="454" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
+  <text x="430" y="479" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">10 dB</text>
 
-  <!-- ============ stage 5: 100 mK, the cold plate ============ -->
-  <rect x="270" y="500" width="730" height="80" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="542" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">100 mK</text>
-  <text x="250" y="570" font-size="20" fill="#6a6a82" text-anchor="end">cold plate</text>
-  <text x="635" y="546" font-size="20" fill="#6a6a82" text-anchor="middle">the lines just pass through here</text>
+  <!-- ============ 100 mK ============ -->
+  <rect x="200" y="512" width="1240" height="62" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="544" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">100 mK</text>
+  <text x="180" y="568" font-size="20" fill="#6a6a82" text-anchor="end">cold plate</text>
 
-  <!-- ============ stage 6: 10 mK, the mixing chamber ============ -->
-  <rect x="270" y="590" width="730" height="248" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="250" y="632" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="end">10 mK</text>
-  <text x="250" y="660" font-size="20" fill="#6a6a82" text-anchor="end">mixing chamber</text>
+  <!-- ============ 10 mK ============ -->
+  <rect x="200" y="586" width="1240" height="286" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="180" y="626" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="end">10 mK</text>
+  <text x="180" y="652" font-size="20" fill="#6a6a82" text-anchor="end">mixing chamber</text>
 
-  <rect x="296" y="606" width="220" height="60" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
-  <text x="406" y="632" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
-  <text x="406" y="658" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">20 dB</text>
+  <rect x="300" y="600" width="260" height="60" rx="10" fill="#ffffff" stroke="#6a6a82" stroke-width="2"/>
+  <text x="430" y="626" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">attenuator</text>
+  <text x="430" y="651" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">20 dB</text>
 
-  <rect x="754" y="606" width="220" height="60" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="864" y="632" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">TWPA</text>
-  <text x="864" y="658" font-size="20" fill="#6a6a82" text-anchor="middle">parametric amp</text>
+  <rect x="1080" y="600" width="260" height="56" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1210" y="624" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">TWPA</text>
+  <text x="1210" y="647" font-size="20" fill="#6a6a82" text-anchor="middle">parametric amp</text>
 
-  <rect x="754" y="686" width="220" height="56" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="864" y="712" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">isolator</text>
-  <text x="864" y="734" font-size="20" fill="#6a6a82" text-anchor="middle">one way only</text>
+  <rect x="1080" y="684" width="260" height="56" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="1210" y="720" font-size="23" font-weight="700" fill="#1c1c2e" text-anchor="middle">isolator</text>
 
-  <text x="635" y="712" font-size="20" fill="#0b5c56" text-anchor="middle">fW to aW at the chip</text>
-
-  <rect x="370" y="762" width="530" height="66" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="635" y="792" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Chip</text>
-  <text x="635" y="818" font-size="20" fill="#6a6a82" text-anchor="middle">the qubit and its readout resonator</text>
+  <rect x="360" y="792" width="920" height="64" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="820" y="833" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">Chip</text>
 
   <!-- ============ the input line, going down ============ -->
-  <line x1="406" y1="182" x2="406" y2="308" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="406" y1="384" x2="406" y2="414" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="406" y1="478" x2="406" y2="602" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="406" y1="666" x2="406" y2="758" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="430" y1="218" x2="430" y2="328" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="430" y1="392" x2="430" y2="424" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="430" y1="488" x2="430" y2="596" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="430" y1="660" x2="430" y2="788" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- ============ the output line, coming up ============ -->
-  <line x1="864" y1="762" x2="864" y2="746" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="864" y1="686" x2="864" y2="670" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="864" y1="606" x2="864" y2="388" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="864" y1="312" x2="864" y2="186" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
-
-  <!-- ============ the notes, one per direction ============ -->
-  <rect x="1030" y="104" width="530" height="276" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="1056" y="146" font-size="22" font-weight="700" fill="#0f766e">Down the input line</text>
-  <text x="1056" y="186" font-size="20" fill="#1c1c2e">Room-temperature Johnson noise would reach</text>
-  <text x="1056" y="214" font-size="20" fill="#1c1c2e">the chip as thermal photons if nothing were</text>
-  <text x="1056" y="242" font-size="20" fill="#1c1c2e">in the way. Every attenuator does two jobs:</text>
-  <text x="1056" y="270" font-size="20" fill="#1c1c2e">it cuts the signal, and it re-thermalizes</text>
-  <text x="1056" y="298" font-size="20" fill="#1c1c2e">the noise it passes on to its own stage</text>
-  <text x="1056" y="326" font-size="20" fill="#1c1c2e">temperature. About 60 dB in total by the</text>
-  <text x="1056" y="354" font-size="20" fill="#1c1c2e">time the tone reaches the chip.</text>
-
-  <rect x="1030" y="400" width="530" height="276" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="1056" y="442" font-size="22" font-weight="700" fill="#0f766e">Up the output line</text>
-  <text x="1056" y="482" font-size="20" fill="#1c1c2e">What comes back is a few tens of photons,</text>
-  <text x="1056" y="510" font-size="20" fill="#1c1c2e">and it still has to reach an ADC at room</text>
-  <text x="1056" y="538" font-size="20" fill="#1c1c2e">temperature. So amplify at the coldest</text>
-  <text x="1056" y="566" font-size="20" fill="#1c1c2e">point first, where the amplifier adds the</text>
-  <text x="1056" y="594" font-size="20" fill="#1c1c2e">least noise, and let the isolator keep its</text>
-  <text x="1056" y="622" font-size="20" fill="#1c1c2e">own noise from travelling back down</text>
-  <text x="1056" y="650" font-size="20" fill="#1c1c2e">to the qubit.</text>
-
-  <rect x="1030" y="692" width="530" height="146" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="1056" y="734" font-size="22" font-weight="700" fill="#0f766e">Why 10 mK</text>
-  <text x="1056" y="770" font-size="20" fill="#1c1c2e">At 4.85 GHz, hf/k_B ~ 233 mK. A 10 mK stage</text>
-  <text x="1056" y="798" font-size="20" fill="#1c1c2e">keeps the thermal population of the qubit</text>
-  <text x="1056" y="826" font-size="20" fill="#1c1c2e">down near a percent.</text>
-
-  <text x="40" y="876" font-size="21" fill="#6a6a82">Everything on the way down is there to make the signal smaller. Everything on the way up is there to make it bigger.</text>
+  <line x1="1210" y1="792" x2="1210" y2="744" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1210" y1="684" x2="1210" y2="660" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1210" y1="600" x2="1210" y2="396" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1210" y1="332" x2="1210" y2="222" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  </g>
 </svg>

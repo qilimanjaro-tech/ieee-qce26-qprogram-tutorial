@@ -55,7 +55,7 @@ A pulse program is arithmetic on numbers a fridge gave you, so the three this no
 
 `F01` is the qubit transition frequency, the energy gap between the two levels used as 0 and 1 divided by Planck's constant. A tone at that frequency rotates the qubit between them, and a tone anywhere else mostly does not. `F_READOUT` is the frequency of the readout resonator, a small microwave cavity coupled to the qubit. A transmon is never measured directly, so a tone goes past the resonator instead and what comes back carries the qubit state. `A_PI` is the drive amplitude that takes 0 all the way to 1, in the dimensionless units a DAC accepts.
 
-On a real chip all three are measured rather than looked up, and measuring them is a day of work. Here they are three constants, so the code stays about the language.
+On a real chip all three are measured rather than looked up, and each one comes out of a calibration of its own. Here they are three constants, so the code stays about the language.
 """
 
 # %%
@@ -70,7 +70,7 @@ print(f"readout tone {F_READOUT / 1e9:.2f} GHz")
 r"""
 ## 1.2 A program is data
 
-`qp.QProgram` is a builder. Every method you call on it appends one typed node to a tree and sends nothing anywhere, so what you hold afterwards is a value your own code can read, compare, rewrite, and save.
+`qp.QProgram` is a builder. Every operation you call on it appends one typed node to a tree and sends nothing anywhere, so what you hold afterwards is a value your own code can read, compare, rewrite, and save.
 
 A bus is the line a signal goes down, and the simplest way to name one is a plain string. Every program in this section and the next is written that way, and section 1.4 replaces the strings with something checked.
 
@@ -117,7 +117,7 @@ Durations are nanoseconds, frequencies hertz, phases radians, and gain and offse
 | `get_parameter(bus, parameter)` | `GetParameter` | read one back. Returns a `Variable` the run fills in |
 | `call(fragment, *args, **kwargs)` | `Call` | invoke a named sub-program. Advanced |
 
-QProgram did not invent that vocabulary. It is close to the intersection of what commercial sequencers offer, given portable names. A sequencer is the instrument that holds a pulse sequence in its own memory and plays it on its own clock with the host computer out of the loop, and the Advanced notebook adds to it through a vendor namespace rather than a patch to the core.
+QProgram did not invent that vocabulary. The verbs are the ones control instruments already offer, under portable names rather than any one vendor's spelling, and the Advanced notebook adds to them through a vendor namespace rather than a patch to the core.
 
 Five block containers hold operations. `block()` is the plain one and appears below. `average(shots)` and `sweep(variable, source)` are the loops, and they compose in lockstep with `|`, all three in Basics. `if_`, `elif_`, and `else_` branch on a measurement, in Advanced.
 """
@@ -126,11 +126,11 @@ Five block containers hold operations. `block()` is the plain one and appears be
 r"""
 ### A sequence, start to finish
 
-The program below prepares the qubit and reads it out, and it uses most of the verbs you need for a day at the bench. A readout line is two paths through a mixer, so it wants a two-path waveform, and `IQZero` is the one-constructor spelling of a pulse with nothing on the second path. `fields=` picks which of a measurement's outputs come back, and the subsection after next takes it apart.
+The program below prepares the qubit and reads it out, and it uses most of the verbs you need for a day at the bench. A readout line carries an in-phase and a quadrature path, so it wants a two-path waveform, and `IQZero` is the one-constructor spelling of a pulse with nothing on the second path. `fields=` picks which of a measurement's outputs come back, and the subsection after next takes it apart.
 
 `set_gain` and the `amplitude` inside a waveform are two different knobs: gain scales the whole output path and the amplitude shapes the envelope. `reset_phase` zeroes the oscillator phase so that every repetition starts from the same reference, which matters as soon as the phase the qubit accumulates is the thing being measured. `with program.block():` opens a plain container and changes nothing about what the statements inside it mean, so the preparation reads as one group.
 
-`play`, `measure`, and `wait` are the operations that book time, the first two because they put a shape on the line and the third because it holds the line idle. Instructions land on a clock grid, typically 4 ns wide, and QProgram rounds nothing onto it: a 3 ns wait reaches the platform as a 3, and the platform is where it is accepted or refused.
+`play`, `measure`, and `wait` are the operations that book time, the first two because they put a shape on the line and the third because it holds the line idle. A platform can require a duration to land on a time grid, 4 ns wide on some machines, and QProgram rounds nothing onto it: a 3 ns wait reaches the platform as a 3, and the platform is where it is accepted or refused.
 """
 
 # %%
@@ -159,7 +159,7 @@ r"""
 
 Every bus keeps its own cursor, advanced only by the pulses, measurements, and waits written to that bus, so two lines that have played different amounts have drifted apart by exactly the difference. A circuit has one global clock and a pulse program does not, and `sync` exists for that reason.
 
-`sync(buses)` holds every listed bus until the furthest ahead has finished. A bare `sync()` covers every bus in the program, convenient in a short sequence and expensive in a long one, and `sync([])` raises rather than guess what you meant. The distinction matters later: the Advanced notebook shows a rewrite that a bare `sync()` quietly blocks.
+`sync(buses)` holds every listed bus until the furthest ahead has finished. A bare `sync()` covers every bus in the program rather than the two you had in mind, and `sync([])` raises rather than guess what you meant. The distinction matters later: the Advanced notebook shows a rewrite that a bare `sync()` quietly blocks.
 """
 
 # %%
@@ -187,11 +187,11 @@ except qp.ValidationError as exc:
 r"""
 ### What a measurement asks for
 
-`measure(bus, waveform, weights)` outputs the readout pulse itself, so there is no separate `play` on a readout line. The second waveform is the integration window, which multiplies the ADC stream before it is summed into the single point you get back, and a flat window of ones is the honest default this material uses throughout.
+`measure(bus, waveform, weights)` outputs the readout pulse itself, so there is no separate `play` on a readout line. The second waveform is the integration window a platform applies before summing the acquisition into the single point you get back, and a flat window of ones is the default this material uses throughout.
 
-`fields=` says which of a measurement's outputs you want. `MeasurementField.IQ` is the integrated complex point and the default, `MeasurementField.STATE` is the platform's classification of that point into a 0 or a 1, and `MeasurementField.RAW` is the ADC trace the other two are computed from. Asking for a name that is not a field raises at the call rather than at run time.
+`fields=` says which of a measurement's outputs you want. `MeasurementField.IQ` is the integrated complex point and the default, `MeasurementField.STATE` is the platform's classification into a 0 or a 1, and `MeasurementField.RAW` is the raw ADC trace. Asking for a name that is not a field raises at the call rather than at run time.
 
-`measure` returns a `MeasurementHandle`, and a handle is a name and nothing more. The name is how you ask for this measurement's data after a run, and section 1.8 uses it for exactly that. Pass `name=` to choose one yourself, and a name already taken is refused.
+`measure` returns a `MeasurementHandle`, and two handles with the same name are the same measurement, so the name is all you need from one here. It is how you ask for this measurement's data after a run, and section 1.8 uses it for exactly that. Pass `name=` to choose one yourself, and a name already taken is refused.
 """
 
 # %%
@@ -205,13 +205,13 @@ except qp.ValidationError as exc:
 
 # %% [markdown]
 r"""
-### Settings the sequencer does not own
+### Two ways to set a property
 
-`set_frequency` and `set_gain` write registers a sequencer owns and can change between one pulse and the next. `set_parameter(bus, name, value)` writes something the platform holds as configuration instead, a room-temperature attenuator or a local oscillator, and a platform is free to realize it as a slow write over a chassis link. The parameter name is a free string that nothing validates, so a typo becomes a setting the platform has never heard of.
+Every operation in this section sets or reads a property of a bus, whatever the bus turns out to be made of. What separates them is not who owns a property but when it can change. `set_frequency` and `set_gain` set properties a platform is expected to change inside a sequence, between one pulse and the next. `set_parameter(bus, name, value)` names something the platform holds as configuration instead, a room-temperature attenuator or a local oscillator, and no platform is expected to change one mid-sequence, so sweeping it costs a round trip per point. The parameter vocabulary is the platform's rather than QProgram's, and nothing in the core validates a name, so a platform's own `get_parameters(bus)` is how you find out what a bus accepts.
 
 `get_parameter(bus, name)` is the read direction and the second of the two calls that hand something back. It appends the read and returns a fresh `Variable`, which the runtime fills in during the run. The `var` line at the top of the body below is that variable, declared with an id derived from the bus and the parameter. A variable is the whole subject of the Basics notebook, and this is the one place the Introduction produces one.
 
-`set_offset` is the third way to put a level on a line, and the `.qp` text tells the three apart. `set_offset` has value slots and no duration, `set_gain` has one value slot and scales whatever is played next, and `play` is the only one of the three that puts a shape on the timeline.
+`set_offset` is the third way to put a level on a line, and the `.qp` text of `sequence` above holds the other two. `set_offset` has value slots and no duration, `set_gain` has one value slot and scales whatever is played next, and `play` is the only one of the three that puts a shape on the timeline.
 """
 
 # %%
@@ -230,7 +230,7 @@ Nothing checked those bus names. Misspell `"q0/readout"` as `"q0/raedout"` and e
 
 `BusSchema` closes that gap without changing what lands in the tree. A schema declares which kinds of bus each element of the chip has, and it declares nothing about how many of each element exist, so any index resolves. What it hands back is a `BusRef`, a real `str` subclass carrying metadata about the line, and everywhere QProgram accepts a bus name a `BusRef` works.
 
-Two fields carry most of the value. `channel` records how many DACs feed the line, so a drive line is `IQ` and a flux line is `single`. `acquires` records whether an ADC listens to it. Both are facts about copper, and both become errors on the line that made the mistake.
+Two fields carry most of the value. `channel` is `IQ` on a line that takes a two-path waveform and `single` on one that takes a real-valued shape, so a drive line is `IQ` and a flux line is `single`. `acquires` says whether an ADC listens to the line, and `measure` needs one. Both are declarations the schema makes, and both become errors on the line that made the mistake.
 """
 
 # %%
@@ -319,11 +319,11 @@ print("area:    ", round(drive_envelope.area(), 4), "ns of amplitude")
 
 # %% [markdown]
 r"""
-Twelve single-channel shapes and five IQ shapes ship. The single-channel family covers the flat and smoothed tones (`Square`, `FlatTop`, `Tukey`), the bell shapes (`Gaussian`, `Sech`, `GaussianDragCorrection`), the periodic pair (`Sine`, `Cosine`), the flux shapes (`Ramp`, `SuddenNetZero`), `Chained` for two envelopes played back to back, and `Arbitrary` for samples you brought yourself from optimal control or a fit. The five IQ shapes are the ones a mixer takes. `IQPair` holds two single-channel shapes, `IQZero` leaves the quadrature silent, `IQDrag` is the standard leakage-suppressed drive pulse, `IQRotation` rotates an existing pair in the IQ plane, and `Modulated` mixes one real envelope up onto a carrier.
+Twelve single-channel shapes and five IQ shapes ship. The single-channel family covers the flat and smoothed tones (`Square`, `FlatTop`, `Tukey`), the bell shapes (`Gaussian`, `Sech`, `GaussianDragCorrection`), the periodic pair (`Sine`, `Cosine`), the flux shapes (`Ramp`, `SuddenNetZero`), `Chained` for two envelopes played back to back, and `Arbitrary` for samples you brought yourself from optimal control or a fit. The five IQ shapes are the ones an IQ line accepts. `IQPair` holds two single-channel shapes, `IQZero` leaves the quadrature silent, `IQDrag` is the standard leakage-suppressed drive pulse, `IQRotation` rotates an existing pair in the IQ plane, and `Modulated` mixes one real envelope up onto a carrier.
 
-Four facts about the parameters, each of which has cost somebody an afternoon. `sigma` and `smooth_duration` are real widths in nanoseconds and not fractions of `duration`. `duration` is only the window the shape is sampled over, and an even-length window puts no sample on the centre, so a peak asked for at 0.5 comes back sampled at 0.499. `area()` integrates trapezoidally, so a 100 ns square at amplitude 0.5 comes to 49.5 rather than 50. And `FlatTop`'s `buffer` pads outside `duration`, so it lengthens the shape rather than eating into the flat top.
+Four facts about the parameters. `sigma` and `smooth_duration` are real widths in nanoseconds and not fractions of `duration`. `duration` is only the window the shape is sampled over, and an even-length window puts no sample on the centre, so a peak asked for at 0.5 comes back sampled at 0.499. `area()` integrates trapezoidally, so a 100 ns square at amplitude 0.5 comes to 49.5 rather than 50. And `FlatTop`'s `buffer` pads outside `duration`, so it lengthens the shape rather than eating into the flat top.
 
-Two more properties matter. Waveforms compare and hash by structure rather than by identity, so two `Gaussian(0.5, 40, 8)` objects built in different cells are the same waveform and a program can count the distinct envelopes it really plays. And `a + b` concatenates two shapes into a `Chained`.
+Two more properties matter. Waveforms compare and hash by structure rather than by identity, so two `Gaussian(0.5, 40, 8)` objects built in different cells are the same waveform and a program can count the distinct envelopes it really plays. And `a + b` concatenates two shapes into a `Chained`. Nothing in a shape says which line it belongs on either, so the same `Square` is a flux excursion on one line and, wrapped in an `IQZero`, a readout tone on another.
 """
 
 # %%
@@ -332,13 +332,6 @@ padded = FlatTop(0.5, 200, smooth_duration=20, buffer=10)
 print("buffer pads outside duration:", padded.get_duration(), "ns for duration=200, buffer=10")
 print("equal by structure:", Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 8))
 print("a + b concatenates:", (Square(0.2, 10) + Square(0.1, 10)).get_duration(), "ns")
-
-# %% [markdown]
-r"""
-### Nothing in a waveform says which line it belongs on
-
-A `Ramp` is an envelope and only that, and the bus you send it down decides what it means. The channel check of section 1.4 is the only thing standing between a shape and a line, so the same `Square` is a readout tone on one bus and a flux excursion on another.
-"""
 
 # %% [markdown]
 r"""
@@ -457,7 +450,7 @@ print("same text back:", qp.dumps(reloaded) == path.read_text())
 
 # %% [markdown]
 r"""
-The consequence worth having is that the file is the experiment. A `.qp` sitting next to your data still loads, still carries the measurement names you indexed the results by, and depends on nothing about the notebook that built it. Two runs of one calibration therefore diff as two text files, and a change of one amplitude shows up as one changed line.
+The consequence is that the file is the experiment. A `.qp` sitting next to your data still loads, still carries the measurement names you indexed the results by, and depends on nothing about the notebook that built it. Two runs of one calibration therefore diff as two text files, and a change of one amplitude shows up as one changed line.
 """
 
 # %% [markdown]
@@ -497,7 +490,7 @@ print("raw trace:            ", trace.shape, "samples by quadrature")
 
 # %% [markdown]
 r"""
-The raw trace is the one field here with an axis to plot against, because it carries one entry per time sample. `result.plot` reads the array's shape and picks the figure, so the same call that draws a line here draws a heatmap in Basics, and it hands back the `Axes` exactly as a waveform does.
+The raw trace is the one field here with an axis to plot against, because it carries one entry per time sample. `result.plot` reads the array's shape and picks the figure, so the same call that draws a line here draws a heatmap in Basics.
 """
 
 # %%
@@ -509,7 +502,7 @@ plt.show()
 
 # %% [markdown]
 r"""
-The integrated point has nowhere to be drawn against, and the library says so rather than guessing an axis. That message is the whole reason the Basics notebook exists: a single measurement is a number, and an experiment is a measurement repeated while something is varied.
+The integrated point has nowhere to be drawn against, and the library says so rather than guessing an axis. That message is where the Basics notebook picks up: a single measurement is a number, and an experiment is a measurement repeated while something is varied.
 """
 
 # %%

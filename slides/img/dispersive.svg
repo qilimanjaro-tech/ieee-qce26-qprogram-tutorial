@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 760" width="1600" height="760"
      role="img" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
   <title>How a measurement becomes a number</title>
-  <desc>The chain from a coupled qubit and resonator to a point in the IQ plane. The qubit state
-  pulls the resonator one way or the other, so a tone parked between the two answers comes back
-  different. After amplification and weighted demodulation it is one complex number per shot, and
-  a threshold turns that into a bit.</desc>
+  <desc>Four panels. A qubit and the resonator beside it, coupled at rate g, so the resonator sits
+  at fr minus chi or fr plus chi and the qubit state picks which. Two transmission dips on one
+  frequency axis, 2 chi = 3.6 MHz apart and kappa = 1.5 MHz wide, with the readout tone parked on
+  the dip the ground state gives. The chain after the chip: returning tone, amplifier chain, IF
+  mixer, ADC, demodulation, one complex number per shot. The IQ plane, where the two clouds sit a
+  distance d apart, each spread by sigma, with a threshold drawn between them.</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 12 12" refX="10.5" refY="6"
@@ -22,203 +24,176 @@
     </marker>
   </defs>
 
-  <rect width="1600" height="900" fill="#ffffff"/>
+  <rect width="1600" height="760" fill="#ffffff"/>
 
   <text x="40" y="52" font-size="32" font-weight="700" fill="#1c1c2e">How a measurement becomes a number</text>
-  <text x="40" y="84" font-size="22" fill="#6a6a82">one tone in, one complex number out, and a line drawn between two clouds</text>
 
   <!-- ============ 1: the coupled pair ============ -->
-  <rect x="40" y="110" width="350" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="68" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The coupled pair</text>
-  <text x="68" y="182" font-size="20" fill="#6a6a82">one qubit, one resonator</text>
+  <rect x="40" y="88" width="320" height="636" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="66" y="132" font-size="25" font-weight="700" fill="#1c1c2e">The coupled pair</text>
 
-  <rect x="68" y="210" width="294" height="76" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
-  <text x="215" y="244" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">q0</text>
-  <text x="215" y="272" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f01 = 4.85 GHz</text>
+  <rect x="66" y="170" width="268" height="100" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="200" y="212" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">q0</text>
+  <text x="200" y="246" font-size="22" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">f01 = 4.85 GHz</text>
 
-  <line x1="215" y1="286" x2="215" y2="346" stroke="#0f766e" stroke-width="2"/>
-  <text x="232" y="322" font-size="24" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">g</text>
-  <text x="254" y="322" font-size="20" fill="#6a6a82">coupling</text>
+  <line x1="200" y1="270" x2="200" y2="360" stroke="#0f766e" stroke-width="2"/>
+  <text x="212" y="322" font-size="26" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">g</text>
+  <text x="236" y="322" font-size="22" fill="#6a6a82">coupling</text>
 
-  <rect x="68" y="346" width="294" height="76" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
-  <text x="215" y="380" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">resonator</text>
-  <text x="215" y="408" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
+  <rect x="66" y="360" width="268" height="100" rx="10" fill="#f5f5fa" stroke="#0f766e" stroke-width="2"/>
+  <text x="200" y="402" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">resonator</text>
+  <text x="200" y="436" font-size="22" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
 
-  <text x="68" y="456" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Delta = -2.35 GHz</text>
-  <text x="362" y="456" font-size="20" fill="#6a6a82" text-anchor="end">f01 - fr</text>
-  <text x="68" y="492" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">g &lt;&lt; Delta</text>
-  <text x="362" y="492" font-size="20" fill="#6a6a82" text-anchor="end">dispersive</text>
-  <text x="68" y="528" font-size="20" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">chi ~ g^2/Delta</text>
-  <text x="362" y="528" font-size="20" fill="#6a6a82" text-anchor="end">the shift</text>
+  <line x1="200" y1="460" x2="200" y2="524" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <rect x="68" y="560" width="294" height="160" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="90" y="596" font-size="20" fill="#6a6a82">so the resonator moves</text>
-  <text x="90" y="634" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;  -&gt;  fr - chi</text>
-  <text x="90" y="666" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;  -&gt;  fr + chi</text>
-  <text x="90" y="702" font-size="20" fill="#0b5c56">that shift is the signal</text>
+  <rect x="66" y="534" width="268" height="154" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="200" y="596" font-size="24" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;  -&gt;  fr - chi</text>
+  <text x="200" y="644" font-size="24" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;  -&gt;  fr + chi</text>
 
-  <polygon points="396,418 416,430 396,442" fill="#0f766e"/>
+  <polygon points="364,394 384,406 364,418" fill="#0f766e"/>
 
   <!-- ============ 2: two dips on one frequency axis ============ -->
-  <rect x="422" y="110" width="378" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="450" y="152" font-size="24" font-weight="700" fill="#1c1c2e">Two dips, one axis</text>
-  <text x="450" y="182" font-size="20" fill="#6a6a82">the same tone, two answers</text>
+  <rect x="388" y="88" width="400" height="636" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="414" y="132" font-size="25" font-weight="700" fill="#1c1c2e">Two dips, one axis</text>
 
-  <!-- the split between the two dips -->
-  <text x="620" y="226" font-size="20" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi = 3.6 MHz</text>
-  <line x1="541" y1="240" x2="699" y2="240" stroke="#0f766e" stroke-width="2"
+  <!-- the split, measured minimum to minimum -->
+  <text x="588" y="182" font-size="22" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi = 3.6 MHz</text>
+  <line x1="508" y1="200" x2="668" y2="200" stroke="#0f766e" stroke-width="2"
         marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
 
   <!-- the resonator with the qubit in |1>, dipping at fr + chi (chi is negative) -->
   <polyline fill="none" stroke="#6a6a82" stroke-width="2.5" stroke-dasharray="7 6" points="
-            450,266.3 455,268 460,269.9 465,272.2 470,274.9 475,278 480,281.7 485,286.1
-            490,291.3 495,297.6 500,305 505,313.9 510,324.4 515,336.4 520,349.6 525,363.4
-            530,376 535,385.5 540,389.9 545,388 550,380.3 555,368.6 560,355.1 565,341.6
-            570,329 575,317.9 580,308.4 585,300.4 590,293.7 595,288.1 600,283.4 605,279.4
-            610,276.1 615,273.2 620,270.8 625,268.7 630,266.9 635,265.4 640,264 645,262.8
-            650,261.8 655,260.8 660,260 665,259.3 670,258.6 675,258 680,257.5 685,257
-            690,256.5 695,256.1 700,255.8 705,255.4 710,255.1 715,254.9 720,254.6 725,254.4
-            730,254.1 735,253.9 740,253.7 745,253.6 750,253.4 755,253.3 760,253.1 765,253
-            770,252.8 775,252.7 780,252.6 785,252.5 790,252.4"/>
+            412,246.9 416,248.9 420,251.1 424,253.6 428,256.3 432,259.4 436,263.0 440,267.0
+            444,271.6 448,276.8 452,282.8 456,289.8 460,297.7 464,307.0 468,317.6 472,329.8
+            476,343.6 480,359.2 484,376.4 488,394.6 492,413.1 496,430.4 500,444.9 504,454.6
+            508,458.0 512,454.6 516,444.9 520,430.4 524,413.1 528,394.6 532,376.4 536,359.2
+            540,343.6 544,329.8 548,317.6 552,307.0 556,297.7 560,289.8 564,282.8 568,276.8
+            572,271.6 576,267.0 580,263.0 584,259.4 588,256.3 592,253.6 596,251.1 600,248.9
+            604,246.9 608,245.2 612,243.6 616,242.2 620,240.9 624,239.7 628,238.6 632,237.6
+            636,236.7 640,235.9 644,235.1 648,234.4 652,233.8 656,233.2 660,232.6 664,232.1
+            668,231.6 672,231.2 676,230.8 680,230.4 684,230.0 688,229.7 692,229.4 696,229.1
+            700,228.8 704,228.5 708,228.3 712,228.0 716,227.8 720,227.6 724,227.4 728,227.2
+            732,227.0 736,226.8 740,226.7 744,226.5 748,226.4 752,226.2 756,226.1 760,226.0
+            764,225.9"/>
 
   <!-- the resonator with the qubit in |0>, dipping at fr - chi (chi is negative) -->
   <polyline fill="none" stroke="#0f766e" stroke-width="2.5" points="
-            450,252.4 455,252.5 460,252.6 465,252.7 470,252.8 475,253 480,253.1 485,253.3
-            490,253.4 495,253.6 500,253.7 505,253.9 510,254.1 515,254.4 520,254.6 525,254.9
-            530,255.1 535,255.4 540,255.8 545,256.1 550,256.5 555,257 560,257.5 565,258
-            570,258.6 575,259.3 580,260 585,260.8 590,261.8 595,262.8 600,264 605,265.4
-            610,266.9 615,268.7 620,270.8 625,273.2 630,276.1 635,279.4 640,283.4 645,288.1
-            650,293.7 655,300.4 660,308.4 665,317.9 670,329 675,341.6 680,355.1 685,368.6
-            690,380.3 695,388 700,389.9 705,385.5 710,376 715,363.4 720,349.6 725,336.4
-            730,324.4 735,313.9 740,305 745,297.6 750,291.3 755,286.1 760,281.7 765,278
-            770,274.9 775,272.2 780,269.9 785,268 790,266.3"/>
+            412,225.9 416,226.0 420,226.1 424,226.2 428,226.4 432,226.5 436,226.7 440,226.8
+            444,227.0 448,227.2 452,227.4 456,227.6 460,227.8 464,228.0 468,228.3 472,228.5
+            476,228.8 480,229.1 484,229.4 488,229.7 492,230.0 496,230.4 500,230.8 504,231.2
+            508,231.6 512,232.1 516,232.6 520,233.2 524,233.8 528,234.4 532,235.1 536,235.9
+            540,236.7 544,237.6 548,238.6 552,239.7 556,240.9 560,242.2 564,243.6 568,245.2
+            572,246.9 576,248.9 580,251.1 584,253.6 588,256.3 592,259.4 596,263.0 600,267.0
+            604,271.6 608,276.8 612,282.8 616,289.8 620,297.7 624,307.0 628,317.6 632,329.8
+            636,343.6 640,359.2 644,376.4 648,394.6 652,413.1 656,430.4 660,444.9 664,454.6
+            668,458.0 672,454.6 676,444.9 680,430.4 684,413.1 688,394.6 692,376.4 696,359.2
+            700,343.6 704,329.8 708,317.6 712,307.0 716,297.7 720,289.8 724,282.8 728,276.8
+            732,271.6 736,267.0 740,263.0 744,259.4 748,256.3 752,253.6 756,251.1 760,248.9
+            764,246.9"/>
 
   <!-- the linewidth, measured across one dip at half depth -->
-  <text x="541" y="306" font-size="20" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa</text>
-  <line x1="508" y1="320" x2="574" y2="320" stroke="#0f766e" stroke-width="2"
+  <text x="508" y="314" font-size="22" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa</text>
+  <line x1="475" y1="340" x2="541" y2="340" stroke="#0f766e" stroke-width="2"
         marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
 
-  <!-- the tone, parked where the two curves are furthest apart -->
-  <line x1="699" y1="246" x2="699" y2="456" stroke="#1c1c2e" stroke-width="2.5" stroke-dasharray="8 6"/>
-  <text x="688" y="424" font-size="20" fill="#1c1c2e" text-anchor="end">readout tone</text>
+  <!-- the frequency axis -->
+  <line x1="412" y1="578" x2="770" y2="578" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <line x1="588" y1="578" x2="588" y2="590" stroke="#6a6a82" stroke-width="2"/>
+  <text x="588" y="622" font-size="22" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
 
-  <line x1="450" y1="450" x2="790" y2="450" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
-  <line x1="620" y1="450" x2="620" y2="462" stroke="#6a6a82" stroke-width="2"/>
-  <text x="620" y="486" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">fr = 7.20 GHz</text>
+  <!-- which dip belongs to which state -->
+  <text x="508" y="506" font-size="24" font-weight="700" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;</text>
+  <text x="692" y="506" font-size="24" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;</text>
 
-  <line x1="450" y1="524" x2="490" y2="524" stroke="#0f766e" stroke-width="2.5"/>
-  <text x="500" y="530" font-size="20" fill="#1c1c2e">|0&gt; dips at fr - chi</text>
-  <line x1="450" y1="560" x2="490" y2="560" stroke="#6a6a82" stroke-width="2.5" stroke-dasharray="7 6"/>
-  <text x="500" y="566" font-size="20" fill="#1c1c2e">|1&gt; dips at fr + chi</text>
+  <!-- the tone, parked down the dip the ground state gives -->
+  <line x1="668" y1="208" x2="668" y2="596" stroke="#1c1c2e" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="654" y="548" font-size="20" fill="#1c1c2e" text-anchor="end">readout tone</text>
 
-  <text x="450" y="612" font-size="21" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa = 1.5 MHz</text>
-  <text x="772" y="612" font-size="20" fill="#6a6a82" text-anchor="end">each dip</text>
-  <text x="450" y="646" font-size="21" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi = 3.6 MHz</text>
-  <text x="772" y="646" font-size="20" fill="#6a6a82" text-anchor="end">the split</text>
+  <text x="588" y="688" font-size="24" fill="#0b5c56" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">kappa = 1.5 MHz</text>
 
-  <rect x="442" y="666" width="336" height="76" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="466" y="700" font-size="24" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 chi / kappa = 2.4</text>
-  <text x="466" y="726" font-size="20" fill="#6a6a82">the figure of merit</text>
-
-  <polygon points="806,418 826,430 806,442" fill="#0f766e"/>
+  <polygon points="792,394 812,406 792,418" fill="#0f766e"/>
 
   <!-- ============ 3: the chain after the chip ============ -->
-  <rect x="832" y="110" width="334" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="860" y="152" font-size="24" font-weight="700" fill="#1c1c2e">After the chip</text>
-  <text x="860" y="182" font-size="20" fill="#6a6a82">the tone becomes a number</text>
+  <rect x="816" y="88" width="334" height="636" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="842" y="132" font-size="25" font-weight="700" fill="#1c1c2e">After the chip</text>
 
-  <rect x="860" y="210" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="999" y="238" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">returning tone</text>
-  <text x="999" y="264" font-size="20" fill="#6a6a82" text-anchor="middle">carries the state</text>
-  <line x1="999" y1="274" x2="999" y2="290" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="842" y="170" width="282" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="983" y="210" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">returning tone</text>
+  <line x1="983" y1="234" x2="983" y2="254" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <rect x="860" y="294" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="999" y="322" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">amplifier chain</text>
-  <text x="999" y="348" font-size="20" fill="#6a6a82" text-anchor="middle">cold first, then warm</text>
-  <line x1="999" y1="358" x2="999" y2="374" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="842" y="254" width="282" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="983" y="294" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">amplifier chain</text>
+  <line x1="983" y1="318" x2="983" y2="338" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <rect x="860" y="378" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="999" y="406" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">ADC</text>
-  <text x="999" y="432" font-size="20" fill="#6a6a82" text-anchor="middle">samples the waveform</text>
-  <line x1="999" y1="442" x2="999" y2="458" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="842" y="338" width="282" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="983" y="378" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">IF mixer</text>
+  <line x1="983" y1="402" x2="983" y2="422" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <rect x="860" y="462" width="278" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="999" y="490" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle">demodulate</text>
-  <text x="999" y="516" font-size="20" fill="#6a6a82" text-anchor="middle">weighted integration</text>
-  <line x1="999" y1="526" x2="999" y2="542" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="842" y="422" width="282" height="64" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="983" y="462" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">ADC</text>
+  <line x1="983" y1="486" x2="983" y2="506" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <rect x="860" y="546" width="278" height="76" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="999" y="580" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">one complex number</text>
-  <text x="999" y="608" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">per shot</text>
+  <rect x="842" y="506" width="282" height="78" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="983" y="540" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">demodulate</text>
+  <text x="983" y="568" font-size="20" fill="#6a6a82" text-anchor="middle">weighted integration</text>
+  <line x1="983" y1="584" x2="983" y2="604" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <text x="860" y="668" font-size="20" fill="#6a6a82">The weights pick the</text>
-  <text x="860" y="696" font-size="20" fill="#6a6a82">part of the record</text>
-  <text x="860" y="724" font-size="20" fill="#6a6a82">that carries the state.</text>
+  <rect x="842" y="604" width="282" height="84" rx="10" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
+  <text x="983" y="640" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle">one complex number</text>
+  <text x="983" y="670" font-size="22" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">per shot</text>
 
-  <polygon points="1172,418 1192,430 1172,442" fill="#0f766e"/>
+  <polygon points="1154,394 1174,406 1154,418" fill="#0f766e"/>
 
   <!-- ============ 4: the IQ plane ============ -->
-  <rect x="1198" y="110" width="362" height="640" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="1226" y="152" font-size="24" font-weight="700" fill="#1c1c2e">The IQ plane</text>
-  <text x="1226" y="182" font-size="20" fill="#6a6a82">one dot per shot</text>
+  <rect x="1178" y="88" width="382" height="636" rx="14" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="1204" y="132" font-size="25" font-weight="700" fill="#1c1c2e">The IQ plane</text>
 
-  <rect x="1226" y="206" width="306" height="304" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <line x1="1254" y1="470" x2="1516" y2="470" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
-  <line x1="1254" y1="470" x2="1254" y2="226" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
-  <text x="1516" y="494" font-size="20" fill="#6a6a82" text-anchor="end">I</text>
-  <text x="1272" y="242" font-size="20" fill="#6a6a82">Q</text>
+  <rect x="1204" y="160" width="330" height="540" rx="10" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <line x1="1232" y1="656" x2="1520" y2="656" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <line x1="1232" y1="656" x2="1232" y2="186" stroke="#6a6a82" stroke-width="2" marker-end="url(#arrowgrey)"/>
+  <text x="1516" y="684" font-size="22" fill="#6a6a82" text-anchor="end">I</text>
+  <text x="1250" y="204" font-size="22" fill="#6a6a82">Q</text>
 
-  <text x="1330" y="258" font-size="22" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;</text>
-  <text x="1448" y="258" font-size="22" font-weight="700" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;</text>
-
-  <line x1="1330" y1="300" x2="1448" y2="300" stroke="#0f766e" stroke-width="2"
+  <text x="1392" y="276" font-size="26" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">d</text>
+  <line x1="1318" y1="288" x2="1466" y2="288" stroke="#0f766e" stroke-width="2"
         marker-start="url(#arrowback)" marker-end="url(#arrow)"/>
-  <text x="1389" y="288" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">d</text>
 
   <!-- the threshold, drawn between the clouds -->
-  <line x1="1389" y1="310" x2="1389" y2="456" stroke="#1c1c2e" stroke-width="2" stroke-dasharray="8 6"/>
-  <text x="1400" y="450" font-size="20" fill="#6a6a82">threshold</text>
+  <line x1="1392" y1="300" x2="1392" y2="630" stroke="#1c1c2e" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="1404" y="620" font-size="20" fill="#6a6a82">threshold</text>
+
+  <text x="1318" y="332" font-size="24" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|0&gt;</text>
+  <text x="1466" y="332" font-size="24" font-weight="700" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">|1&gt;</text>
 
   <!-- one shot per circle, placed deterministically -->
   <g fill="#0f766e">
-    <circle cx="1334.5" cy="356.0" r="4.5"/><circle cx="1324.2" cy="361.3" r="4.5"/>
-    <circle cx="1330.9" cy="345.7" r="4.5"/><circle cx="1337.5" cy="365.8" r="4.5"/>
-    <circle cx="1316.0" cy="353.5" r="4.5"/><circle cx="1343.4" cy="347.5" r="4.5"/>
-    <circle cx="1325.5" cy="372.9" r="4.5"/><circle cx="1321.2" cy="339.1" r="4.5"/>
-    <circle cx="1349.3" cy="363.1" r="4.5"/><circle cx="1309.6" cy="364.4" r="4.5"/>
-    <circle cx="1340.0" cy="334.6" r="4.5"/><circle cx="1337.5" cy="380.0" r="4.5"/>
-    <circle cx="1306.9" cy="342.6" r="4.5"/><circle cx="1357.6" cy="349.9" r="4.5"/>
-    <circle cx="1312.8" cy="380.5" r="4.5"/><circle cx="1325.9" cy="324.6" r="4.5"/>
-    <circle cx="1355.7" cy="377.6" r="4.5"/><circle cx="1294.5" cy="357.5" r="4.5"/>
-    <circle cx="1356.8" cy="329.4" r="4.5"/><circle cx="1328.1" cy="396.2" r="4.5"/>
-    <circle cx="1302.3" cy="322.9" r="4.5"/><circle cx="1376.4" cy="362.2" r="4.5"/>
+    <circle cx="1324.1" cy="420.0" r="5"/><circle cx="1310.1" cy="427.2" r="5"/>
+    <circle cx="1319.2" cy="406.0" r="5"/><circle cx="1328.2" cy="433.4" r="5"/>
+    <circle cx="1298.9" cy="416.6" r="5"/><circle cx="1336.3" cy="408.4" r="5"/>
+    <circle cx="1311.9" cy="443.0" r="5"/><circle cx="1306.0" cy="397.0" r="5"/>
+    <circle cx="1344.3" cy="429.7" r="5"/><circle cx="1290.2" cy="431.5" r="5"/>
+    <circle cx="1331.6" cy="390.8" r="5"/><circle cx="1328.2" cy="452.7" r="5"/>
+    <circle cx="1286.5" cy="401.7" r="5"/><circle cx="1355.6" cy="411.7" r="5"/>
+    <circle cx="1294.5" cy="453.4" r="5"/><circle cx="1312.4" cy="377.2" r="5"/>
+    <circle cx="1353.0" cy="449.5" r="5"/><circle cx="1269.6" cy="422.0" r="5"/>
+    <circle cx="1354.5" cy="383.7" r="5"/><circle cx="1315.4" cy="474.8" r="5"/>
+    <circle cx="1280.2" cy="374.9" r="5"/><circle cx="1381.3" cy="428.5" r="5"/>
   </g>
   <g fill="#1c1c2e">
-    <circle cx="1451.5" cy="358.9" r="4.5"/><circle cx="1440.1" cy="356.3" r="4.5"/>
-    <circle cx="1455.3" cy="348.7" r="4.5"/><circle cx="1447.4" cy="368.3" r="4.5"/>
-    <circle cx="1438.9" cy="345.1" r="4.5"/><circle cx="1463.7" cy="358.1" r="4.5"/>
-    <circle cx="1433.6" cy="366.0" r="4.5"/><circle cx="1452.2" cy="337.4" r="4.5"/>
-    <circle cx="1458.2" cy="373.8" r="4.5"/><circle cx="1427.0" cy="349.3" r="4.5"/>
-    <circle cx="1469.4" cy="346.1" r="4.5"/><circle cx="1438.3" cy="379.2" r="4.5"/>
-    <circle cx="1439.0" cy="330.9" r="4.5"/><circle cx="1473.0" cy="369.2" r="4.5"/>
-    <circle cx="1419.0" cy="363.6" r="4.5"/><circle cx="1465.1" cy="329.3" r="4.5"/>
-    <circle cx="1453.7" cy="389.1" r="4.5"/><circle cx="1419.9" cy="334.2" r="4.5"/>
-    <circle cx="1485.6" cy="352.9" r="4.5"/><circle cx="1420.7" cy="385.6" r="4.5"/>
-    <circle cx="1448.2" cy="312.8" r="4.5"/><circle cx="1479.4" cy="390.6" r="4.5"/>
+    <circle cx="1470.8" cy="424.0" r="5"/><circle cx="1455.2" cy="420.4" r="5"/>
+    <circle cx="1476.0" cy="410.0" r="5"/><circle cx="1465.2" cy="436.8" r="5"/>
+    <circle cx="1453.6" cy="405.1" r="5"/><circle cx="1487.4" cy="422.9" r="5"/>
+    <circle cx="1446.4" cy="433.6" r="5"/><circle cx="1471.7" cy="394.6" r="5"/>
+    <circle cx="1479.9" cy="444.3" r="5"/><circle cx="1437.4" cy="410.9" r="5"/>
+    <circle cx="1495.2" cy="406.5" r="5"/><circle cx="1452.8" cy="451.6" r="5"/>
+    <circle cx="1453.7" cy="385.8" r="5"/><circle cx="1500.1" cy="438.0" r="5"/>
+    <circle cx="1426.5" cy="430.4" r="5"/><circle cx="1489.3" cy="383.6" r="5"/>
+    <circle cx="1473.8" cy="465.1" r="5"/><circle cx="1427.7" cy="390.3" r="5"/>
+    <circle cx="1517.3" cy="415.8" r="5"/><circle cx="1428.8" cy="460.4" r="5"/>
+    <circle cx="1466.3" cy="361.1" r="5"/><circle cx="1508.8" cy="467.2" r="5"/>
   </g>
 
-  <circle cx="1330" cy="356" r="22" fill="none" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="1330" y="424" font-size="20" fill="#6a6a82" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sigma</text>
-
-  <text x="1226" y="552" font-size="20" fill="#6a6a82">d is the gap between</text>
-  <text x="1226" y="580" font-size="20" fill="#6a6a82">the two cloud centres.</text>
-  <text x="1226" y="616" font-size="20" fill="#6a6a82">sigma is the spread</text>
-  <text x="1226" y="644" font-size="20" fill="#6a6a82">of one cloud.</text>
-  <text x="1226" y="690" font-size="20" fill="#0b5c56">Every choice upstream</text>
-  <text x="1226" y="718" font-size="20" fill="#0b5c56">shows up here as d/sigma.</text>
-
-  <!-- ============ what the separation is worth ============ -->
-  <rect x="40" y="770" width="1520" height="90" rx="14" fill="#e6f4f1" stroke="#0f766e" stroke-width="2"/>
-  <text x="68" y="810" font-size="22" fill="#1c1c2e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">epsilon = (1/2) erfc(d / (2 sqrt(2) sigma))</text>
-  <text x="68" y="842" font-size="21" fill="#6a6a82">d = 4 sigma gives about 2 percent, d = 6 sigma gives about 0.1 percent. Separation and spread are the two things you tune.</text>
+  <circle cx="1318" cy="420" r="30" fill="none" stroke="#1c1c2e" stroke-width="2" stroke-dasharray="7 5"/>
+  <line x1="1318" y1="484" x2="1318" y2="508" stroke="#1c1c2e" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1318" y="528" font-size="22" fill="#1c1c2e" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sigma</text>
 </svg>

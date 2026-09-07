@@ -96,7 +96,7 @@ print(qp.dumps(demo))
 r"""
 The definition came out as a `fragment` section above the body and each call site stayed one line, so a reader of the `.qp` file sees the structure you wrote rather than an inlining of it.
 
-A parameter is an untyped placeholder, so one may stand for a number, a bus, or a waveform, and the binding at the call site decides which. It is also an ordinary expression operand, so `2 * tau` inside a definition is recorded rather than computed. The second call above shows the same thing from the other side: `amp / 2` was folded by Python before the call, because that arithmetic happened on a float at the call site.
+A parameter is an untyped placeholder, so one may stand for a number, a bus, or a waveform, and the binding at the call site decides which. It is also an ordinary expression operand, so `2 * amp` inside a definition is recorded rather than computed. The second call above shows the same thing from the other side: `amp / 2` was folded by Python before the call, because that arithmetic happened on a float at the call site.
 
 The decorator is strict about the signature it will read.
 """
@@ -262,7 +262,7 @@ print(qp.dumps(chain).split("body:")[1].rstrip())
 r"""
 ### What a condition may be
 
-One comparison of one classified state against `0` or `1`. Everything else is refused where it is written, with a message naming what arrived instead.
+One equality or inequality comparison, of one classified state against an integer or against another classified state. Everything else is refused where it is written, with a message naming what arrived instead.
 """
 
 # %%
@@ -341,7 +341,7 @@ r"""
 
 A qubit does not arrive in the ground state every time. At 40 mK a 4.85 GHz transmon should be excited on well under one shot in a hundred, and real devices come in worse than that, so waiting for those shots to decay costs several times the coherence time on every repetition. Measuring first and flipping only the shots that came back excited is faster, and it is the standard use of a conditional. `P_HOT` below sits far above any real device at 30 percent, so that the before and the after separate at a glance.
 
-The measurement model below has state in it, and that state is beyond what `qp.MockMeasurementModel` can express, because the second measurement of a shot has to report the qubit the first measurement found after the corrective pulse has had its chance. A model is any object with a `sample(bus, env)` method, so this is a dozen lines.
+The measurement model below carries state, because the second measurement of a shot has to report the qubit the first one found after the corrective pulse has had its chance, and nothing a model receives says which measurement it is answering. A model is any object with a `sample(bus, env)` method, so this is a dozen lines.
 """
 
 # %%
@@ -415,7 +415,7 @@ r"""
 
 The shapes the core ships are ordinary Python classes, and so is one you write. A `Waveform` subclass owes exactly two methods. `envelope(resolution=1)` returns the samples, one per `resolution` nanoseconds, and `get_duration()` returns the length in nanoseconds. Everything else is derived on the base class from those two, so `area()`, `peak_amplitude()`, `rms_amplitude()`, `spectrum()`, `plot()`, the notebook rendering, structural equality, and `+` all arrive without being written.
 
-`HalfSine` below is half a sine period, a shape the core does not have.
+`HalfSine` below is half a sine period, written as a class of its own so the call site names the shape rather than a frequency.
 """
 
 # %%
@@ -495,7 +495,7 @@ The class is a working Python object already, and it plays and it draws. Two cal
 
 `qp.register_waveform_token` maps the class to a capability token, so a rack that cannot generate the shape has a name to refuse it by. Without it the shape asks only for `waveform.single`, and any platform accepting single-channel waveforms accepts yours sight unseen.
 
-Both registries are global and keyed by name, so re-running a cell that defines and registers a class raises, the `class` statement having made a new object with a name the registry already holds. There is no unregister, and the guard below is what keeps the cell re-runnable. `register_waveform_token` is idempotent and needs no guard.
+The serialization registry is global and keyed by class name, so re-running a cell that defines and registers a class raises, the `class` statement having made a new object with a name the registry already holds. There is no unregister, and the guard below is what keeps the cell re-runnable. `register_waveform_token` is idempotent and needs no guard.
 """
 
 # %%
@@ -581,7 +581,7 @@ The interesting part is the one thing a package does that a notebook cell cannot
 qblox = "qprogram_qblox"
 ```
 
-The name is the vendor namespace and the value is a module that self-registers on import, and `qprogram.vendors` is the only group scanned. So a `.qp` file that names the extensions it needs in its own header loads in a fresh interpreter without the reader knowing what to import, and an archived file stays usable years later because of it.
+The name is the vendor namespace and the value is a module that self-registers on import, and `qprogram.vendors` is the only group scanned. So a `.qp` file that names the extensions it needs in its own header loads in a fresh interpreter without the reader knowing what to import.
 
 Watch the load below. Nothing in this notebook has imported `qprogram_qblox` yet, so the first line reads `False`, and it does so only the first time the cell runs in a kernel. Both lines are facts about this interpreter rather than about the file.
 """
@@ -604,7 +604,7 @@ print("the operation came back as:", qp.dumps(delivered).splitlines()[-1].strip(
 r"""
 ### What the two packages add
 
-Each one registers a namespace reached as an attribute of any program, and a profile that says what the instrument can do. The two disagree in a way that is the whole point of the exercise. A Qblox sequencer output has an offset register behind it, so `qblox-default-v1` claims the core `op.set_offset`. Setting a QDAC channel is a slow write over the chassis link rather than a sequencer opcode, so `qdac-default-v1` refuses that token and offers `vendor.qdac.set_offset` in its place, because borrowing a core name whose semantics do not fit would make the two look interchangeable.
+Each one registers a namespace reached as an attribute of any program, and a profile that says what the instrument can do. The two disagree in a way that is the whole point of the exercise. A Qblox bus changes its offset between one pulse and the next, so `qblox-default-v1` claims the core `op.set_offset`. A QDAC channel takes every change through the host at millisecond latency, so `qdac-default-v1` refuses that token and offers `vendor.qdac.set_offset` in its place, because borrowing a core name whose semantics do not fit would make the two look interchangeable.
 """
 
 # %%
@@ -638,7 +638,7 @@ from qprogram.waveforms import Ramp
 from qprogram_qblox import QbloxMixin
 from qprogram_qdac import QdacMixin
 
-FLUX_BIAS = 0.42  # V, the offset that parks qubit 0 where it is least sensitive to flux noise
+FLUX_BIAS = 0.42  # V, the DC level the QDAC channel holds on the flux line
 
 
 class RackProgram(QbloxMixin, QdacMixin, qp.QProgram):
@@ -674,7 +674,7 @@ r"""
 
 Two classes and four calls. An `Operation` subclass is the node that lands in the tree, and it owes only `required_capabilities()`, with `variables()`, `buses()`, `waveforms()`, `walk()`, and structural equality all coming from the base. A `qp.VendorNamespace` subclass is the method surface, where `self._append` puts a node into the program being built.
 
-The operation below sets the pump tone of a parametric amplifier, one box sitting between the fridge and the digitizer. It belongs in nobody's vendor-agnostic language, and the seam exists for exactly that.
+The operation below sets the pump tone of a parametric amplifier, one box on the 10 mK stage and the first amplifier the readout tone meets on the way out. It belongs in nobody's vendor-agnostic language, and the seam exists for exactly that.
 
 `register_vendor_version` goes last on purpose. Registering the version marks a vendor active, so it doubles as the flag `qp.try_activate_vendor` reads and makes the whole block re-runnable with one guard. The two class definitions sit inside that guard for the same reason: re-running a cell that defines a class makes a new class object, the registry would still point at the old one, and `qp.dumps` would then meet a node it does not recognise.
 """
@@ -746,7 +746,7 @@ r"""
 
 `BenchtopRack` below is a complete platform. It answers the four resource questions from a schema and a parameter dictionary, it holds a capability descriptor built once, and its `execute` follows the convention line for line.
 
-The last line of `execute` is the seam. A real platform lowers the tree to a sequencer language there, allocates registers and waveform memory, uploads, arms the triggers, starts the acquisition, and assembles the arrays. That work is where a vendor's expertise lives and the protocol deliberately says nothing about it. This one borrows the reference interpreter instead, which is the honest way to show a working platform in a dozen lines.
+The last line of `execute` is the seam. A real platform compiles the tree for its own instruments there, uploads it, runs it, and assembles the arrays. That work is where a vendor's expertise lives and the protocol deliberately says nothing about it. This one borrows the reference interpreter instead, so the cell shows the six members rather than a compiler.
 """
 
 # %%
@@ -755,7 +755,7 @@ q = schema.q
 
 
 class BenchtopRack(qp.PlatformProtocol):
-    """One flux-tunable qubit, with the flux line on a slow DAC rather than a sequencer."""
+    """One flux-tunable qubit, with the flux line on a slow DAC and no real-time half."""
 
     def __init__(self, schema, capabilities, parameters=None):
         self._schema = schema
@@ -796,7 +796,7 @@ print("still abstract:", sorted(BenchtopRack.__abstractmethods__) or "nothing, a
 
 # %% [markdown]
 r"""
-The program it runs steps a flux bias and reads the qubit out at every point. The flux line is the one this rack drives with a slow DAC, and taking the real-time half of the flux slot away from an otherwise permissive descriptor is how that gets written down. A descriptor holds one capability slot per kind of bus, each slot a real-time half named `rt` and a host half named `host`, and section 3.6 takes the shape apart in full. All this cell needs is that `rt=None` on the flux slot means the line has no sequencer behind it. `dataclasses.replace` on a frozen descriptor is the shortest way to record a machine that differs from one you already have.
+The program it runs steps a flux bias and reads the qubit out at every point. The flux line is the one this rack drives with a slow DAC, and taking the real-time half of the flux slot away from an otherwise permissive descriptor is how that gets written down. A descriptor holds one capability slot per kind of bus, each slot a real-time half named `rt` and a host half named `host`, and section 3.6 takes the shape apart in full. All this cell needs is that `rt=None` on the flux slot means nothing on that line can run a loop in real time. `dataclasses.replace` on a frozen descriptor is the shortest way to record a machine that differs from one you already have.
 """
 
 # %%
@@ -817,7 +817,7 @@ def flux_sweep(label="flux_sweep"):
 
 
 reference = qp.reference_capabilities()
-slow_dac = replace(reference.default_bus_profile, rt=None)  # a flux line with no sequencer behind it
+slow_dac = replace(reference.default_bus_profile, rt=None)  # a flux line with no real-time half
 rack_caps = replace(reference, bus={("q", "flux"): slow_dac})
 
 rack = BenchtopRack(schema, rack_caps, parameters={"q0/flux.dac_range": 0.5})
@@ -858,7 +858,7 @@ except qp.UnsupportedOperationError as exc:
 r"""
 ### What comes free, and where the arrays come from
 
-Nothing on `BenchtopRack` implements `validate`, `plan`, or `explain`, and all three work, because a platform that supplies a capability descriptor has supplied everything the core validator needs.
+`BenchtopRack` implements none of the three, and all three answer.
 """
 
 # %%
@@ -870,7 +870,7 @@ print("plan entries:", len(rack.plan(sweep)))
 r"""
 The one thing borrowing the interpreter hid is where a result comes from, so here it is. A `qp.QProgramResult` is built empty and filled one measurement at a time with `append_measurement(bus=, name=, data=)`, where `data` is an `xarray.DataArray` the platform assembles itself. Omitting `fields=` records the array under the integrated-point field, which is the one `result.get` returns by default.
 
-The subclass below overrides `execute` and returns arrays of zeros with the right shape and the right coordinates. Nine of its lines are shape bookkeeping, the part a real compiler already knows from its own upload, and that is why the delegating version above reads better as a platform.
+The subclass below overrides `execute` and returns arrays of zeros with the right shape and the right coordinates. Its first three lines are shape bookkeeping, the part a real compiler already knows from its own upload, and that is why the delegating version above reads better as a platform.
 """
 
 # %%
@@ -923,7 +923,7 @@ A capability descriptor is where a machine writes down what it can run, the obje
 
 A `qp.PlatformCapabilities` has three fields. `bus` is a mapping keyed by the pair of element kind and bus kind, so `("q", "flux")` is a separate entry from `("q", "drive")`. `platform` answers for whatever names no bus, meaning the blocks and the expressions. `default_bus_profile` answers for every bus slot the map does not list, a plain string bus included, since a plain string carries no schema coordinate to route on.
 
-Every one of those three is a `qp.BusCapabilities`, a pair of an `rt` half and a `host` half, where `rt` is the sequencer and `host` is the lab server, and either half may be `None`. Each half is a `qp.CompilerCapabilities` with six fields: a `profile` name, a `version`, a set of `capabilities` tokens, a mapping of `limits`, a tuple of `predicates`, and the `vendor_versions` it implements.
+Every one of those three is a `qp.BusCapabilities`, a pair of an `rt` half and a `host` half, where `rt` is whatever in the machine runs a sequence on its own clock, a sequencer for instance, and `host` is the control PC, and either half may be `None`. Each half is a `qp.CompilerCapabilities` with six fields: a `profile` name, a `version`, a set of `capabilities` tokens, a mapping of `limits`, a tuple of `predicates`, and the `vendor_versions` it implements.
 """
 
 # %%
@@ -940,7 +940,7 @@ print("host can do, rt cannot:", sorted(bus_slot.host.capabilities - bus_slot.rt
 
 # %% [markdown]
 r"""
-Those two operations are the one asymmetry the reference descriptor builds in. A parameter write is a setting the platform holds as configuration rather than a register a sequencer owns, so it is host-side on every bus even on the most permissive machine in the library.
+Those two operations are the one asymmetry the reference descriptor builds in. A parameter write is a setting the platform holds as configuration rather than a property of the bus a run can change, so it is host-side on every bus even on the most permissive machine in the library.
 
 What picks a slot is the node rather than the token. A block goes to the platform slot. An operation that touches a bus goes to that bus's slot, and one that touches several is checked against the intersection. One prefix routes on its own: every `expr.*` token goes to the platform slot even on an operation that does touch a bus, because it is a claim about the language rather than about the line.
 
@@ -1013,7 +1013,7 @@ print("clean run:", clean, "| plan entries:", len(plan))
 print()
 
 reference_bus = reference.default_bus_profile
-slow_dac = replace(reference_bus, rt=None)  # a flux line with no sequencer behind it
+slow_dac = replace(reference_bus, rt=None)  # a flux line with no real-time half
 rack_caps = replace(reference, bus={("q", "flux"): slow_dac})
 
 for diagnostic in qp.validate(bias_sweep, rack_caps)[0]:
@@ -1050,7 +1050,7 @@ print(qp.explain(bias_sweep, reference))
 r"""
 Every row reads both domains, because the reference platform supports the whole language.
 
-Now the rack whose flux line has no sequencer. Nothing in the program changed and its plan did.
+Now the rack whose flux line has no real-time half. Nothing in the program changed and its plan did.
 """
 
 # %%
@@ -1101,7 +1101,7 @@ The third field a descriptor carries is a tuple of callables. A predicate receiv
 
 A `qp.Diagnostic` is a hard no. The rule below is about a bench rather than about an instruction set. This rack's flux DAC will not go past a tenth of a volt, and a predicate is where that number gets written down. The context is why the rule is expressible at all, because the value being written is a variable and the numbers live in the loop that binds it, a different node several levels up. `ctx.binding_loop_of(variable)` finds that loop and `loop.source.values()` is its own numbers.
 
-Eight queries make up the context, and those two are the ones the shipped predicates use. The others report the deepest loop nesting, the widest lockstep composition, the measurement count, the fields one measurement asked for, every measurement name, and every bus the program touches. `ctx.sweep_kind_of(variable)` answers whether a variable is swept linearly, arbitrarily, or not at all, so a rack can refuse an arbitrary list of delays behind a `wait` without refusing every arbitrary sweep it has.
+Eight queries make up the context, and `binding_loop_of` and `sweep_kind_of` are the two the shipped predicates use. The others report the deepest loop nesting, the widest lockstep composition, the measurement count, the fields one measurement asked for, every measurement name, and every bus the program touches. `ctx.sweep_kind_of(variable)` answers whether a variable is swept linearly, arbitrarily, or not at all, so a rack can refuse an arbitrary list of delays behind a `wait` without refusing every arbitrary sweep it has.
 """
 
 # %%
@@ -1142,7 +1142,7 @@ print("a scan inside the range:", qp.validate(narrow, guarded)[0] or "no diagnos
 
 # %% [markdown]
 r"""
-The other thing a predicate may yield is a `qp.DomainConstraint`. It is the answer when the truth is not a refusal but "not in the sequencer, and the host can do it". It names the block to restrict, the domains to take away, and a reason, and the classifier subtracts that domain from the loop rather than failing the program. The reason comes back inside the warning.
+The other thing a predicate may yield is a `qp.DomainConstraint`. It is the answer when the truth is not a refusal but "not in real time, and the host can do it". It names the block to restrict, the domains to take away, and a reason, and the classifier subtracts that domain from the loop rather than failing the program. The reason comes back inside the warning.
 
 The node has to be a block rather than the operation that noticed, and the binding loop is the block worth naming, because the fallback is about a loop's iteration mechanism and an operation has none. Point one at an operation and the validator answers with an error of its own.
 
@@ -1168,7 +1168,7 @@ print(qp.explain(bias_sweep, networked))
 r"""
 ### `qp.optimize`
 
-Back to the rack whose flux line has no sequencer, where the averaging fell host-side because it *encloses* the flux sweep while everything it averages runs in the sequencer. Swapping the two loops removes the reason, and `qp.optimize(program, capabilities)` is the swap. It returns a new program and never mutates the one it was given.
+Back to the rack whose flux line has no real-time half, where the averaging fell host-side because it *encloses* the flux sweep while everything it averages runs in real time. Swapping the two loops removes the reason, and `qp.optimize(program, capabilities)` is the swap. It returns a new program and never mutates the one it was given.
 """
 
 # %%
@@ -1177,7 +1177,7 @@ print(qp.explain(regrouped, rack_caps))
 
 # %% [markdown]
 r"""
-The sweep is the outer block now, the `set_offset` has been hoisted to sit between the two, and the averaging is back in the sequencer with no warning left.
+The sweep is the outer block now, the `set_offset` has been hoisted to sit between the two, and the averaging is back in real time with no warning left.
 
 The rewrite is opt-in, because it is not unconditionally equivalent. It takes all two hundred shots of one bias point before moving on, where the program as written interleaved passes over the whole sweep. The two are the same experiment for a stationary device and different under drift, so when you want the interleaving, do not call it. The hoisted `set_offset` also runs once per bias point rather than once per shot, right for a DC level and wrong for an operation with side effects. The rewrite therefore hoists only a leading run of host-side-only operations, and it refuses to move one past an operation it would reorder against.
 
@@ -1310,7 +1310,7 @@ r"""
 ## Recap
 
 - **A fragment** is a named, parameterized sub-program. `@qp.fragment` reads a plain positional signature, the body runs once at definition time, and a parameter is an untyped placeholder that may stand for a number, a bus, or a waveform. `expand()` inlines every call and renames what cannot survive inlining, and `with_waveforms` does not follow a call, so expand first.
-- **A conditional** reads a classified state during the run. `if_(handle.state == 1)` is the shape, one comparison against 0 or 1, and the measurement has to have asked for `MeasurementField.STATE`. The arm that did not run holds `NaN`, so `combine_first` puts two arms back together, and active reset is the standard use.
+- **A conditional** reads a classified state during the run. `if_(handle.state == 1)` is the shape, one equality or inequality comparison against an integer or another classified state, and the measurement has to have asked for `MeasurementField.STATE`. The arm that did not run holds `NaN`, so `combine_first` puts two arms back together, and active reset is the standard use.
 - **A waveform** owes `envelope()` and `get_duration()` and gets everything else free. A parameter a sweep can bind is annotated `float | qp.Expression` and resolved at the point of use. `qp.register_waveform` teaches the file format, whose one constraint is that the constructor arguments are the object's state, and `qp.register_waveform_token` gives a rack a name to refuse it by. A **sweep source** is the same seam with `KIND`, `TOKEN`, `length()`, and `values()`, and its registration covers the token too.
 - **A vendor extension** is a package that registers at import time and declares a `qprogram.vendors` entry point, so a `.qp` file loads the extensions its own header names. Your own takes an `Operation` subclass, a `qp.VendorNamespace` subclass, and four registration calls, and `qp.try_activate_vendor` is the guard that makes the cell re-runnable.
 - **A platform** implements six members: a schema, its buses, two parameter listings, a capability descriptor, and `execute`. `validate`, `plan`, and `explain` come free from the descriptor, `stream` is optional, and by convention `execute` validates first and raises on an error. A result is a `qp.QProgramResult` filled with `append_measurement`.
@@ -1321,7 +1321,7 @@ r"""
 r"""
 ## Where to go next
 
-The reference documentation at [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram) is normative, and its developer section covers the seams of this notebook in more depth than a tutorial can. `python -m qprogram.lsp check file.qp` runs the parser and the validator from a shell and prints JSON, `python -m qprogram.lsp explain file.qp` prints the plan, and the VS Code extension is a thin front end over the same module, so an editor squiggle cannot drift from what the parser accepts at load time.
+The reference documentation at [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram) is normative, and its developer section covers the seams of this notebook in more depth than a tutorial can. `python -m qprogram.lsp check file.qp` runs the parser and the validator from a shell and prints JSON, `python -m qprogram.lsp explain file.qp` prints the plan, and `python -m qprogram.lsp serve` speaks the Language Server Protocol over stdio to any editor that asks, so an editor squiggle cannot drift from what the parser accepts at load time.
 
-Reading `qprogram-qblox` or `qprogram-qdac` before writing your own extension is worth the hour. Both are small, both are complete, and between them they show every seam this notebook opened being used for a real instrument.
+Read `qprogram-qblox` or `qprogram-qdac` before writing your own extension. Both are small, and between them they show the vendor namespace, the operations, the capability profile, and both kinds of predicate on a real instrument.
 """

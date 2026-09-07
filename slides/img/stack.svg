@@ -16,14 +16,12 @@
   <rect width="1600" height="900" fill="#ffffff"/>
 
   <text x="40" y="56" font-size="32" font-weight="700" fill="#1c1c2e">The QProgram stack</text>
-  <text x="40" y="88" font-size="22" fill="#6a6a82">the same program object, from your script down to the instruments</text>
 
   <!-- layer 1: experiment script -->
-  <rect x="480" y="112" width="600" height="88" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="780" y="150" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Experiment script</text>
-  <text x="780" y="182" font-size="22" fill="#6a6a82" text-anchor="middle">the calibration you write</text>
+  <rect x="480" y="126" width="600" height="60" rx="14" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="780" y="166" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Experiment script</text>
 
-  <line x1="780" y1="204" x2="780" y2="234" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="780" y1="190" x2="780" y2="234" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="800" y="227" font-size="22" fill="#0b5c56">builds the tree</text>
 
   <!-- layer 2: the core -->
@@ -48,12 +46,10 @@
   <text x="800" y="451" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">qp.validate()</text>
 
   <!-- layer 3: capability validation -->
-  <rect x="480" y="462" width="600" height="118" rx="14" fill="#e6f4f1" stroke="#0b5c56" stroke-width="2"/>
-  <text x="780" y="502" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Capability validation</text>
-  <text x="780" y="534" font-size="22" fill="#1c1c2e" text-anchor="middle">tokens · limits · predicates</text>
-  <text x="780" y="564" font-size="22" fill="#6a6a82" text-anchor="middle">Diagnostic + ExecutionPlan (rt / host)</text>
+  <rect x="480" y="486" width="600" height="60" rx="14" fill="#e6f4f1" stroke="#0b5c56" stroke-width="2"/>
+  <text x="780" y="526" font-size="26" font-weight="700" fill="#1c1c2e" text-anchor="middle">Capability validation</text>
 
-  <line x1="780" y1="584" x2="780" y2="614" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="780" y1="550" x2="780" y2="614" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="800" y="607" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ExecutionPlan</text>
 
   <!-- layer 4: platform -->
@@ -73,12 +69,9 @@
   <text x="780" y="836" font-size="22" fill="#6a6a82" text-anchor="middle">AWG · digitizer · slow DAC · fridge</text>
 
   <!-- vendor extension packages, plugging into the core from the side -->
-  <rect x="30" y="216" width="330" height="230" rx="14" fill="#ffffff" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
-  <text x="54" y="258" font-size="24" font-weight="700" fill="#0f766e">Vendor extensions</text>
-  <text x="54" y="302" font-size="22" fill="#1c1c2e">· vendor namespace</text>
-  <text x="54" y="336" font-size="22" fill="#1c1c2e">· operations · blocks</text>
-  <text x="54" y="370" font-size="22" fill="#1c1c2e">· capability tokens</text>
-  <text x="54" y="414" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">program.qblox.*</text>
+  <rect x="30" y="252" width="330" height="130" rx="14" fill="#ffffff" stroke="#6a6a82" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="54" y="296" font-size="24" font-weight="700" fill="#0f766e">Vendor extensions</text>
+  <text x="54" y="348" font-size="22" fill="#0b5c56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">program.qblox.*</text>
 
   <line x1="362" y1="331" x2="476" y2="331" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="420" y="317" font-size="22" fill="#0b5c56" text-anchor="middle">registers</text>
