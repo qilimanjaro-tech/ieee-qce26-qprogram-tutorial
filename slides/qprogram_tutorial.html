@@ -777,17 +777,17 @@ program.sync([])                           <span class="hljs-comment"># raises, 
 </thead>
 <tbody>
 <tr>
-<td><code>MF.RAW</code></td>
+<td><code>MeasurementField.RAW</code></td>
 <td><code>(*sweeps, time, IQ)</code></td>
 <td>the ADC trace, averaged over shots</td>
 </tr>
 <tr>
-<td><code>MF.IQ</code></td>
+<td><code>MeasurementField.IQ</code></td>
 <td><code>(*sweeps, IQ)</code></td>
 <td>integrated I and Q, the default</td>
 </tr>
 <tr>
-<td><code>MF.STATE</code></td>
+<td><code>MeasurementField.STATE</code></td>
 <td><code>(*sweeps)</code></td>
 <td>classified per shot, averaged into a population</td>
 </tr>
@@ -1703,7 +1703,7 @@ program.sync()                   <span class="hljs-comment"># every bus, includi
 <p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Add a vendor measurement field, then prove it is legal on one rack and rejected on another.</p>
 </blockquote>
 <ul>
-<li>Register the token <code>measure.fields.counts</code>, then measure with <code>fields=(&quot;counts&quot;, MF.STATE)</code>.</li>
+<li>Register the token <code>measure.fields.counts</code>, then measure with <code>fields=(&quot;counts&quot;, MeasurementField.STATE)</code>.</li>
 <li>Validate against the reference platform, then against a rack without the token.</li>
 <li>Read the counts back and say why they are zero.</li>
 </ul>

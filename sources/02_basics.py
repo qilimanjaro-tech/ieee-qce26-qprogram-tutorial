@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import qprogram as qp
-from qprogram import MeasurementField as MF
+from qprogram import MeasurementField
 from qprogram.buses import BusSchema
 from qprogram.plotting import Quantity, Style
 from qprogram.waveforms import IQDrag, IQZero, Square
@@ -335,11 +335,13 @@ class TwoStateReadout:
 
 
 one_point = qp.QProgram(label="own_model", schema=schema)
-m_own = one_point.measure(q[0].readout, "readout", "weights", fields=(MF.IQ, MF.STATE))
+m_own = one_point.measure(
+    q[0].readout, "readout", "weights", fields=(MeasurementField.IQ, MeasurementField.STATE)
+)
 own = qp.simulate(one_point, model=TwoStateReadout(lambda bus, env: 1.0, seed=1))
 
 print("one shot of the excited cloud:", np.round(own.get(m_own).values, 3))
-print("and its classified state:     ", float(own.get(m_own, field=MF.STATE)))
+print("and its classified state:     ", float(own.get(m_own, field=MeasurementField.STATE)))
 
 # %% [markdown]
 r"""
@@ -381,9 +383,11 @@ def population_scan(shots):
     rep = program.variable("rep")
     with program.average(shots=shots):
         with program.sweep(rep, qp.Range(0, 4, 1)):
-            handle = program.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+            handle = program.measure(
+                q[0].readout, "readout", "weights", fields=(MeasurementField.STATE,)
+            )
     biased = qp.MockMeasurementModel(p_excited=lambda bus, env: 0.3, seed=9)
-    return qp.simulate(program, model=biased).get(handle, field=MF.STATE)
+    return qp.simulate(program, model=biased).get(handle, field=MeasurementField.STATE)
 
 
 print("shots=1   ->", population_scan(1).values, "  one classified shot per point")
@@ -441,9 +445,9 @@ for record in result.measurements:
 
 # %% [markdown]
 r"""
-`result.get(measurement, bus=None, field=MF.IQ)` pulls one array out, and it resolves three spellings of the first argument. A handle says what it means and is the one to prefer. A plain name string selects the same record, and you reach for that after loading a program back from a `.qp` file in a session that never built it. An integer is positional sugar for declaration order. `bus=` narrows the candidates before any of the three is resolved, the thing a program measuring several qubits in one sweep needs, and `result.plot` takes all three spellings too.
+`result.get(measurement, bus=None, field=MeasurementField.IQ)` pulls one array out, and it resolves three spellings of the first argument. A handle says what it means and is the one to prefer. A plain name string selects the same record, and you reach for that after loading a program back from a `.qp` file in a session that never built it. An integer is positional sugar for declaration order. `bus=` narrows the candidates before any of the three is resolved, the thing a program measuring several qubits in one sweep needs, and `result.plot` takes all three spellings too.
 
-`field=` defaults to the integrated point. Ask for a field the measurement never requested and you get a `KeyError`, the default included, so a measurement declared with `fields=(MF.STATE,)` needs `field=MF.STATE` spelled out.
+`field=` defaults to the integrated point. Ask for a field the measurement never requested and you get a `KeyError`, the default included, so a measurement declared with `fields=(MeasurementField.STATE,)` needs `field=MeasurementField.STATE` spelled out.
 
 What comes back is an `xarray.DataArray`. Its dimensions are the enclosing sweeps, outermost first, named after your variable ids, with the swept values as coordinates, and an integrated measurement carries one extra `IQ` axis of length two. The label and the units you declared arrive as attributes on the coordinate, which is where every axis label in this notebook comes from.
 """
@@ -459,7 +463,8 @@ on_resonance = iq.sel(IQ="I").sel(ro_freq=F_READOUT, method="nearest")
 print("I at the resonator:", round(float(on_resonance), 4))
 
 try:
-    result.get(m_spec, field=MF.STATE)  # this measurement asked for the point and nothing else
+    # this measurement asked for the integrated point and nothing else
+    result.get(m_spec, field=MeasurementField.STATE)
 except KeyError as exc:
     print("a field that was never requested:", exc)
 
@@ -562,13 +567,15 @@ with two_tone.average(shots=200):
             two_tone.set_frequency(q[0].drive, drive_freq)
             two_tone.play(q[0].drive, IQZero(Square(amplitude=drive_amp, duration=20_000)))
             two_tone.sync([q[0].drive, q[0].readout])
-            m_two_tone = two_tone.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+            m_two_tone = two_tone.measure(
+                q[0].readout, "readout", "weights", fields=(MeasurementField.STATE,)
+            )
 
 print("points:", 21 * 41, "at 200 shots =", 21 * 41 * 200, "samples")
 
 # %%
 map_result = qp.simulate(two_tone, model=qp.MockMeasurementModel(p_excited=p_saturated, seed=11))
-population = map_result.get(m_two_tone, field=MF.STATE)
+population = map_result.get(m_two_tone, field=MeasurementField.STATE)
 
 print("dims:", population.dims, "shape:", population.shape, "(outermost sweep first)")
 
@@ -580,7 +587,7 @@ Two swept dimensions make a heatmap, with one number per cell on the colour bar.
 # %%
 ax_map = map_result.plot(
     m_two_tone,
-    field=MF.STATE,
+    field=MeasurementField.STATE,
     coords={"drive_freq": Quantity("Drive frequency", "MHz from $f_{01}$", lambda v: (v - F01) / 1e6)},
     value=Quantity("Excited-state population"),
     title="Qubit spectroscopy against drive amplitude",
@@ -651,12 +658,12 @@ with ridge.average(shots=200):
         ridge.set_frequency(q[0].drive, r_freq)
         ridge.play(q[0].drive, IQZero(Square(amplitude=r_amp, duration=20_000)))
         ridge.sync([q[0].drive, q[0].readout])
-        m_ridge = ridge.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+        m_ridge = ridge.measure(q[0].readout, "readout", "weights", fields=(MeasurementField.STATE,))
 
 
 # %%
 ridge_result = qp.simulate(ridge, model=qp.MockMeasurementModel(p_excited=p_saturated, seed=11))
-ridge_pop = ridge_result.get(m_ridge, field=MF.STATE)
+ridge_pop = ridge_result.get(m_ridge, field=MeasurementField.STATE)
 
 print("dims:  ", ridge_pop.dims, ridge_pop.shape)
 print("coords:", list(ridge_pop.coords))
@@ -675,7 +682,7 @@ The trace itself should come out flat at one half. On resonance the saturated re
 # %%
 ax_ridge = ridge_result.plot(
     m_ridge,
-    field=MF.STATE,
+    field=MeasurementField.STATE,
     coords={"drive_freq": Quantity("Peak frequency", "MHz from $f_{01}$", lambda v: (v - F01) / 1e6)},
     value=Quantity("Excited-state population"),
     style=Style(markers=True),
@@ -687,7 +694,7 @@ ax_ridge.legend(fontsize=8)
 plt.show()
 
 try:
-    ridge_result.plot(m_ridge, field=MF.STATE, x="drive_amp",
+    ridge_result.plot(m_ridge, field=MeasurementField.STATE, x="drive_amp",
                       coords={"drive_freq": Quantity(units="Hz")})
 except qp.ValidationError as exc:
     print(exc)
@@ -703,7 +710,7 @@ A drive left on resonance rotates the qubit at a rate proportional to its amplit
 1. Build a `qp.QProgram` with `label="rabi"` and the `schema` in scope. Declare `amp` with `label="Drive amplitude"` and `units="DAC units"`.
 2. Wrap the experiment in `average(shots=200)` and sweep `amp` with a 41-point `qp.Linspace` from 0.0 to 1.0.
 3. Inside the loop, `set_frequency` the drive bus to `F01`, then `play` an `IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.15)` on it. The variable goes inside the waveform, as in section 2.8.
-4. `sync` the drive and readout buses, then `measure` the readout bus with the `"readout"` and `"weights"` aliases and `fields=(MF.STATE,)`.
+4. `sync` the drive and readout buses, then `measure` the readout bus with the `"readout"` and `"weights"` aliases and `fields=(MeasurementField.STATE,)`.
 5. Run it with `qp.MockMeasurementModel(p_excited=p_rabi, seed=17)` and print the dims and shape of the state array.
 6. Take the swept amplitudes off the array with `rabi_pop.coords["amp"].values`, since `amps` is already in scope from section 2.8 and holds that map's twenty-one values. Then read the calibration off the rising branch rather than off the peak: keep the amplitudes at or below 0.5, find the one whose population sits closest to a half, and double it. Print that beside `A_PI`.
 7. Draw it with `style=Style(markers=True)` and `value=Quantity("Excited-state population")`, then put a dashed line on the returned axes at the amplitude you found.
@@ -726,10 +733,10 @@ with rabi.average(shots=200):
         rabi.set_frequency(q[0].drive, F01)
         rabi.play(q[0].drive, IQDrag(amplitude=r_pulse_amp, duration=40, sigma=10, beta=0.15))
         rabi.sync([q[0].drive, q[0].readout])
-        m_rabi = rabi.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+        m_rabi = rabi.measure(q[0].readout, "readout", "weights", fields=(MeasurementField.STATE,))
 
 rabi_result = qp.simulate(rabi, model=qp.MockMeasurementModel(p_excited=p_rabi, seed=17))
-rabi_pop = rabi_result.get(m_rabi, field=MF.STATE)
+rabi_pop = rabi_result.get(m_rabi, field=MeasurementField.STATE)
 rabi_amps = rabi_pop.coords["amp"].values
 
 rising = rabi_amps <= 0.5  # the first half of the sweep, before the curve turns over
@@ -742,7 +749,7 @@ print(f"true A_PI {A_PI:.3f}, grid step {rabi_amps[1] - rabi_amps[0]:.3f}")
 
 ax_rabi = rabi_result.plot(
     m_rabi,
-    field=MF.STATE,
+    field=MeasurementField.STATE,
     value=Quantity("Excited-state population"),
     style=Style(markers=True),
     title="A drive on resonance, stepped in amplitude",
@@ -758,7 +765,7 @@ plt.show()
 # 3)     set_frequency(q[0].drive, F01), then play IQDrag(amplitude=amp, duration=40, sigma=10,
 #        beta=0.15) on the drive bus
 # 4)     sync([q[0].drive, q[0].readout]), then measure the readout bus with the "readout" and
-#        "weights" aliases and fields=(MF.STATE,)
+#        "weights" aliases and fields=(MeasurementField.STATE,)
 # 5) qp.simulate(rabi, model=qp.MockMeasurementModel(p_excited=p_rabi, seed=17)), then print the
 #    dims and shape of the state array
 # 6) rabi_amps = rabi_pop.coords["amp"].values (not `amps`, which is section 2.8's); then

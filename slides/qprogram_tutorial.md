@@ -651,9 +651,9 @@ print(m0 == qp.MeasurementHandle("m0"))     # True
 
 | field | shape | what it is |
 |---|---|---|
-| `MF.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots |
-| `MF.IQ` | `(*sweeps, IQ)` | integrated I and Q, the default |
-| `MF.STATE` | `(*sweeps)` | classified per shot, averaged into a population |
+| `MeasurementField.RAW` | `(*sweeps, time, IQ)` | the ADC trace, averaged over shots |
+| `MeasurementField.IQ` | `(*sweeps, IQ)` | integrated I and Q, the default |
+| `MeasurementField.STATE` | `(*sweeps)` | classified per shot, averaged into a population |
 
 - One `measure` call can ask for all three.
 - Multiply `raw` by the weights and sum to get `iq`.
@@ -1419,7 +1419,7 @@ $ python -m qprogram.lsp check flux_sweep.qp   (exit 1)
 
 > 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
 
-- Register the token `measure.fields.counts`, then measure with `fields=("counts", MF.STATE)`.
+- Register the token `measure.fields.counts`, then measure with `fields=("counts", MeasurementField.STATE)`.
 - Validate against the reference platform, then against a rack without the token.
 - Read the counts back and say why they are zero.
 

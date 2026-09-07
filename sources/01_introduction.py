@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import qprogram as qp
-from qprogram import MeasurementField as MF
+from qprogram import MeasurementField
 from qprogram.buses import BusNaming, BusSchema
 from qprogram.waveforms import Arbitrary, FlatTop, Gaussian, IQDrag, IQPair
 from qprogram.waveforms import IQZero, Ramp, Square, SuddenNetZero
@@ -106,7 +106,7 @@ Durations are nanoseconds, frequencies hertz, phases radians, and gain and offse
 | Call | Node it appends | What it is for |
 |---|---|---|
 | `play(bus, waveform)` | `Play` | put one envelope on the line |
-| `measure(bus, waveform, weights, *, name=None, fields=(MF.IQ,))` | `Measure` | output a readout pulse and acquire what comes back. Returns a `MeasurementHandle` |
+| `measure(bus, waveform, weights, *, name=None, fields=(MeasurementField.IQ,))` | `Measure` | output a readout pulse and acquire what comes back. Returns a `MeasurementHandle` |
 | `wait(bus, duration)` | `Wait` | idle one bus for a number of nanoseconds |
 | `sync(buses=None)` | `Sync` | hold the listed buses until the furthest ahead has finished |
 | `set_frequency(bus, frequency)` | `SetFrequency` | park the carrier of a line |
@@ -147,7 +147,9 @@ with sequence.block():
     sequence.wait("q0/drive", 4)  # ns of dead time before the readout starts
 sequence.set_frequency("q0/readout", F_READOUT)
 sequence.sync(["q0/drive", "q0/readout"])
-m0 = sequence.measure("q0/readout", readout_pulse, weights, fields=(MF.IQ, MF.STATE))
+m0 = sequence.measure(
+    "q0/readout", readout_pulse, weights, fields=(MeasurementField.IQ, MeasurementField.STATE)
+)
 
 print(qp.dumps(sequence))
 
@@ -187,13 +189,13 @@ r"""
 
 `measure(bus, waveform, weights)` outputs the readout pulse itself, so there is no separate `play` on a readout line. The second waveform is the integration window, which multiplies the ADC stream before it is summed into the single point you get back, and a flat window of ones is the honest default this material uses throughout.
 
-`fields=` says which of a measurement's outputs you want. `MF.IQ` is the integrated complex point and the default, `MF.STATE` is the platform's classification of that point into a 0 or a 1, and `MF.RAW` is the ADC trace the other two are computed from. Asking for a name that is not a field raises at the call rather than at run time.
+`fields=` says which of a measurement's outputs you want. `MeasurementField.IQ` is the integrated complex point and the default, `MeasurementField.STATE` is the platform's classification of that point into a 0 or a 1, and `MeasurementField.RAW` is the ADC trace the other two are computed from. Asking for a name that is not a field raises at the call rather than at run time.
 
 `measure` returns a `MeasurementHandle`, and a handle is a name and nothing more. The name is how you ask for this measurement's data after a run, and section 1.8 uses it for exactly that. Pass `name=` to choose one yourself, and a name already taken is refused.
 """
 
 # %%
-print("fields a core measurement can ask for:", [field.value for field in MF])
+print("fields a core measurement can ask for:", [field.value for field in MeasurementField])
 print("this handle:", m0.name)
 
 try:
@@ -285,7 +287,9 @@ checked = qp.QProgram(label="prepare_and_read", schema=schema)
 checked.set_frequency(q[0].drive, F01)
 checked.play(q[0].drive, pi_pulse)
 checked.sync([q[0].drive, q[0].readout])
-m_checked = checked.measure(q[0].readout, readout_pulse, weights, fields=(MF.IQ, MF.STATE))
+m_checked = checked.measure(
+    q[0].readout, readout_pulse, weights, fields=(MeasurementField.IQ, MeasurementField.STATE)
+)
 
 print("handle, schema-backed:", m_checked.name)
 print("handle, raw string:   ", m0.name)
@@ -351,7 +355,7 @@ A plain dict is the simplest thing to bind with. `qp.WaveformLibrary` is the sam
 aliased = qp.QProgram(label="prepare_and_read", schema=schema)
 aliased.play(q[0].drive, "pi")
 aliased.sync([q[0].drive, q[0].readout])
-aliased.measure(q[0].readout, "readout", "weights", fields=(MF.IQ, MF.STATE))
+aliased.measure(q[0].readout, "readout", "weights", fields=(MeasurementField.IQ, MeasurementField.STATE))
 
 print("still unbound:", sorted(name for name in aliased.body.waveforms() if isinstance(name, str)))
 
@@ -472,18 +476,24 @@ The program below has no variable in it, no loop around it, and no averaging, so
 # %%
 single = qp.QProgram(label="one_measurement", schema=schema)
 single.set_frequency(q[0].readout, F_READOUT)
-m_single = single.measure(q[0].readout, readout_pulse, weights, fields=(MF.IQ, MF.STATE, MF.RAW))
+m_single = single.measure(
+    q[0].readout,
+    readout_pulse,
+    weights,
+    fields=(MeasurementField.IQ, MeasurementField.STATE, MeasurementField.RAW),
+)
 
 model = qp.MockMeasurementModel(
     response=lambda bus, env: 0.62 + 0.18j, noise=0.02, raw_samples=64, seed=4
 )
 result = qp.simulate(single, model=model)
 
-point = result.get(m_single, field=MF.IQ)
+point = result.get(m_single, field=MeasurementField.IQ)
 print("records in the result:", len(result))
 print("the integrated point: ", f"I={float(point.sel(IQ='I')):+.4f}  Q={float(point.sel(IQ='Q')):+.4f}")
-print("classified state:     ", float(result.get(m_single, field=MF.STATE)))
-print("raw trace:            ", result.get(m_single, field=MF.RAW).shape, "samples by quadrature")
+print("classified state:     ", float(result.get(m_single, field=MeasurementField.STATE)))
+trace = result.get(m_single, field=MeasurementField.RAW)
+print("raw trace:            ", trace.shape, "samples by quadrature")
 
 # %% [markdown]
 r"""
@@ -491,7 +501,9 @@ The raw trace is the one field here with an axis to plot against, because it car
 """
 
 # %%
-ax_raw = result.plot(m_single, field=MF.RAW, title="One readout acquisition, as the ADC saw it")
+ax_raw = result.plot(
+    m_single, field=MeasurementField.RAW, title="One readout acquisition, as the ADC saw it"
+)
 ax_raw.axhline(0.0, color="grey", linewidth=0.6)
 plt.show()
 
@@ -502,7 +514,7 @@ The integrated point has nowhere to be drawn against, and the library says so ra
 
 # %%
 try:
-    result.plot(m_single, field=MF.IQ)
+    result.plot(m_single, field=MeasurementField.IQ)
 except qp.ValidationError as exc:
     print(exc)
 
@@ -515,7 +527,7 @@ Write one program that biases the flux line, prepares the qubit, reads it out, a
 1. Build a `qp.QProgram` with `label="biased_prepare_and_read"` and the `schema` already in scope.
 2. `set_offset` the flux bus of `q[0]` to `0.05`, then `set_frequency` its drive bus to `F01` and its readout bus to `F_READOUT`.
 3. Inside a `with program.block():`, `play` the `pi_pulse` on the drive bus and `wait` 4 ns on it.
-4. `sync` the drive and readout buses by name, then `measure` the readout bus with `readout_pulse`, `weights`, and `fields=(MF.IQ, MF.STATE)`. Keep the handle.
+4. `sync` the drive and readout buses by name, then `measure` the readout bus with `readout_pulse`, `weights`, and `fields=(MeasurementField.IQ, MeasurementField.STATE)`. Keep the handle.
 5. Print `qp.dumps(program)`, save it to `out/exercise_1_1.qp`, load it back, and print whether the two bodies are equal.
 6. Then, inside `try` and `except qp.ValidationError`, `measure` the flux bus and print the message.
 
@@ -531,7 +543,9 @@ with exercise.block():
     exercise.play(q[0].drive, pi_pulse)
     exercise.wait(q[0].drive, 4)
 exercise.sync([q[0].drive, q[0].readout])
-m_exercise = exercise.measure(q[0].readout, readout_pulse, weights, fields=(MF.IQ, MF.STATE))
+m_exercise = exercise.measure(
+    q[0].readout, readout_pulse, weights, fields=(MeasurementField.IQ, MeasurementField.STATE)
+)
 
 print(qp.dumps(exercise))
 
@@ -552,7 +566,7 @@ except qp.ValidationError as exc:
 #    (F_READOUT)
 # 3) with exercise.block(): play the pi_pulse on q[0].drive, then wait 4 ns on it
 # 4) sync([q[0].drive, q[0].readout]), then measure q[0].readout with readout_pulse, weights and
-#    fields=(MF.IQ, MF.STATE), keeping the handle
+#    fields=(MeasurementField.IQ, MeasurementField.STATE), keeping the handle
 # 5) print(qp.dumps(exercise)), save to out/exercise_1_1.qp, load it back, and print whether the
 #    two bodies are equal
 # 6) then measure q[0].flux inside try / except qp.ValidationError and print the message

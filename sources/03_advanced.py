@@ -44,7 +44,7 @@ import numpy as np
 import xarray as xr
 
 import qprogram as qp
-from qprogram import MeasurementField as MF
+from qprogram import MeasurementField
 from qprogram.buses import BusSchema
 from qprogram.plotting import Quantity, Style
 from qprogram.waveforms import IQDrag, IQPair, Square
@@ -161,7 +161,7 @@ settle_bus = settle.parameter("bus")
 delay = settle.variable("n", label="Settling time", units="ns")
 with settle.sweep(delay, qp.Range(0, 200, 100)):
     settle.wait(settle_bus, delay)
-settle.measure(settle_bus, "probe", "weights", fields=(MF.STATE,))
+settle.measure(settle_bus, "probe", "weights", fields=(MeasurementField.STATE,))
 
 host = qp.QProgram(label="two_readouts")
 host.call(settle, READOUT)
@@ -223,12 +223,12 @@ spacing = experiment.variable("spacing", label="Pulse spacing", units="ns")
 with experiment.average(shots=400):
     with experiment.sweep(spacing, qp.Linspace(50, 2000, 21)):
         experiment.call(pulse_train, DRIVE, spacing)
-        m_train = experiment.measure(READOUT, "probe", "weights", fields=(MF.STATE,))
+        m_train = experiment.measure(READOUT, "probe", "weights", fields=(MeasurementField.STATE,))
 
 runnable = experiment.expand().with_waveforms(library)
 result = qp.simulate(runnable, model=qp.MockMeasurementModel(p_excited=decay, seed=3))
 
-result.plot(m_train, field=MF.STATE, value=Quantity("Excited-state population"),
+result.plot(m_train, field=MeasurementField.STATE, value=Quantity("Excited-state population"),
             style=Style(markers=True), title="One fragment, called once per point")
 plt.show()
 
@@ -238,7 +238,7 @@ r"""
 
 Every experiment so far decided everything before the run started. `if_` breaks that, reading a measurement the run has already taken and choosing what happens next while the shot is still in progress.
 
-`program.if_(condition)`, `program.elif_(condition)`, and `program.else_()` are context managers, and the three build one `Conditional` node. The condition is a comparison against a measurement's classified state, so `measure` has to have asked for `MF.STATE`.
+`program.if_(condition)`, `program.elif_(condition)`, and `program.else_()` are context managers, and the three build one `Conditional` node. The condition is a comparison against a measurement's classified state, so `measure` has to have asked for `MeasurementField.STATE`.
 
 A measurement handle carries a `state` proxy whose `==` builds a comparison rather than answering a bool, which a plain `Variable` cannot do for the reason Basics gave. So the branch reads `if_(handle.state == 1)`. `qp.eq(handle.state, 1)` is accepted too and builds the same node, redundant on a handle where it is the only option on a variable.
 """
@@ -247,7 +247,7 @@ A measurement handle carries a `state` proxy whose `==` builds a comparison rath
 PI_NS = 40  # ns, the length of the corrective pulse
 
 chain = qp.QProgram(label="one_chain")
-m_chain = chain.measure(READOUT, "probe", "weights", fields=(MF.STATE,))
+m_chain = chain.measure(READOUT, "probe", "weights", fields=(MeasurementField.STATE,))
 
 with chain.if_(m_chain.state == 1):
     chain.play(DRIVE, "pi")
@@ -275,7 +275,7 @@ def refuse(label, build):
 
 
 scratch = qp.QProgram(label="refusals")
-m_scratch = scratch.measure(READOUT, "probe", "weights", fields=(MF.STATE,))
+m_scratch = scratch.measure(READOUT, "probe", "weights", fields=(MeasurementField.STATE,))
 counter = scratch.variable("counter")
 
 refuse("two conditions joined", lambda: scratch.if_((m_scratch.state == 1) & (m_scratch.state == 0)))
@@ -314,18 +314,20 @@ split = qp.QProgram(label="two_arms")
 level = split.variable("level", label="Herald level", units="DAC units")
 
 with split.sweep(level, qp.Linspace(0.0, 1.0, 4)):
-    herald = split.measure(READOUT, "probe", "weights", name="herald", fields=(MF.STATE,))
+    herald = split.measure(READOUT, "probe", "weights", name="herald", fields=(MeasurementField.STATE,))
     with split.if_(herald.state == 1):
-        m_up = split.measure(READOUT, "probe", "weights", name="up", fields=(MF.STATE,))
+        m_up = split.measure(READOUT, "probe", "weights", name="up", fields=(MeasurementField.STATE,))
     with split.else_():
-        m_down = split.measure(READOUT, "probe", "weights", name="down", fields=(MF.STATE,))
+        m_down = split.measure(
+            READOUT, "probe", "weights", name="down", fields=(MeasurementField.STATE,)
+        )
 
 # The herald reports an excited qubit only above 0.5, so each arm owns half the sweep.
 heralded = qp.MockMeasurementModel(p_excited=lambda bus, env: float(env["level"] >= 0.5))
 arms = qp.simulate(split, model=heralded)
 
-up_arm = arms.get(m_up, field=MF.STATE)
-down_arm = arms.get(m_down, field=MF.STATE)
+up_arm = arms.get(m_up, field=MeasurementField.STATE)
+down_arm = arms.get(m_down, field=MeasurementField.STATE)
 
 print("level     ", up_arm.coords["level"].values)
 print("if arm    ", up_arm.values)
@@ -371,18 +373,22 @@ class HotQubit:
 
 reset = qp.QProgram(label="active_reset")
 with reset.average(shots=4000):
-    m_before = reset.measure(READOUT, "probe", "weights", name="before", fields=(MF.STATE,))
+    m_before = reset.measure(
+        READOUT, "probe", "weights", name="before", fields=(MeasurementField.STATE,)
+    )
     with reset.if_(m_before.state == 1):
         reset.play(DRIVE, "pi")
     with reset.else_():
         reset.wait(DRIVE, PI_NS)
-    m_after = reset.measure(READOUT, "probe", "weights", name="after", fields=(MF.STATE,))
+    m_after = reset.measure(READOUT, "probe", "weights", name="after", fields=(MeasurementField.STATE,))
 
 reset_run = qp.simulate(reset, model=HotQubit(seed=0))
 
-print(f"excited before: {float(reset_run.get(m_before, field=MF.STATE)):.3f}   expected {P_HOT:.3f}")
-print(f"excited after:  {float(reset_run.get(m_after, field=MF.STATE)):.3f}   "
-      f"expected {P_HOT * (1 - RESET_FIDELITY):.3f}")
+excited_before = float(reset_run.get(m_before, field=MeasurementField.STATE))
+excited_after = float(reset_run.get(m_after, field=MeasurementField.STATE))
+
+print(f"excited before: {excited_before:.3f}   expected {P_HOT:.3f}")
+print(f"excited after:  {excited_after:.3f}   expected {P_HOT * (1 - RESET_FIDELITY):.3f}")
 
 # %% [markdown]
 r"""
@@ -397,7 +403,7 @@ shot = composed.variable("shot")
 
 with composed.average(shots=50):
     with composed.sweep(shot, qp.Range(0, 3, 1)):
-        seen = composed.measure(READOUT, "probe", "weights", fields=(MF.STATE,))
+        seen = composed.measure(READOUT, "probe", "weights", fields=(MeasurementField.STATE,))
         with composed.if_(seen.state == 1):
             composed.play(DRIVE, "pi")
 
@@ -804,7 +810,9 @@ def flux_sweep(label="flux_sweep"):
             program.set_frequency(q[0].drive, DRIVE_FREQ)
             program.play(q[0].drive, "pi")
             program.sync([q[0].drive, q[0].readout])
-            program.measure(q[0].readout, "probe", "weights", name="m0", fields=(MF.STATE,))
+            program.measure(
+                q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,)
+            )
     return program
 
 
@@ -824,7 +832,8 @@ with warnings.catch_warnings(record=True) as caught:
     run = rack.execute(sweep)
 
 print("result:              ", run)
-print("array:               ", run.get("m0", field=MF.STATE).dims, run.get("m0", field=MF.STATE).shape)
+population = run.get("m0", field=MeasurementField.STATE)
+print("array:               ", population.dims, population.shape)
 print("warning it surfaced: ", caught[0].message)
 
 # %% [markdown]
@@ -877,12 +886,12 @@ class ArrayRack(BenchtopRack):
             if isinstance(node, qp.operations.Measure):
                 data = xr.DataArray(np.zeros(shape), dims=tuple(axes), coords=axes)
                 result.append_measurement(bus=node.bus, name=node.handle.name,
-                                          data=data, fields={MF.STATE.value: data})
+                                          data=data, fields={MeasurementField.STATE.value: data})
         return result
 
 
 own = ArrayRack(schema, rack_caps).execute(sweep)
-state = own.get("m0", field=MF.STATE)
+state = own.get("m0", field=MeasurementField.STATE)
 
 print("result:    ", own)
 print("array:     ", state.dims, state.shape)
@@ -947,7 +956,7 @@ with bias_sweep.average(shots=200):
         bias_sweep.set_frequency(q[0].drive, DRIVE_FREQ)
         bias_sweep.play(q[0].drive, "pi")
         bias_sweep.sync([q[0].drive, q[0].readout])
-        bias_sweep.measure(q[0].readout, "probe", "weights", name="m0", fields=(MF.STATE,))
+        bias_sweep.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
 
 for node in bias_sweep.body.walk():
     if node is not bias_sweep.body:  # walk() yields the root block first
@@ -1190,7 +1199,7 @@ with nested.average(shots=200):
         with nested.sweep(nested_freq, qp.Linspace(DRIVE_FREQ - 50e6, DRIVE_FREQ + 50e6, 11)):
             nested.set_frequency(q[0].drive, nested_freq)
             nested.play(q[0].drive, "pi")
-            nested.measure(q[0].readout, "probe", "weights", name="m0", fields=(MF.STATE,))
+            nested.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
 
 broadcast = qp.QProgram(label="bare_sync", schema=schema)
 broadcast_bias = broadcast.variable("bias", label="Flux bias", units="V")
@@ -1199,7 +1208,7 @@ with broadcast.average(shots=200):
         broadcast.set_offset(q[0].flux, broadcast_bias)
         broadcast.play(q[0].drive, "pi")
         broadcast.sync()  # every bus in the program, the flux line included
-        broadcast.measure(q[0].readout, "probe", "weights", name="m0", fields=(MF.STATE,))
+        broadcast.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
 
 cases = (
     ("the program above", bias_sweep, rack_caps),
@@ -1228,9 +1237,9 @@ Add a measurement field to the language, then prove it is legal on one rack and 
 
 The `fields=` vocabulary is derived from the capability registry, so a readout that returns photon counts rather than an integrated point needs no new seam at all. One token registration widens `measure` itself.
 
-1. Print `sorted(qp.protocol.known_measurement_fields())` and then try `measure(..., fields=("counts", MF.STATE))` inside `try` and `except qp.ValidationError`. Print the message, and print a note in the `else` branch instead, since a second run of the cell in one kernel finds the token already registered and the refusal cannot happen twice.
+1. Print `sorted(qp.protocol.known_measurement_fields())` and then try `measure(..., fields=("counts", MeasurementField.STATE))` inside `try` and `except qp.ValidationError`. Print the message, and print a note in the `else` branch instead, since a second run of the cell in one kernel finds the token already registered and the refusal cannot happen twice.
 2. Register the token with `qp.register_capability_tokens(qp.protocol.measurement_field_token("counts"))`, then print the known fields again.
-3. Build a program that measures with `fields=("counts", MF.STATE)` and print the measure line of its `.qp` text. Note which order the fields come back in.
+3. Build a program that measures with `fields=("counts", MeasurementField.STATE)` and print the measure line of its `.qp` text. Note which order the fields come back in.
 4. Validate it against `qp.reference_capabilities()` and show there are no diagnostics.
 5. Build a descriptor that lacks the token. Take one `qp.CompilerCapabilities` half, `replace` its `capabilities` with that set minus `"measure.fields.counts"`, wrap it in a `qp.BusCapabilities` and a `qp.PlatformCapabilities`, validate again, and print the code and the message.
 6. Run the program on the reference platform, print the `counts` array, and say in a comment why it is zero.
@@ -1243,7 +1252,7 @@ print("fields the language accepts:", sorted(qp.protocol.known_measurement_field
 
 before = qp.QProgram(label="counting", schema=schema)
 try:
-    before.measure(q[0].readout, "probe", "weights", fields=("counts", MF.STATE))
+    before.measure(q[0].readout, "probe", "weights", fields=("counts", MeasurementField.STATE))
 except qp.ValidationError as exc:
     print("\nrefused at the call:", exc)
 else:
@@ -1254,7 +1263,9 @@ print("\nfields the language accepts:", sorted(qp.protocol.known_measurement_fie
 
 counting = qp.QProgram(label="counting", schema=schema)
 with counting.average(shots=8):
-    clicks = counting.measure(q[0].readout, "probe", "weights", fields=("counts", MF.STATE))
+    clicks = counting.measure(
+        q[0].readout, "probe", "weights", fields=("counts", MeasurementField.STATE)
+    )
 
 print(qp.dumps(counting).split("body:")[1].rstrip())
 print("canonical order puts the core fields first, then vendor names alphabetically")
@@ -1278,15 +1289,16 @@ counted = qp.simulate(counting, model=qp.MockMeasurementModel(p_excited=lambda b
 # has no idea how to produce a photon count, so it leaves the entries at zero. A real compiler is
 # what fills them in, which is the whole reason the field is a capability and not a core feature.
 print("\ncounts:", counted.get(clicks, field="counts").values)
-print("state: ", counted.get(clicks, field=MF.STATE).values)
+print("state: ", counted.get(clicks, field=MeasurementField.STATE).values)
 
 # %% stub
 # TODO: add a measurement field, then prove one rack takes it and another does not.
 # 1) print sorted(qp.protocol.known_measurement_fields()), then measure with
-#    fields=("counts", MF.STATE) inside try / except qp.ValidationError and print the message
+#    fields=("counts", MeasurementField.STATE) inside try / except qp.ValidationError, and
+#    print the message
 # 2) qp.register_capability_tokens(qp.protocol.measurement_field_token("counts")), then print the
 #    known fields again
-# 3) build a program measuring with fields=("counts", MF.STATE) and print its measure line
+# 3) build a program measuring with fields=("counts", MeasurementField.STATE) and print its measure line
 # 4) qp.validate(program, qp.reference_capabilities()) should return no diagnostics
 # 5) replace() one CompilerCapabilities half with its capabilities minus "measure.fields.counts",
 #    wrap it in qp.BusCapabilities and qp.PlatformCapabilities, validate again, print the code
@@ -1298,7 +1310,7 @@ r"""
 ## Recap
 
 - **A fragment** is a named, parameterized sub-program. `@qp.fragment` reads a plain positional signature, the body runs once at definition time, and a parameter is an untyped placeholder that may stand for a number, a bus, or a waveform. `expand()` inlines every call and renames what cannot survive inlining, and `with_waveforms` does not follow a call, so expand first.
-- **A conditional** reads a classified state during the run. `if_(handle.state == 1)` is the shape, one comparison against 0 or 1, and the measurement has to have asked for `MF.STATE`. The arm that did not run holds `NaN`, so `combine_first` puts two arms back together, and active reset is the standard use.
+- **A conditional** reads a classified state during the run. `if_(handle.state == 1)` is the shape, one comparison against 0 or 1, and the measurement has to have asked for `MeasurementField.STATE`. The arm that did not run holds `NaN`, so `combine_first` puts two arms back together, and active reset is the standard use.
 - **A waveform** owes `envelope()` and `get_duration()` and gets everything else free. A parameter a sweep can bind is annotated `float | qp.Expression` and resolved at the point of use. `qp.register_waveform` teaches the file format, whose one constraint is that the constructor arguments are the object's state, and `qp.register_waveform_token` gives a rack a name to refuse it by. A **sweep source** is the same seam with `KIND`, `TOKEN`, `length()`, and `values()`, and its registration covers the token too.
 - **A vendor extension** is a package that registers at import time and declares a `qprogram.vendors` entry point, so a `.qp` file loads the extensions its own header names. Your own takes an `Operation` subclass, a `qp.VendorNamespace` subclass, and four registration calls, and `qp.try_activate_vendor` is the guard that makes the cell re-runnable.
 - **A platform** implements six members: a schema, its buses, two parameter listings, a capability descriptor, and `execute`. `validate`, `plan`, and `explain` come free from the descriptor, `stream` is optional, and by convention `execute` validates first and raises on an error. A result is a `qp.QProgramResult` filled with `append_measurement`.
