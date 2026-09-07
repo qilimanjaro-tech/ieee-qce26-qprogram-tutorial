@@ -112,19 +112,19 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 ## Follow along
 
-- **Local**: `pip install "qprogram[viz]" scipy`, Python 3.11 to 3.14.
+- **Local**: `pip install "qprogram[viz]==0.1.0" scipy`, Python 3.11 to 3.14.
 - **Colab**: the first cell of each notebook installs what is missing.
+- Parts 5 and 6 add two vendor packages, and their own first cells install them.
 - No hardware and no cloud account, since the reference platform ships in the wheel.
-- Open and run `notebooks/00_setup.ipynb` now.
-- Its last cell draws a resonator dip near 7.2 GHz.
+- Open and run `notebooks/00_setup.ipynb` now. Its last cell draws a dip near 7.2 GHz.
 
 ---
 
 ## How we work
 
 - The slides are the map, and the notebooks are the work.
-- Each part is a short concept, a live code-along, then one 🧩 exercise.
-- `notebooks/` holds blank `# TODO` cells, `notebooks/solutions/` holds the answers.
+- Each part is a short concept, a live code-along, and one 🧩 exercise.
+- `notebooks/` holds the `# TODO` cells with the steps written out, `notebooks/solutions/` the answers.
 - Interrupt me, above all with a lab story that contradicts the slide.
 
 ---
@@ -294,7 +294,7 @@ $$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
 
 $$Q(t) = \beta\,\dot{I}(t)$$
 
-- DRAG adds a second quadrature alongside the envelope you play.
+- DRAG adds a second envelope on the quadrature 90 degrees from the one you play.
 - Its shape is the derivative of the in-phase envelope.
 - It cancels the leading transfer into $|2\rangle$ and the phase error left behind.
 - First order gives $\beta \approx 1/|\alpha|$, and $\beta$ is calibrated per qubit.
@@ -319,7 +319,8 @@ Two qubits interact through a coupling, and a gate is an interval where you let 
 | **flux** | push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
 | **all-microwave** | drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
 
-- The flux route drags a qubit off its sweet spot, the microwave route moves neither.
+- The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.
+- The microwave route moves neither qubit.
 - Two-qubit error runs five to ten times single-qubit error.
 - Each pair is calibrated by a two-dimensional scan, amplitude against duration.
 
@@ -418,11 +419,11 @@ Every fit you run has to land on these, and a circuit carries none of them.
 A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply this.
 
 ```text
-40 ns DRAG envelope,  IQ pair,  carrier 4.8501 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
+40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
 ```
 
 - Nothing in `X(q0)` names a line, a carrier, or an envelope.
-- Each of these numbers came out of its own scan.
+- The carrier and the amplitude came out of their own scans, and the rest are choices.
 - They drift, so the scans are run again.
 
 ---
@@ -501,6 +502,7 @@ m0 = program.measure(q[0].readout, readout_pulse, weights)
 
 - A program is a label, a schema, and the calls you append.
 - `BusSchema.transmon()` gives each qubit a drive line and a readout line.
+- `readout_pulse` and `weights` are envelopes, and a string alias can stand in for either.
 - Without a schema, bus names are plain strings and nothing is checked.
 
 ---
@@ -563,7 +565,7 @@ with program.if_(m0.state == 1):             # a branch on a classified bit
 ```
 
 - Four blocks nest, and nesting in the file is nesting in the result.
-- `sweep` adds a dimension, `average` takes one away.
+- `sweep` adds a dimension, `average` adds none.
 - `if_` reads a measurement outcome inside the shot.
 
 ---
@@ -631,10 +633,11 @@ body:
     play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
     wait q[0].drive 4
   sync q[0].drive q[0].readout
-  measure q[0].readout "readout" "weights" name="q0/readout/m0" fields=["state", "iq"]
+  measure q[0].readout IQPair(...) IQPair(...) name="q0/readout/m0" fields=["state", "iq"]
 ```
 
 - Prepare on the drive bus, hold at a barrier, then read on the readout bus.
+- The two `IQPair`s are the readout tone and the integration weights, written out in full.
 - Each call appends exactly one node, and `body.walk()` hands them back in order.
 - The tree is now in memory, and nothing has reached the rack.
 
@@ -744,7 +747,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 ![h:430](img/anatomy.svg)
 
-<p class="cap"><code>sweep</code> creates an axis, <code>average</code> collapses one, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
+<p class="cap"><code>sweep</code> creates an axis, <code>average</code> creates none, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
 
 ---
 
@@ -782,7 +785,7 @@ with program.average(shots=200):
 ## Averaging
 
 - `average(shots)` repeats the body and hands back the mean.
-- It is the one block that removes a dimension instead of adding one.
+- It is the one block that adds no dimension, where every `sweep` around it does.
 - Amplifier noise and projection noise both fall as $1/\sqrt{N}$.
 - Halving the noise therefore costs four times the measurement time.
 
@@ -837,7 +840,7 @@ measurements: 25 against 1025 for the full map
 - Nested `with` statements are nested loops, so a two-deep nest is a grid.
 - `sweep(a) | sweep(b)` advances both on the same tick instead.
 - One dimension comes back carrying two coordinate arrays, a diagonal cut.
-- Unequal lengths raise on the `|` line, before anything runs.
+- Unequal lengths raise when the block opens, before anything runs.
 
 ---
 
@@ -911,6 +914,16 @@ a_pi true   : 0.6200                error:    -0.39%
 
 ---
 
+## Exercise 3.1
+
+> 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
+
+- Refit the points up to the maximum with the model written in terms of $a_{90}$.
+- A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
+- On a real drive line, the measured value can differ by percent.
+
+---
+
 ## The waveform library
 
 - The library resolves each alias per bus, in three tiers, most specific first.
@@ -955,18 +968,9 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 ---
 
-## Exercise 3.1
-
-> 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
-
-- A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
-- On a real drive line, the measured value can differ by percent.
-
----
-
 <!-- _class: divider -->
 
-<p class="kicker">Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
+<p class="kicker">Session 2 · Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
 
 # Coherence and feedback
 
@@ -1116,7 +1120,7 @@ population before reset = 18.5%     population after reset = 1.0%
 
 - One `shot` variable swept with `qp.Range(0, 399, 1)`, and no `average`.
 - `check` asks for `state`, and the excited arm calls `x180` then measures again.
-- Recover the population with `np.where(np.isnan(verify), check, verify)`.
+- Recover the population with `np.where(np.isnan(verified), before, verified)`.
 
 ---
 
@@ -1470,6 +1474,17 @@ qblox = "qprogram_qblox"
 
 ---
 
+## Exercise 6.1
+
+> 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
+
+- Register the token `measure.fields.counts`.
+- Measure with `fields=("counts", MF.STATE)` and print the `.qp` body.
+- Validate against the reference platform, then against a rack without the token.
+- Read the counts back and say why they are zero.
+
+---
+
 ## The calibration diff
 
 ```diff
@@ -1504,17 +1519,6 @@ $ python -m qprogram.lsp check rabi_hand_edited.qp   (exit 1)
 
 ---
 
-## Exercise 6.1
-
-> 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
-
-- Register the token `measure.fields.counts`.
-- Measure with `fields=("counts", MF.STATE)` and print the `.qp` body.
-- Validate against the reference platform, then against a rack without the token.
-- Read the counts back and say why they are zero.
-
----
-
 ## The capstone
 
 ```
@@ -1531,7 +1535,7 @@ T2 echo (us)           15.8509     16.0000     0.9%
 - Each step consumes the answer measured by the one before it.
 - T1, Ramsey and echo drive with the $\pi$ pulse that Rabi fitted.
 - The run leaves a `.qp` per step plus one `calibration.wfl`.
-- Six primitives under all of it, assembled into one tree and run by a swappable platform.
+- The six requirements from the opening under all of it, in one tree, run by a swappable platform.
 
 ---
 

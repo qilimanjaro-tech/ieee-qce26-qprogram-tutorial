@@ -31,8 +31,8 @@ By the end of the tutorial, participants will be able to design, validate, seria
 | Path | What it is |
 |------|------------|
 | [`setup/README.md`](setup/README.md) | Install instructions (pip, uv, or Google Colab). Start here. |
-| [`notebooks/`](notebooks/) | The seven tutorial notebooks (`00_setup` to `06_extending_and_shipping`), attendee versions with the exercises left blank. |
-| [`notebooks/solutions/`](notebooks/solutions/) | The same notebooks with the exercises solved and the outputs embedded. |
+| [`notebooks/`](notebooks/) | The seven tutorial notebooks (`00_setup` to `06_extending_and_shipping`), attendee versions whose exercise cells are a numbered `# TODO`, with every other cell's output already in place. |
+| [`notebooks/solutions/`](notebooks/solutions/) | The same notebooks with the exercises solved. |
 | [`slides/`](slides/) | The Marp deck (`qprogram_tutorial.md`) and its diagrams. See [`slides/README.md`](slides/README.md). |
 | [`sources/`](sources/) | The percent-format Python sources the notebooks are built from. Edit these, never the `.ipynb` files. |
 | [`tools/`](tools/) | The notebook builder, the house-style checker, and the paragraph unwrapper. |
@@ -44,11 +44,11 @@ By the end of the tutorial, participants will be able to design, validate, seria
 | | Part | Experiments |
 |---|------|-------------|
 | | Setup ([`00_setup`](notebooks/00_setup.ipynb), run it before the session) | readout pulse, one resonator scan |
-| 1 | The program is data ([`01_pulse_programs`](notebooks/01_pulse_programs.ipynb)) | readout pulse and acquisition |
+| 1 | The program is data ([`01_pulse_programs`](notebooks/01_pulse_programs.ipynb)) | readout pulse and acquisition, then a pi pulse before the readout |
 | 2 | Sweeps and results ([`02_sweeps_and_results`](notebooks/02_sweeps_and_results.ipynb)) | resonator spectroscopy, punchout |
 | 3 | Finding the qubit ([`03_finding_the_qubit`](notebooks/03_finding_the_qubit.ipynb)) | qubit spectroscopy, Rabi, flux arc |
 | 4 | Coherence and feedback ([`04_coherence_and_feedback`](notebooks/04_coherence_and_feedback.ipynb)) | T1, Ramsey, Hahn echo, single-shot readout, active reset |
-| 5 | One program, many machines ([`05_one_program_many_machines`](notebooks/05_one_program_many_machines.ipynb)) | porting the flux arc to another rack, then rebuilding that rack from two published vendor profiles |
+| 5 | One program, many machines ([`05_one_program_many_machines`](notebooks/05_one_program_many_machines.ipynb)) | describing a rack that cannot run the flux arc, rebuilding it from two published vendor profiles, then porting the program onto it |
 | 6 | Extending and shipping ([`06_extending_and_shipping`](notebooks/06_extending_and_shipping.ipynb)) | custom waveform, custom sweep source, vendor profile and namespace, full bring-up capstone |
 
 The notebooks carry more material than a live session gets through, and the excess is deliberate. They are also the thing attendees take home, so the sections a live session drops are the ones worth having in writing.
@@ -96,11 +96,11 @@ Upon completing this tutorial, attendees will be able to:
 
 ## Format
 
-The two halves of the material do different jobs. The slides carry the physics and the concepts: what a transmon is, what the fridge and the rack around it are for, how a gate becomes a voltage, what a measurement really returns, and why any of that needs a language of its own. The notebooks carry the code. They build one experiment at a time, explain what that experiment measures and why it comes in this order, and leave the background to the deck. The coding is instructor-led, and each part ends with one exercise on a real problem. The attendee notebooks leave that cell blank and `notebooks/solutions/` has the answer. Every example runs on QProgram's reference executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
+The two halves of the material do different jobs. The slides carry the physics and the concepts: what a transmon is, what the fridge and the rack around it are for, how a gate becomes a voltage, what a measurement really returns, and why any of that needs a language of its own. The notebooks carry the code. They build one experiment at a time, explain what that experiment measures and why it comes in this order, and leave the background to the deck. The coding is instructor-led, and each part carries one exercise on a real problem, placed where the notebook has taught enough to attempt it. The attendee notebooks leave that cell blank and `notebooks/solutions/` has the answer. Every example runs on QProgram's reference executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
 
 The figures come from the library. `result.plot(measurement)` draws whatever the array's shape asks for, a line per quadrature, a heatmap, or an IQ scatter, and hands back the Matplotlib `Axes` it drew on, so a fit, a reference line, or an annotation is one more call. `waveform.plot()` draws an envelope through the same palette, which is why a pulse and the sweep it produced look like one experiment. That is the whole reason the notebooks reach for Matplotlib as rarely as they do.
 
-QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform and result plotting. The tutorial adds SciPy for the curve fits in Parts 3, 4, and 6. [`setup/README.md`](setup/README.md) covers all of it, whether you install locally with pip or uv or run the notebooks on Google Colab, and `notebooks/00_setup.ipynb` is the pass/fail check that your environment is ready.
+QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform and result plotting. The tutorial adds SciPy for the curve fits in Parts 3, 4, 5, and 6. [`setup/README.md`](setup/README.md) covers all of it, whether you install locally with pip or uv or run the notebooks on Google Colab, and `notebooks/00_setup.ipynb` is the pass/fail check that your environment is ready.
 
 ---
 

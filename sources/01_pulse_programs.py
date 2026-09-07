@@ -2,11 +2,9 @@
 r"""
 # 01 · The program is data
 
-A gate is a promise. A pulse is the voltage an instrument emits.
+You will write the first two programs of a bring-up, a readout tone with an acquisition and then a pi pulse followed by a readout, and then take both of them apart.
 
-You will write the first two programs of a bring-up: a readout tone with an acquisition, then a pi pulse followed by a readout. Then you take them apart. The builder hands you a tree you can inspect, transform, and save, not a string to give to a box.
-
-Nothing here runs, on hardware or on the simulator. Part 1 builds and inspects. Part 2 presses go.
+Every builder call appends one typed node to a tree and sends nothing anywhere. The tree stays in memory, where you can read it, measure it, compare it, rewrite it, and write it to a file. Part 0 ran a program somebody else had written. This part is where you find out what one is made of, and Part 2 runs the ones you write yourself.
 """
 
 # %%
@@ -39,43 +37,22 @@ import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
 from qprogram.operations import Play, Wait
-from qprogram.waveforms import Arbitrary, FlatTop, Gaussian, IQDrag, IQPair, Ramp, Square, SuddenNetZero
-
-# What a core measurement can ask for, in the canonical order QProgram sorts fields into.
-# A vendor extension can register more names; these three ship in the box.
-print("measurement fields:", [field.value for field in MF])
+from qprogram.waveforms import Arbitrary, FlatTop, Gaussian, IQDrag, IQPair, IQZero, Ramp, Square, SuddenNetZero
 
 # %% [markdown]
 r"""
-## 1.1 From a circuit to a voltage
+A circuit says `X(q0)`. An instrument needs an output port, a carrier frequency, an envelope shape, a duration, and an amplitude, and a gate carries none of them.
 
-A circuit says `X(q0)`. An instrument needs more: which output port, at what carrier frequency, with what envelope shape, for how many nanoseconds, at what amplitude. A gate carries none of that, because supplying those numbers is calibration work rather than algorithm work. QProgram keeps the program as data and lets the platform decide how to run it.
-
-A qubit is reached by at most three coaxial lines, each with a single job. The drive line carries a tone near $f_{01}$ and rotates the state. The readout line carries a tone near $f_r$, the frequency of a resonator beside the qubit, and interrogates it. The flux line holds a near-DC level that moves $f_{01}$, on tunable qubits only. Every operation in this part puts a voltage on one of those lines or records what comes back.
-"""
-
-# %% [markdown]
-r"""
-### What comes back
-
-A circuit's `measure(q0)` returns a bit. The hardware returns one complex number per shot, the amplitude and phase of a tone that went past the resonator and picked up a state-dependent shift. Turning that number into a 0 or a 1 means putting a threshold between two clouds in the IQ plane, and the threshold is a calibration of its own that Part 4 measures. Until then `MF.IQ` is the raw point and `MF.STATE` is the platform's classification of it.
-
-Every number in the dict below was measured by a scan that has no gate-level spelling, and all of them drift. The chip here is simulated so that the scans run on a laptop.
+The dict below is the simulated chip the whole tutorial talks to. It is here so that the programs you build have real numbers to put on a bus, and every part from 2 onward measures one of them back.
 """
 
 # %%
-# The simulated chip this tutorial calibrates. Every part uses the same numbers, and every fit you
-# do later has to recover them. Part 1 needs the frequencies and the two pi amplitudes.
+# The simulated chip this tutorial calibrates. Every part writes down the numbers it uses, and
+# every fit later has to recover them. Part 1 plays nothing into a model, so it reads five.
 DEVICE = {
     "q0_f01": 4.85e9,  # Hz, qubit 0 transition frequency at the flux sweet spot
     "q0_fr": 7.20e9,  # Hz, readout resonator
-    "q0_kappa": 1.5e6,  # Hz, resonator linewidth (FWHM)
-    "q0_chi": -1.8e6,  # Hz, dispersive shift
     "q0_a_pi": 0.62,  # drive amplitude of a pi pulse (DAC units)
-    "q0_T1": 18_000,  # ns
-    "q0_T2star": 9_000,  # ns
-    "q0_T2echo": 16_000,  # ns
-    "q0_linewidth": 2.0e6,  # Hz, spectroscopy FWHM at low power
     "q1_f01": 5.12e9,
     "q1_a_pi": 0.55,
 }
@@ -86,90 +63,29 @@ print("pi amplitude:   ", DEVICE["q0_a_pi"], "(DAC units)")
 
 # %% [markdown]
 r"""
-### Reading the datasheet
+## 1.1 Buses and schemas
 
-Those eleven numbers are not independent. Every experiment in this tutorial recovers one of them, and knowing what constrains what is how you tell a bad fit from a surprising result.
-
-Start with the detuning between the qubit and its resonator.
-
-$$\Delta = f_{01} - f_r = -2.35\ \text{GHz}$$
-
-That gap is the whole design. Put the resonator too close and it eats the qubit's lifetime through the Purcell channel. Put it too far and it stops learning anything about the qubit's state. In between, the two systems can no longer exchange energy but they can still shift each other, and that residual shift is dispersive readout.
-"""
-
-# %% [markdown]
-r"""
-### The dispersive shift
-
-$\chi$ is half the distance the resonator moves when the qubit goes from $|0\rangle$ to $|1\rangle$. For a transmon it follows from the qubit-resonator coupling $g$ and the anharmonicity $\alpha$.
-
-$$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta + \alpha}$$
-
-Put this chip's numbers in, with $\alpha \approx -300$ MHz, and it is claiming $g \approx 190$ MHz, a coupling at the top of what anybody builds. Nothing breaks here, because the simulated device was specified by the numbers you can measure rather than derived from a Hamiltonian. Do the arithmetic on a real datasheet. Parameters that do not close usually mean one of them is wrong.
-"""
-
-# %% [markdown]
-r"""
-### The readout ratio
-
-The two qubit states pull the resonator apart by $2\chi$, and $\kappa$ is how wide the resonator is.
-
-$$2\chi/\kappa = 2.4$$
-
-Too small and the two Lorentzians overlap, and no amount of averaging separates them. Too large and the tone you park between them barely enters the cavity. Information per photon peaks near $2\chi \approx \kappa$, so this chip is a little over-separated, trading signal for cleanliness. The same linewidth fixes the cavity fill time at $1/\kappa \approx 106$ ns, and the readout pulse below is 2000 ns rather than 200 for that reason.
-"""
-
-# %% [markdown]
-r"""
-### The three coherence times
-
-One hard constraint links them.
-
-$$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
-
-Relaxation contributes half its rate to dephasing and pure dephasing $T_\varphi$ adds the rest, so $T_1 = 18$ us puts a ceiling of 36 us on $T_2$. The measured $T_2^* = 9$ us implies 12 us of pure dephasing, and the echoed $T_2 = 16$ us implies 29 us. Refocusing removed about 60 percent of the dephasing rate, so the noise causing it is slow compared with the sequence. Part 4 measures all three and checks the inequality out loud.
-"""
-
-# %% [markdown]
-r"""
-### The spectroscopy linewidth
-
-$T_2^* = 9$ us corresponds to an intrinsic line $1/\pi T_2^*$ wide, or 35 kHz, and the dict says 2 MHz. The difference is deliberate. Two-tone spectroscopy needs a saturating drive to produce any population at all, and a saturating drive broadens the line it is measuring.
-
-$$\Delta f = \frac{1}{\pi T_2}\sqrt{1 + \Omega^2 T_1 T_2}$$
-
-So 2 MHz corresponds to a Rabi rate of roughly 700 kHz. Part 3 drives its survey scans harder still and quotes 20 MHz on purpose, so that a coarse frequency grid cannot step over the peak.
-"""
-
-# %% [markdown]
-r"""
-## 1.2 Buses and schemas
-
-A bus is one signal path taken whole, from a port on an instrument, through the attenuators and filters at each temperature stage, out at one line on the chip. QProgram names that chain once and addresses everything through the name.
-
-The unit of addressing is the path rather than the qubit, for two reasons.
-
-**One qubit owns several lines that have nothing in common.** `q[0].drive` is a pair of DACs feeding an IQ mixer at 4.85 GHz. `q[0].flux` is a single filtered wire holding a DC level. Different bandwidths, different waveform types, and in Part 5 different instruments in different chassis.
-
-**One line often serves several qubits.** Readout resonators are spread across a couple of gigahertz so that one feedline and one ADC carry all of them at once. `q[0].readout` and `q[1].readout` are two frequencies on one wire.
-
-So `play` names a bus, never a qubit. Almost every operation does, with a bare `sync()` as the exception later in this part, and the simplest spelling is a string.
+The simplest spelling of a bus is a plain string, and a program written that way is complete and will run.
 """
 
 # %%
 raw = qp.QProgram(label="readout_raw_strings")
 raw.set_frequency("readout_q0", DEVICE["q0_fr"])
-m_raw = raw.measure("readout_q0", "readout", "weights")
+m_raw0 = raw.measure("readout_q0", "readout", "weights")
+m_raw1 = raw.measure("readout_q0", "readout", "weights")
 
 print(qp.dumps(raw))
 print("buses:  ", sorted(raw.buses))
-print("handle: ", m_raw.name)  # a global counter: a raw string has no bus name to derive one from
+print("schema: ", raw.schema, "<- nothing declared, so nothing is checked")
+print("handles:", m_raw0.name, m_raw1.name)  # one global counter, since a string has no bus to prefix
 
 # %% [markdown]
 r"""
-That program is valid and it will run. Typing strings costs you two things: no tab-completion, and no checking. Misspell the bus as `"raedout_q0"` and you find out on hardware.
+Nothing checked those bus names. Misspell one as `"raedout_q0"` and the program still builds, still serializes, and finds you out on hardware.
 
-`BusSchema` fixes both without changing what lands in the AST. A schema declares which kinds of bus each element of the chip has. It does not declare how many qubits exist, so any index works. It hands back a `BusRef`, a real `str` subclass that also carries metadata, and everywhere QProgram wants a bus name a `BusRef` works.
+`BusSchema` closes that gap without changing what lands in the tree. A schema declares which kinds of bus each element of the chip has, and it declares nothing about how many qubits exist, so any index resolves. What it hands back is a `BusRef`, a real `str` subclass carrying six fields of metadata, and everywhere QProgram wants a bus name a `BusRef` works. The index field is spelled `idx` rather than `index` because a `str` subclass must not shadow `str.index`.
+
+The quoted `"readout"` and `"weights"` in the program above are pulse names rather than bus names, and section 1.3 is where they get their numbers.
 """
 
 # %%
@@ -182,22 +98,18 @@ print("the ref:     ", repr(readout_bus), "| a str?", isinstance(readout_bus, st
 print("element/idx: ", readout_bus.element, readout_bus.idx)
 print("kind:        ", readout_bus.kind)
 print("channel:     ", readout_bus.channel, "| acquires:", readout_bus.acquires)
+print("its schema:  ", readout_bus.schema is schema)
 print("any index:   ", q[7].drive, q[7].drive.channel)
 
 # %% [markdown]
 r"""
 ### What the schema catches
 
-`channel` records how many DACs feed the line and `acquires` records whether an ADC listens to it. Both are facts about copper.
+`channel` records how many DACs feed the line and `acquires` records whether an ADC listens to it. Both are facts about copper, and QProgram turns both into errors raised on the line that made the mistake rather than on hardware an hour later.
 
-A drive line ends at an IQ mixer, which needs two synchronized DACs to place a tone at an arbitrary sideband of the local oscillator without also placing a mirror image somewhere you did not want one. So an IQ bus needs an IQ waveform, and a single-channel `Square` on one leaves half the data missing. A flux line is a single DC-coupled wire and takes one channel, with no mixer and no carrier. An ADC exists on the readout line only.
+Three checks run. An IQ bus needs an IQ waveform and a single-channel bus needs a real-valued one, which `measure` applies twice over, once to the pulse and once to the weights. `measure` needs a bus with an ADC. And a program carries at most one schema, so a reference built from a second one is refused even though the two schemas describe the same chip, because the checking is done by the reference and not by the string it happens to spell.
 
-QProgram turns both facts into build-time errors:
-
-- an IQ bus needs an IQ waveform, and a single-channel bus needs a real-valued one.
-- `measure` needs a bus with an ADC.
-
-Both raise `qp.ValidationError` on the line that made the mistake. The messages below name the bus, the reason, and what to do instead.
+All three raise `qp.ValidationError`, naming the bus, the reason, and what to do instead. The first of them runs a second time in section 1.3, when `with_waveforms` puts a real envelope where a name used to be.
 """
 
 # %%
@@ -213,66 +125,59 @@ try:
 except qp.ValidationError as exc:
     print("\nno ADC          ->", exc)
 
+try:
+    scratch.play(BusSchema.transmon().q[0].drive, "pi")  # the same shape, a different schema object
+except qp.ValidationError as exc:
+    print("\nforeign schema  ->", exc)
+
 # %% [markdown]
 r"""
-Raw strings skip every one of these checks, on purpose. A `.qp` file can be mostly schema-backed with one odd bus slotted in by name, and QProgram will not argue. You lose the checks for that bus only.
+The two spellings mix. A program can be mostly schema-backed with one odd bus slotted in by name, and you lose the checks for that bus and keep them everywhere else.
 """
 
 # %% [markdown]
 r"""
-## 1.3 Operations
+## 1.2 Operations
 
-Naming a line is half of the vocabulary. The other half is the list of things you can tell the electronics to do on that line, and the list is short.
+Naming a line is half the vocabulary. The verbs are the other half, and each call appends exactly one typed node to whichever block is open and returns `None`. Two are exceptions. `measure` hands back a `MeasurementHandle` and `get_parameter` hands back a `Variable`.
 
-| What it does | QProgram |
-|---|---|
-| set the modulation frequency of the pulses | `set_frequency` |
-| set or zero the phase reference | `set_phase`, `reset_phase` |
-| scale the whole output path | `set_gain` |
-| offset the whole output path | `set_offset` |
-| output one pulse envelope | `play` |
-| idle a bus for a given time | `wait` |
-| bring buses back to a common time reference | `sync` |
-| output a pulse, integrate the return, optionally classify it | `measure` |
-| repeat a block a fixed number of times | `average`, `sweep` |
-| take a branch on a classified outcome | `if_` / `else_` |
-| change a setting the pulse program does not own | `set_parameter` |
+Durations are nanoseconds, frequencies hertz, phases radians, and gain and offset are dimensionless. Every numeric argument also accepts a variable or an expression built from one, and that is Part 2.
 
-QProgram did not invent that vocabulary. It is roughly the intersection of what commercial sequencers offer, given portable names. Adding to it takes a vendor namespace instead of a patch to the core (Part 6), and a program written in it has a chance of running on a rack you have never seen (Part 5).
+| Call | Node it appends | First shown in |
+|---|---|---|
+| `play(bus, waveform)` | `Play` | here |
+| `measure(bus, waveform, weights, *, name=None, fields=(MF.IQ,))` | `Measure` | here |
+| `wait(bus, duration)` | `Wait` | here |
+| `sync(buses=None)` | `Sync` | here |
+| `set_frequency(bus, frequency)` | `SetFrequency` | here |
+| `set_gain(bus, gain)` | `SetGain` | here |
+| `set_phase(bus, phase)`, `reset_phase(bus)` | `SetPhase`, `ResetPhase` | here |
+| `set_parameter(bus, parameter, value)`, `get_parameter(bus, parameter)` | `SetParameter`, `GetParameter` | Part 2 |
+| `set_offset(bus, offset_path0, offset_path1=None)` | `SetOffset` | Part 3 |
+| `call(fragment, *args, **kwargs)` | `Call` | Part 4 |
+
+QProgram did not invent that vocabulary. It is roughly the intersection of what commercial sequencers offer, given portable names, and Part 6 adds to it through a vendor namespace rather than a patch to the core.
 """
 
-# %% [markdown]
-r"""
-### Four hardware facts
+# %%
+sketch = qp.QProgram(label="one_node", schema=schema)
+sketch.play(q[0].drive, "pi")  # returns None; the program grew by one node
 
-Most of the constraints you meet later follow from these.
-
-- **Instructions land on a clock grid**, 4 ns on a typical box. Ask for a 3 ns wait and you get 4.
-- **Waveform memory is finite**, tens of thousands of samples. You play from a small library of envelopes rather than streaming samples, so a program refers to pulses and a separate library holds them (Part 3).
-- **Loop counters are integer registers.** A sweep the hardware can generate on its own is one where the next value is the previous plus a constant. Everything else has to be uploaded as a table, and Part 2 is where that distinction starts costing time.
-- **A branch has to resolve in tens of nanoseconds**, while the qubit is still coherent. That budget is why the conditional in Part 4 compares one classified bit against a constant and nothing wider.
-"""
+node = sketch.body.elements[0]
+print("class:  ", type(node).__name__)
+print("bus:    ", node.bus)
+print("payload:", node.waveform)
+print("buses():", node.buses())
 
 # %% [markdown]
 r"""
 ### The first readout pulse
 
-The first measurement on a new chip is the readout resonator, and the smallest useful program is one readout tone plus one acquisition. `measure` takes three arguments, the bus, the pulse to play, and the integration weights, and it outputs the pulse itself, so there is no separate `play` on the readout line.
+The smallest useful program on a new chip is one readout tone plus one acquisition. `measure(bus, waveform, weights)` outputs the pulse itself, so there is no separate `play` on the readout line, and `name=` and `fields=` after it are keyword-only.
 
-The pulse is flat because you want the resonator in steady state for as much of the window as possible. It is long because the signal is a handful of microwave photons through an amplifier chain whose noise you cannot avoid, and signal-to-noise grows as the square root of the integration time. The other side sets the upper limit. The qubit relaxes during the measurement, so integrating for a time comparable with $T_1$ reports a state you no longer have. Two microseconds against 18 us is roughly where labs land.
+The weights are the second waveform, a window that multiplies the ADC stream before it is summed into the single point you get back. A flat window of ones is the honest starting default and the one this tutorial uses throughout.
 
-`fields=` says which data you want back. `iq` is the default, and `state` asks the platform to classify the point into 0 or 1.
-"""
-
-# %% [markdown]
-r"""
-### The weights
-
-The ADC hands the platform a stream of samples, and the weights multiply that stream before it is summed into the single IQ point you get back. A flat window of ones is the honest starting default, and this tutorial uses it throughout.
-
-It is not the best you can do. The optimal weights are the difference between the average trace from $|0\rangle$ and the one from $|1\rangle$, which downweights the beginning of the record while the resonator is still filling and the two states have not separated. Labs measure that pair of traces once and keep the difference as a calibrated array, in the same library as a calibrated pi pulse.
-
-Both pulses below are `IQPair`s because a readout line is two paths. When the quadrature is silent, `IQZero(Square(amplitude=0.2, duration=2000))` names the same pulse in one constructor, and it is the one to reach for when a calibrated single-channel envelope has to go down an IQ line.
+Both arguments are `IQPair`s because a readout line is two paths. When the quadrature is silent, `IQZero(Square(amplitude=0.2, duration=2000))` names the same pulse in one constructor, and it is the one to reach for when a calibrated single-channel envelope has to go down an IQ line. The tone is flat and 2000 ns long because the resonator fills in roughly 106 ns and the integration has to run well past that.
 """
 
 # %%
@@ -291,53 +196,62 @@ print(qp.dumps(readout_program))
 
 # %% [markdown]
 r"""
-### The measurement handle
+### What a measurement asks for
 
-`measure` returns a `MeasurementHandle`. It is how you ask for this measurement's data after the run (`result.get(m0)` in Part 2) and how you refer to its outcome inside a conditional (Part 4).
+`fields=` says which of a measurement's outputs you want back. `MF.IQ` is the integrated complex point and the default, `MF.STATE` is the platform's classification of that point into a 0 or a 1, and `MF.RAW` is the ADC trace the other two are computed from, which Part 4 reaches for.
 
-The handle is a name, nothing more. Names are auto-allocated per bus (`q0/readout/m0`, `q0/readout/m1`, and so on) unless you pass `name=`, and they are written into the `.qp` file verbatim. Handles compare by name, so a handle you reconstruct after loading a file still refers to the same measurement.
+The names are checked at the call rather than at run time, and the tuple stored on the node comes back in a canonical order rather than the order you asked in. A vendor extension registers its own field names through the seam Part 6 uses.
 """
 
 # %%
-measure_node = readout_program.body.elements[-1]
+print("every field a core measurement can ask for:", [field.value for field in MF])
+print("this measurement requested:                ", readout_program.body.elements[-1].fields)
 
+try:
+    readout_program.measure(q[0].readout, readout_pulse, weights, fields=("iq", "bogus"))
+except qp.ValidationError as exc:
+    print("\nchecked at the call:", exc)
+
+# %% [markdown]
+r"""
+### The measurement handle
+
+`measure` returns a `MeasurementHandle`, and a handle is a name and nothing more. The name is how you ask for this measurement's data after the run (`result.get(m0)` in Part 2), and the same object carries the state proxy a conditional reads in Part 4.
+
+Names are allocated per bus for a `BusRef` and from one global counter for a raw string, which is the difference between `q0/readout/m0` here and the bare `m0` and `m1` in section 1.1. Pass `name=` to choose one yourself, and a name already taken is refused. Handles compare by name, so one you rebuild after loading a file still refers to the same measurement.
+"""
+
+# %%
 print("handle name:  ", m0.name)
-print("requested:    ", measure_node.fields)  # canonical order, not the order you asked in
 print("rebuilt equal:", m0 == qp.MeasurementHandle("q0/readout/m0"))
+print("all handles:  ", [handle.name for handle in readout_program.measurement_handles()])
+
+try:
+    readout_program.measure(q[0].readout, readout_pulse, weights, name="q0/readout/m0")
+except qp.ValidationError as exc:
+    print("\nduplicate name:", exc)
 
 # %% [markdown]
 r"""
 ### The drive sequence
 
-Now the other half of a bring-up: put energy into the qubit, then read it. This one uses most of the verbs you will need all day.
+Now the other half of a bring-up, putting energy into the qubit and then reading it. This one uses most of the verbs you will need all day.
 
-- `set_frequency(bus, hz)` and `set_gain(bus, g)` touch hardware registers. Gain scales the whole output path; the `amplitude` inside a waveform shapes the envelope. Two different knobs.
-- `reset_phase(bus)` zeroes the oscillator phase on a bus and `set_phase(bus, radians)` writes it to a value you choose. Resetting before a sequence makes every shot start from the same reference, so the phase the qubit accumulates is the phase you asked for. Setting it advances a later pulse by a chosen angle, one of the two ways a Ramsey fringe is produced and the whole of how a virtual Z gate is written.
-- `play(bus, waveform)` outputs one envelope, and `wait(bus, ns)` idles one bus.
-- `with program.block():` groups statements and changes nothing about what they mean. Part 2 replaces this grouping with a real sweep.
+- `set_frequency(bus, hz)` and `set_gain(bus, g)` write hardware registers. Gain scales the whole output path, and the `amplitude` inside a waveform shapes the envelope. Two different knobs.
+- `reset_phase(bus)` zeroes the oscillator phase on a bus and `set_phase(bus, radians)` writes it to a value you choose. Resetting before a sequence makes every shot start from the same reference, so the phase the qubit accumulates is the phase you asked for.
+- `play(bus, waveform)` outputs one envelope and `wait(bus, ns)` idles one bus. Instructions land on a clock grid, 4 ns on a typical box, and QProgram rounds nothing onto it. A 3 ns wait reaches the platform as a 3, and the platform is where it is accepted or refused.
+- `with program.block():` opens a plain container and changes nothing about what the statements inside it mean. It is the plainest member of a family. `average` and `sweep` in Part 2 and `if_` in Part 4 push a block onto the same stack.
 """
 
 # %% [markdown]
 r"""
 ### The sync barrier
 
-`sync(buses)` makes the listed buses agree on where "now" is. It catches people arriving from circuits, because a circuit has one global clock and a pulse program does not. Every bus keeps its **own** cursor, advanced only by the pulses and waits written to that bus, so two buses that have played different amounts have drifted apart by exactly the difference.
+Every bus keeps its own cursor, advanced only by the pulses and waits written to that bus, so two buses that have played different amounts have drifted apart by exactly the difference. A circuit has one global clock and a pulse program does not, and this operation exists for that reason.
 
-```text
-without a sync
-  q[0].drive     |play pi 40 ns|4|
-  q[0].readout   |measure 2000 ns .....................................|
-                 ^ both buses start from their own cursor, and both are still at 0
+`sync(buses)` holds every listed bus until the furthest-ahead one has finished. `sync()` with no argument covers every bus in the program, convenient here and expensive in Part 5, and `sync([])` raises rather than guess. The node stores its argument under `targets`, and a bare `sync()` stores `None` and reports no buses of its own, so it writes as a single unqualified line in the exercise below.
 
-with sync([q[0].drive, q[0].readout])
-  q[0].drive     |play pi 40 ns|4|
-  q[0].readout   .................|measure 2000 ns .....................................|
-                                  ^ the barrier moved the readout cursor to 44 ns
-```
-
-In the first case the acquisition runs while the qubit is still being flipped, so you measure the pulse rather than the state. The barrier holds every named bus until the furthest-ahead one has finished. `sync()` with no argument covers every bus in the program, convenient here and expensive in Part 5, and `sync([])` raises rather than guess.
-
-A mixer does not stop the instant its envelope reaches zero, and a readout tone that starts while the drive is still ringing down measures the ringdown along with the qubit. Hence the 4 ns wait, one clock cycle on a typical sequencer.
+The 4 ns wait before the barrier is dead time, one clock cycle held open between the end of the drive and the start of the readout.
 """
 
 # %%
@@ -361,33 +275,84 @@ print(qp.dumps(drive_program))
 
 # %% [markdown]
 r"""
-## 1.4 Waveforms are data
+## 1.3 Waveforms are data
 
-Both programs above played an envelope without ever saying what an envelope is. A waveform is a pure-data description of one. It knows nothing about hardware, and it can be built, compared, and drawn with no program around it.
+Both programs above played an envelope without ever saying what an envelope is. A waveform is a pure-data description of one. It knows nothing about hardware, and it can be built, measured, compared, and drawn with no program around it.
 
-Three methods carry the whole contract. `envelope(resolution=1)` returns the samples as a numpy array, `get_duration()` returns nanoseconds, and `plot()` draws the envelope and hands back the matplotlib `Axes` it drew on. Reach for `plot()` whenever the goal is to look at a shape. The gallery below needs a row of six panels, so it opens the row with matplotlib and hands each panel to a waveform through `target=`. Part 2 passes the same argument to `result.plot`.
+Two methods are the whole contract. `envelope(resolution=1)` returns the samples as a numpy array and `get_duration()` returns nanoseconds, and an IQ shape supplies `get_I()`, `get_Q()`, and `get_duration()` instead. Everything else is derived on the base class, so `area()`, `peak_amplitude()`, `rms_amplitude()`, `spectrum()`, and `plot()` answer for any shape, including one you write yourself in Part 6.
 """
+
+# %%
+drive_envelope = Gaussian(amplitude=0.5, duration=40, sigma=8)
+
+print("duration:", drive_envelope.get_duration(), "ns | samples:", drive_envelope.envelope().shape)
+print("peak:    ", round(drive_envelope.peak_amplitude(), 4))
+print("area:    ", round(drive_envelope.area(), 4), "ns of amplitude")
+print("rms:     ", round(drive_envelope.rms_amplitude(), 4))
+freqs, _ = drive_envelope.spectrum()
+print("spectrum:", len(freqs), "bins out to", freqs[-1] / 1e6, "MHz")
 
 # %% [markdown]
 r"""
-### The shapes
+### Reading a shape
 
-Each of these exists because a specific thing goes wrong without it.
+Four facts about those parameters, each of which has cost somebody an afternoon.
 
-- **`Square`** is the readout tone, square because you want the resonator in steady state and the integration window at constant amplitude.
-- **`Gaussian`** is the drive envelope, not square because a square edge is broadband. A transmon has a $|1\rangle \to |2\rangle$ transition sitting 200 to 300 MHz below the one you are aiming at, and a sharp edge puts power there. It is also the shape your AWG can actually produce.
-- **`FlatTop`** is a Gaussian rise, a flat hold, and a Gaussian fall. Reach for it when the length of the interaction is the parameter you sweep and the edges have to stay bounded. Flux pulses for two-qubit gates are the usual customer.
-- **`Arbitrary`** takes samples you brought yourself, from numerical optimal control or from predistortion. A flux line through a fridge is a filter with several time constants in it, so the step you asked for arrives at the chip with a tail on it. Labs measure that response once and send the inverse.
+- `sigma` and `smooth_duration` are real widths in nanoseconds, not fractions of `duration`.
+- `duration` is only the window the shape is sampled over, and an even-length window puts no sample on the centre, so a peak asked for at 0.5 is sampled at 0.499.
+- `area()` integrates trapezoidally, so a 100 ns square at amplitude 0.5 comes to 49.5 rather than 50.
+- `FlatTop`'s `buffer` pads outside `duration`, so it lengthens the shape rather than eating into the flat top.
+
+Twelve single-channel shapes and five IQ shapes ship, and Part 6 adds one of its own. Two waveforms also add, and `a + b` concatenates them into a `Chained`.
 """
+
+# %%
+print("sigma in ns:      ", Gaussian(amplitude=0.5, duration=40, sigma=8).sigma)
+print("sampled peak:     ", round(Gaussian(amplitude=0.5, duration=40, sigma=8).peak_amplitude(), 4))
+print("trapezoidal area: ", Square(amplitude=0.5, duration=100).area())
+print("buffer pads out:  ", FlatTop(amplitude=0.5, duration=200, smooth_duration=20, buffer=10).get_duration(), "ns")
+
+chained = Square(amplitude=0.2, duration=10) + Square(amplitude=0.1, duration=10)
+print("a + b:            ", type(chained).__name__, "|", chained.get_duration(), "ns")
 
 # %% [markdown]
 r"""
-### The flux shapes
+### Drawing a shape
 
-- **`Ramp`** is a linear excursion, the shape a bias line takes between two DC values.
-- **`SuddenNetZero`** is the two-qubit flux pulse whose positive and negative halves cancel. Those same long time constants mean a pulse with net area leaves a residual bias behind it, so the second gate in a circuit sees a chip the first gate detuned. Zero net area, no accumulation. The `b` parameter is detuned slightly from 1 to null whatever the line adds on top.
+The shortest spelling draws nothing at all. A bare waveform on the last line of a notebook cell renders its own envelope through `_repr_html_`, in a light and a dark version so the picture survives either notebook theme.
+"""
 
-Nothing in either waveform says it belongs on a flux line. A `Ramp` is an envelope and only that, and the line you send it down decides what it means. `BusSchema.transmon()` has no flux bus at all, and Part 3 reaches for `BusSchema.flux_tunable_transmon()` when it starts tuning the qubit with flux.
+# %%
+drive_envelope
+
+# %% [markdown]
+r"""
+`plot()` draws the same envelope.
+"""
+
+# %%
+drive_envelope.plot()
+
+# %% [markdown]
+r"""
+Two things came back from that one call. The figure, titled with the class name and labelled in nanoseconds, and the matplotlib `Axes` it was drawn on. In a notebook the axes is also the cell's value, printed as `<Axes: ...>` beside the picture, so bind it or end the line with a semicolon.
+
+Handing the axes back is the point. The call draws the data and gets out of the way, so a fuller title, a reference line, an annotation, or a fit is one ordinary method call on the object that came back. Part 2 hands you a result's axes the same way, and every figure in this tutorial is built like this.
+"""
+
+# %%
+ax = drive_envelope.plot()
+ax.set_title(f"Gaussian, {drive_envelope.get_duration()} ns, sigma {drive_envelope.sigma} ns", loc="left")
+ax.axhline(drive_envelope.peak_amplitude(), color="grey", linestyle=":", linewidth=0.8)
+plt.show()
+
+# %% [markdown]
+r"""
+### A row of panels
+
+`target=` runs the other direction. You open the layout yourself and hand each panel to a waveform, and that is how six shapes fit in one row below. Part 4 passes the same argument to `result.plot` to put two clouds of single shots on one axes.
+
+Nothing in a waveform says which line it belongs on. A `Ramp` is an envelope and only that, and the bus you send it down decides what it means. `BusSchema.transmon()` has no flux bus at all, and Part 3 reaches for `BusSchema.flux_tunable_transmon()` when it starts tuning the qubit with flux.
 """
 
 # %%
@@ -397,92 +362,60 @@ gallery = [
     FlatTop(amplitude=0.5, duration=200, smooth_duration=20),  # rise, hold, fall
     Arbitrary(0.4 * np.hanning(120)),  # samples you brought yourself, from optimal control or a fit
     Ramp(from_amplitude=0.0, to_amplitude=0.4, duration=200),  # a flux excursion
-    SuddenNetZero(amplitude=0.4, duration=100, b=0.4, t_phi=20),  # a two-qubit gate pulse
+    SuddenNetZero(amplitude=0.4, duration=100, b=1.0, t_phi=20),  # a two-qubit gate pulse
 ]
 
-fig, axes = plt.subplots(1, len(gallery), figsize=(17, 2.4))
-for ax, waveform in zip(axes, gallery, strict=True):
-    waveform.plot(target=ax)  # the waveform draws itself onto the panel we opened for it
+fig, panels = plt.subplots(1, len(gallery), figsize=(17, 2.4))
+for panel, waveform in zip(panels, gallery, strict=True):
+    waveform.plot(target=panel)  # the waveform draws itself onto the panel we opened for it
     # plot() titles the panel with the class name; add the duration to it.
-    ax.set_title(f"{type(waveform).__name__}\n{waveform.get_duration()} ns", loc="left", fontsize=9)
+    panel.set_title(f"{type(waveform).__name__}\n{waveform.get_duration()} ns", loc="left", fontsize=9)
 fig.tight_layout()
 plt.show()
 
 # %% [markdown]
 r"""
-### IQ waveforms and DRAG
+### IQ waveforms
 
-A drive line is a pair of paths, I and Q, fed through an IQ mixer. An `IQWaveform` carries both, and `get_I()` and `get_Q()` hand back the two halves as ordinary single-channel waveforms.
+A drive line is a pair of paths fed through an IQ mixer, so it takes an `IQWaveform`. `get_I()` and `get_Q()` hand back the two halves as ordinary single-channel waveforms, and for an `IQDrag` they come back as a `Gaussian` and a `GaussianDragCorrection`, shapes you could have built yourself.
 
-`IQDrag` is the standard drive shape, a Gaussian on I plus its scaled derivative on Q. A transmon is a ladder whose rungs are almost evenly spaced, not a two-state system that happens to have neighbours. The $|1\rangle \to |2\rangle$ transition sits only $|\alpha| \approx 300$ MHz below $|0\rangle \to |1\rangle$, so driving the lower transition at Rabi rate $\Omega$ drives the upper one too, off resonance by $\alpha$, populating $|2\rangle$ at order $(\Omega/\alpha)^2$. Most of that comes back at the end of the pulse. What stays behind is leakage out of the computational subspace, and no later correction recovers it.
-"""
-
-# %% [markdown]
-r"""
-### Why fast gates need it
-
-A 40 ns pulse with `sigma=10` has a Gaussian area of roughly $\sigma\sqrt{2\pi}$, so a pi rotation needs a peak Rabi rate near 20 MHz. Against a 300 MHz anharmonicity that puts $(\Omega/\alpha)^2$ at about $4\times10^{-3}$. Shorten the same pulse to 10 ns and the peak rate goes to 80 MHz and the ratio to 7 percent, the difference between a gate you tune and a gate that does not work.
-
-The correction is one term. A quadrature component proportional to the derivative of the envelope, $Q(t) = \beta\,\dot{I}(t)$, cancels the leading-order transfer to $|2\rangle$ and the phase error it leaves on $|1\rangle$. First order gives $\beta \approx 1/|\alpha|$, and nobody uses the first-order value. It is calibrated per qubit by a dedicated experiment.
-
-Nothing in this tutorial measures `beta`, and the reference simulator has no third level to leak into, so the 0.15 in the cells above is a placeholder with no provenance. Treat it as you would any uncalibrated number in someone else's script.
-"""
-
-# %% [markdown]
-r"""
-An `IQWaveform` draws itself as two panels on a shared time axis, and `plot()` returns them as an `(I, Q)` pair, so the figure below is one call plus the labels written onto the axes that came back. The two panels carry their own vertical scales, and the difference between those scales is the physics. A derivative is antisymmetric and picks up a factor of $1/\sigma$, so with `beta=0.15` and `sigma=10` the Q peak is about a hundred times smaller than the I peak. Forced onto one axis it would be a flat line at zero.
+`plot()` on an IQ shape returns the two panels as an `(I, Q)` pair, and `target=` wants a pair too. The panels carry their own vertical scales, and that is what keeps the Q trace from being drawn as a flat line at zero, because its peak here is 0.0056 against 0.6192 on I. That small number is the DRAG correction from the opening, and the `beta=0.15` producing it is the one literal in this notebook with no provenance behind it. Nothing here measures `beta` and the reference simulator has no third level to leak into, so treat it as you would any uncalibrated number in someone else's script.
 """
 
 # %%
 ax_i, ax_q = pi_pulse.plot()  # an IQWaveform hands back the two panels it drew
 ax_i.set_title(f"IQDrag, the pi pulse on qubit 0 ({pi_pulse.get_duration()} ns)", loc="left")
 ax_q.axhline(0.0, color="grey", linewidth=0.6)
-ax_q.annotate(
-    f"the derivative of I, scaled by beta={pi_pulse.beta}",
-    xy=(0.98, 0.95),
-    xycoords="axes fraction",
-    ha="right",
-    va="top",
-    fontsize=8,
-)
 plt.show()
 
-i_samples = pi_pulse.get_I().envelope()  # the samples themselves, for the arithmetic
-q_samples = pi_pulse.get_Q().envelope()
-print("peak I:", round(float(i_samples.max()), 4), "| peak |Q|:", round(float(np.abs(q_samples).max()), 4))
-
-# %% [markdown]
-r"""
-There is a shorter spelling still. Both waveform bases define `_repr_html_`, so a bare waveform on the last line of a notebook cell renders its own envelope with no plotting call at all, in a light and a dark version so the picture survives either notebook theme. `plot()` makes the axes the cell's value instead, which a notebook prints as `<Axes: ...>` next to the figure, so bind it or end the line with a semicolon.
-"""
-
-# %%
-pi_pulse
+print("I and Q are shapes:", type(pi_pulse.get_I()).__name__, "|", type(pi_pulse.get_Q()).__name__)
+print("peak I:", round(pi_pulse.get_I().peak_amplitude(), 4), "| peak |Q|:", round(pi_pulse.get_Q().peak_amplitude(), 4))
+print("IQZero leaves Q silent:", IQZero(Square(amplitude=0.2, duration=2000)).get_Q().peak_amplitude())
 
 # %% [markdown]
 r"""
 ### Structural equality
 
-Waveforms compare and hash by structure, not by identity. Two `Gaussian(0.5, 40, 8)` objects built in different cells are the same waveform. Whole-program comparison after a file round-trip depends on that, and so does the equality check in section 1.6.
+Waveforms compare and hash by structure rather than by identity, so two `Gaussian(0.5, 40, 8)` objects built in different cells are the same waveform. The type has to match exactly, so a subclass never equals its base.
+
+Two things in this notebook rest on it. It lets a program count the distinct envelopes it really plays, the number printed in section 1.4, and it is the guarantee the file round trip is checked against in section 1.5. One trap comes with it. `QProgram` itself defines no `__eq__`, so every comparison below reads `a.body == b.body` and never `a == b`.
 """
 
 # %%
-print("same shape:      ", Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 8))
-print("one sigma apart: ", Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 9))
-print("the pi pulse:    ", pi_pulse == IQDrag(DEVICE["q0_a_pi"], 40, 10, 0.15))
+print("same shape:       ", Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 8))
+print("one sigma apart:  ", Gaussian(0.5, 40, 8) == Gaussian(0.5, 40, 9))
+print("the pi pulse:     ", pi_pulse == IQDrag(DEVICE["q0_a_pi"], 40, 10, 0.15))
 print("distinct in a set:", len({Gaussian(0.5, 40, 8), Gaussian(0.5, 40, 8), Gaussian(0.5, 40, 9)}))
 
 # %% [markdown]
 r"""
 ### String aliases
 
-Look again at the `.qp` text of `drive_program`. The amplitude 0.62 is welded into it. That number came out of a Rabi fit and it moves as the chip drifts, so the program text changes every time the calibration changes and every diff is noise.
+Look again at the `.qp` text of `drive_program`. The amplitude 0.62 is welded into it, and that number came out of a Rabi fit and moves as the chip drifts.
 
-The worse version costs people data. A script with a literal amplitude in it claims a calibration. Run it against a chip whose pi amplitude has moved and it runs perfectly and produces numbers that mean nothing, because nothing in the file knows the number went stale.
+`play` and `measure` also accept a string alias instead of a waveform. The program then says which pulse it wants, and the numbers arrive later from `with_waveforms`, which returns a new program and leaves the original alone.
 
-`play` and `measure` also accept a **string alias** instead of a waveform. The program then says which pulse it wants, and the numbers arrive later from `with_waveforms`. Version the sequence, keep the amplitudes elsewhere. A program with an unbound alias cannot silently claim a stale calibration, because it does not carry one.
-
-Part 3 fits a real pi pulse and binds it this way, and Part 5 replaces the plain dict below with a `WaveformLibrary` that resolves a name differently per bus.
+Two rules govern the substitution. It is lenient about names it does not recognise, so an alias with no entry stays a string, and `body.waveforms()` is how you ask a program what it still needs. It is strict about shapes, so the channel check from section 1.1 runs again at the bind rather than back at the `play`. Part 3 fits a real pi pulse, binds it this way, and swaps the plain dict below for a `WaveformLibrary` that resolves a name differently per bus.
 """
 
 # %%
@@ -492,19 +425,25 @@ aliased.sync([q[0].drive, q[0].readout])
 aliased.measure(q[0].readout, "readout", "weights", fields=(MF.IQ, MF.STATE))
 
 print(qp.dumps(aliased).split("body:")[1])  # the body only: the header holds nothing new here
+print("still unbound:", sorted(name for name in aliased.body.waveforms() if isinstance(name, str)))
 
-calibration = {"pi": pi_pulse, "readout": readout_pulse, "weights": weights}
-bound = aliased.with_waveforms(calibration)  # a new program; `aliased` is untouched
+bound = aliased.with_waveforms({"pi": pi_pulse, "readout": readout_pulse, "weights": weights})
 resolved = next(line.strip() for line in qp.dumps(bound).splitlines() if line.strip().startswith("play"))
 print("after binding:", resolved)
+print("the original: play", aliased.body.elements[0].bus, aliased.body.elements[0].waveform)
+
+try:
+    aliased.with_waveforms({"pi": Gaussian(amplitude=0.62, duration=40, sigma=10)})
+except qp.ValidationError as exc:
+    print("\nchecked at the bind, not at the play:", exc)
 
 # %% [markdown]
 r"""
-## 1.5 The program is a tree
+## 1.4 The program is a tree
 
-Binding a waveform produced a new program rather than mutating the old one, a hint about what a program is underneath. Every builder call appended a node. `program.body` is the root `Block`, and `body.elements` is a plain Python list of its immediate children, in the order you wrote them.
+Binding a waveform produced a new program rather than mutating the old one, a hint about what a program is underneath. Every node in the tree is one of two things. Operations are the leaves, `Play`, `Measure`, `Wait`, `Sync`, and the rest of the table in section 1.2. Blocks are the containers, `Block` here, `Sweep`, `Average`, and `Parallel` in Part 2, and `Conditional` in Part 4.
 
-`drive_program` has three top-level children, because the four preparation statements live inside the `block()`.
+`program.body` is the root `Block`, and `body.elements` is a plain Python list of its immediate children in the order you wrote them, the same list you indexed twice already. `drive_program` has three top-level children, because the five preparation statements live inside the `block()`.
 """
 
 # %%
@@ -514,48 +453,46 @@ for index, node in enumerate(drive_program.body.elements):
 
 # %% [markdown]
 r"""
-`walk()` is the same tree in pre-order: the root `body` block first, then the `block()` you opened, then everything inside it, at any depth. One uniform API covers blocks and operations, so you never write the recursion yourself.
+`walk()` is the same tree in pre-order, the root `body` block first, then the `block()` you opened, then everything inside it at any depth. An operation's own `walk()` yields just that operation, so one uniform loop runs from any node and you never write the recursion yourself.
 
-Keeping a program as data means you can compute things about a sequence before anything runs. The cell below reads how many nanoseconds this program books on the drive line, straight off the AST. Fridge time is the scarce resource in a lab, and the length of a sweep is the product of its point count, its shot count, and the length of one shot, all three sitting in the tree before you press go.
-
-The reference simulator has no timing model, so that number comes out of your own arithmetic and nothing reports it back to you.
+Keeping a program as data means you can compute things about a sequence before anything runs. The cell after next reads how many nanoseconds this program books on the drive line straight off the tree, the kind of question a compiler asks and you can now ask too.
 """
 
 # %%
-print("walk() order:")
 for node in drive_program.body.walk():
-    print("  ", type(node).__name__)
+    print(" ", type(node).__name__)
 
+# %%
 drive_ns = 0
 for node in drive_program.body.walk():
     if isinstance(node, Play) and node.bus == q[0].drive:
         drive_ns += node.waveform.get_duration()
     elif isinstance(node, Wait) and node.bus == q[0].drive:
         drive_ns += node.duration
-print("\ntime booked on q[0].drive:", drive_ns, "ns")
+
+print("time booked on q[0].drive:", drive_ns, "ns")
 
 # %% [markdown]
 r"""
-Four more things to know about a built program. One of them is empty on purpose.
+Five accessors summarise a built program, and each answers a different question. `buses` is recomputed by walking the body on every access, so it is always the truth about the tree as it stands. `waveforms()` returns the distinct set, structural equality doing the counting, so a program playing one envelope twenty times reports one. `measurement_handles()` hands them back in declaration order, and Part 2 indexes results by exactly these. `variables` stays empty until Part 2 declares one. `schema` is the one the program adopted.
 """
 
 # %%
 print("buses:    ", sorted(drive_program.buses))
-print("variables:", drive_program.variables, "<- nothing declared yet, that is Part 2")
+print("variables:", drive_program.variables, "<- nothing declared here, that is Part 2")
 print("waveforms:", len(drive_program.body.waveforms()), "distinct")
+print("handles:  ", [handle.name for handle in drive_program.measurement_handles()])
 print("schema:   ", drive_program.schema)
 
 # %% [markdown]
 r"""
-## 1.6 The `.qp` format
+## 1.5 The `.qp` format
 
-A tree of plain objects serializes. `qp.dumps` writes the `.qp` text format and `qp.loads` reads it back; `qp.save` and `qp.load` are the same pair against a file.
+You have been reading `.qp` text since the first program in section 1.1. `qp.dumps` writes it and `qp.loads` reads it back, and `qp.save` and `qp.load` are the same pair against a file.
 
-The format is deliberately boring. One statement per line, indentation for nesting, quoting as the type distinction, so a quoted `"readout_q0"` is a plain string and a bare `q[0].readout` is a bus path. Nothing is truncated and nothing is implied, so a program holding an `Arbitrary` of 4000 samples writes 4000 samples and a file that loads has everything the program had.
+Two properties are worth knowing before you commit one. Nothing is truncated, so a program holding an `Arbitrary` of 4000 samples writes 4000 samples and a predistorted flux pulse becomes a large file, with no compression and no reference to an external array. And `dumps` raises `qp.SerializationError` rather than emit text it cannot read back, so a file that exists is a file that parses.
 
-That costs something. A predistorted flux pulse becomes a large file, with no compression and no reference to an external array. The trade is a file with no dependencies: no particular numpy version, no sidecar, no database. It either parses or it does not, and there is no third outcome where it parses into something subtly different.
-
-The round-trip is exact, and structural equality is how you check it.
+The round trip is exact, and structural equality is how you check it.
 """
 
 # %%
@@ -567,7 +504,7 @@ qp.save(drive_program, path)
 text = path.read_text()
 
 reloaded = qp.load(path)
-print("wrote:", path.resolve(), f"({len(text.splitlines())} lines)")
+print("wrote:", path, f"({len(text.splitlines())} lines)")
 print("same structure:", reloaded.body == drive_program.body)
 print("same text back:", qp.dumps(reloaded) == text)
 
@@ -576,11 +513,11 @@ assert qp.loads(qp.dumps(drive_program)).body == drive_program.body
 
 # %% [markdown]
 r"""
-Three things follow from having that file. A text diff of two calibration runs shows exactly which numbers moved. A pulse sequence a colleague can read in a pull request gets checked before it costs fridge time. And the file is the experiment: the `.qp` next to your data still loads, still carries the measurement names you indexed the results by, and does not depend on the notebook that built it.
+The consequence worth having is that the file is the experiment. A `.qp` sitting next to your data still loads, still carries the measurement names you indexed the results by, and depends on nothing about the notebook that built it.
 
-The first is worth doing rather than describing. `out/drive_then_read.qp` is on disk, so retune the pi pulse the way a lab would, by opening the file and changing 0.62 to 0.31 (`str.replace` stands in for the editor). The unified diff shows the one line that moved, and loading the edited text back gives a program whose body no longer compares equal to the original.
+`out/drive_then_read.qp` is on disk now, so retune the pi pulse the way a lab would, by opening the file and changing 0.62 to 0.31, with `str.replace` standing in for the editor.
 
-Watch the last two loops. Structural equality answers about any node in the tree, not just about a whole file, so comparing `body.elements` pairwise and then descending into the one child that changed localises a colleague's edit to a single operation without reading the file.
+Watch the last two loops in particular. Structural equality answers about any node in the tree rather than about a whole file alone, so comparing `body.elements` pairwise and then descending into the one child that changed localises a colleague's edit to a single operation without reading the file.
 """
 
 # %%
@@ -595,6 +532,7 @@ diff = difflib.unified_diff(
 )
 print("".join(diff))
 
+# %%
 retuned = qp.loads(edited_text)
 print("whole body equal?", retuned.body == drive_program.body)
 
@@ -615,7 +553,7 @@ Build one program that excites qubit 0 and qubit 1 and reads both out, then make
 1. One `QProgram` with `label="prepare_and_read_2q"` and the same `schema`.
 2. For each qubit, `set_frequency` its drive bus to `DEVICE["q<i>_f01"]`, then `play` an `IQDrag` at `DEVICE["q<i>_a_pi"]` with `duration=40, sigma=10, beta=0.15`.
 3. `program.sync()` with no arguments, so both readouts start from the same point in time.
-4. `measure` both readout buses, using the `"readout"` and `"weights"` aliases and `fields=(MF.IQ, MF.STATE)`. Collect the two handles and print their names.
+4. `measure` both readout buses, using the `"readout"` and `"weights"` aliases and `fields=(MF.IQ, MF.STATE)`. Keep each handle as you make it and print the two names.
 5. Print `qp.dumps(program)`.
 6. Then, inside `try` / `except qp.ValidationError`, measure `q[1].drive` and print the message.
 
@@ -629,7 +567,10 @@ for i in (0, 1):
     two_qubit.set_frequency(q[i].drive, DEVICE[f"q{i}_f01"])
     two_qubit.play(q[i].drive, IQDrag(amplitude=DEVICE[f"q{i}_a_pi"], duration=40, sigma=10, beta=0.15))
 two_qubit.sync()  # every bus in the program, so the two readouts line up
-handles = [two_qubit.measure(q[i].readout, "readout", "weights", fields=(MF.IQ, MF.STATE)) for i in (0, 1)]
+
+handles = []
+for i in (0, 1):
+    handles.append(two_qubit.measure(q[i].readout, "readout", "weights", fields=(MF.IQ, MF.STATE)))
 
 print(qp.dumps(two_qubit))
 print("handles:", [handle.name for handle in handles])  # per-bus counters, so both are m0
@@ -646,25 +587,25 @@ except qp.ValidationError as exc:
 #    DEVICE[f"q{i}_a_pi"] with duration=40, sigma=10, beta=0.15
 # 3) two_qubit.sync()
 # 4) measure both readout buses with the "readout" / "weights" aliases and
-#    fields=(MF.IQ, MF.STATE); keep the handles and print their names
-# 5) print(qp.dumps(two_qubit))
+#    fields=(MF.IQ, MF.STATE), keeping each handle as you make it
+# 5) print(qp.dumps(two_qubit)) and print the two handle names
 # 6) then measure q[1].drive inside try / except qp.ValidationError and print the message
 
 # %% [markdown]
 r"""
 ## Recap
 
-- A **bus** is one signal path. Strings work; a `BusSchema` gives you `BusRef`s that are still strings but carry `channel` and `acquires`. Those two fields reject a single-channel waveform on an IQ line and a `measure` on a bus with no ADC.
-- **Operations** are the instrument verbs: `play`, `measure`, `wait`, `sync`, `set_frequency`, `set_gain`, `reset_phase`. You built a readout tone with an acquisition, and a pi pulse followed by a readout.
-- **Waveforms are data.** `plot()` draws them, `envelope()` hands you the samples, and structural equality compares them. A string alias leaves the number to be filled in later, the seam between a stable sequence and a drifting calibration.
-- **The program is a tree.** `body.elements`, `walk()`, `buses`, `variables`. You read a pulse-time budget off the AST before anything ran, the same move a compiler makes.
+- **Buses.** Strings work, and a `BusSchema` gives you `BusRef`s that are still strings but carry `channel`, `acquires`, and a back-pointer to the schema. Those fields reject a single-channel waveform on an IQ line, a `measure` on a bus with no ADC, and a reference from a second schema.
+- **Operations** append typed nodes and return `None`, apart from `measure` and `get_parameter`. You built a readout tone with an acquisition, and a pi pulse followed by a readout.
+- **A measurement handle** is a name, allocated per bus, that survives a file round trip. It is how Part 2 reads data back and how Part 4 branches.
+- **Waveforms are data.** `envelope()` and `get_duration()` are the contract, `area()`, `peak_amplitude()`, `spectrum()`, and `plot()` come free, and `plot()` hands back the `Axes` everything else is built on. A string alias defers the numbers, checked at the bind rather than at the `play`.
+- **The program is a tree.** `body.elements` and `walk()` read it, and you took a pulse-time budget off it before anything ran.
 - **`.qp` is the artifact.** `loads(dumps(p)).body == p.body`, so a diff of two files is a diff of two calibrations.
-- **The chip has a shape.** A qubit far below its resonator, a cavity the qubit state pulls apart by more than its own linewidth, a $T_1$ twice the $T_2^*$, and a spectroscopy line as wide as the drive makes it. Every scan from here on measures one of those.
 """
 
 # %% [markdown]
 r"""
 ## Next
 
-Nothing you wrote said which loop runs on the sequencer and which runs on the control computer, because there were no loops. Part 2 adds them, with averaging and the results that come back.
+Every program in this part runs once, with no variable in it and no shots behind it. Every calibration is a loop, and Part 2 adds them, along with the results that come back.
 """

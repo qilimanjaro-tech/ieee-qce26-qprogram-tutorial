@@ -47,11 +47,11 @@
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="4" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="4" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="follow-along">Follow along</h2>
 <ul>
-<li><strong>Local</strong>: <code>pip install &quot;qprogram[viz]&quot; scipy</code>, Python 3.11 to 3.14.</li>
+<li><strong>Local</strong>: <code>pip install &quot;qprogram[viz]==0.1.0&quot; scipy</code>, Python 3.11 to 3.14.</li>
 <li><strong>Colab</strong>: the first cell of each notebook installs what is missing.</li>
+<li>Parts 5 and 6 add two vendor packages, and their own first cells install them.</li>
 <li>No hardware and no cloud account, since the reference platform ships in the wheel.</li>
-<li>Open and run <code>notebooks/00_setup.ipynb</code> now.</li>
-<li>Its last cell draws a resonator dip near 7.2 GHz.</li>
+<li>Open and run <code>notebooks/00_setup.ipynb</code> now. Its last cell draws a dip near 7.2 GHz.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -59,8 +59,8 @@
 <h2 id="how-we-work">How we work</h2>
 <ul>
 <li>The slides are the map, and the notebooks are the work.</li>
-<li>Each part is a short concept, a live code-along, then one <img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> exercise.</li>
-<li><code>notebooks/</code> holds blank <code># TODO</code> cells, <code>notebooks/solutions/</code> holds the answers.</li>
+<li>Each part is a short concept, a live code-along, and one <img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> exercise.</li>
+<li><code>notebooks/</code> holds the <code># TODO</code> cells with the steps written out, <code>notebooks/solutions/</code> the answers.</li>
 <li>Interrupt me, above all with a lab story that contradicts the slide.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -310,7 +310,7 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <h2 id="drag">DRAG</h2>
 <p><span is="marp-span" data-auto-scaling="downscale-only" class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>Q</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo><mi>β</mi><mtext> </mtext><mover accent="true"><mi>I</mi><mo>˙</mo></mover><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">Q(t) = \beta\,\dot{I}(t)
 </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">Q</span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.1702em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9202em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0785em;">I</span></span><span style="top:-3.2523em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.0278em;"><span class="mord">˙</span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span></span></span></span></span></p><ul>
-<li>DRAG adds a second quadrature alongside the envelope you play.</li>
+<li>DRAG adds a second envelope on the quadrature 90 degrees from the one you play.</li>
 <li>Its shape is the derivative of the in-phase envelope.</li>
 <li>It cancels the leading transfer into <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">∣</mi><mn>2</mn><mo stretchy="false">⟩</mo></mrow><annotation encoding="application/x-tex">|2\rangle</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">∣2</span><span class="mclose">⟩</span></span></span></span> and the phase error left behind.</li>
 <li>First order gives <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>β</mi><mo>≈</mo><mn>1</mn><mi mathvariant="normal">/</mi><mi mathvariant="normal">∣</mi><mi>α</mi><mi mathvariant="normal">∣</mi></mrow><annotation encoding="application/x-tex">\beta \approx 1/|\alpha|</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1/∣</span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mord">∣</span></span></span></span>, and <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>β</mi></mrow><annotation encoding="application/x-tex">\beta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0528em;">β</span></span></span></span> is calibrated per qubit.</li>
@@ -352,7 +352,8 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 </tbody>
 </table>
 <ul>
-<li>The flux route drags a qubit off its sweet spot, the microwave route moves neither.</li>
+<li>The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.</li>
+<li>The microwave route moves neither qubit.</li>
 <li>Two-qubit error runs five to ten times single-qubit error.</li>
 <li>Each pair is calibrated by a two-dimensional scan, amplitude against duration.</li>
 </ul>
@@ -502,11 +503,11 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="33" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="33" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="six-measured-numbers">Six measured numbers</h2>
 <p>A circuit says <code>X(q0)</code>. Before an instrument can emit it, somebody has to supply this.</p>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-text">40 ns DRAG envelope,  IQ pair,  carrier 4.8501 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-text">40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6176,  sigma 10 ns,  beta 0.1
 </code></pre>
 <ul>
 <li>Nothing in <code>X(q0)</code> names a line, a carrier, or an envelope.</li>
-<li>Each of these numbers came out of its own scan.</li>
+<li>The carrier and the amplitude came out of their own scans, and the rest are choices.</li>
 <li>They drift, so the scans are run again.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -586,6 +587,7 @@ m0 = program.measure(q[<span class="hljs-number">0</span>].readout, readout_puls
 <ul>
 <li>A program is a label, a schema, and the calls you append.</li>
 <li><code>BusSchema.transmon()</code> gives each qubit a drive line and a readout line.</li>
+<li><code>readout_pulse</code> and <code>weights</code> are envelopes, and a string alias can stand in for either.</li>
 <li>Without a schema, bus names are plain strings and nothing is checked.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -680,7 +682,7 @@ m0 = program.measure(q[<span class="hljs-number">0</span>].readout, readout_puls
 </code></pre>
 <ul>
 <li>Four blocks nest, and nesting in the file is nesting in the result.</li>
-<li><code>sweep</code> adds a dimension, <code>average</code> takes one away.</li>
+<li><code>sweep</code> adds a dimension, <code>average</code> adds none.</li>
 <li><code>if_</code> reads a measurement outcome inside the shot.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -741,10 +743,11 @@ reloaded = qp.load(<span class="hljs-string">&quot;first_readout.qp&quot;</span>
     play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
     wait q[0].drive 4
   sync q[0].drive q[0].readout
-  measure q[0].readout &quot;readout&quot; &quot;weights&quot; name=&quot;q0/readout/m0&quot; fields=[&quot;state&quot;, &quot;iq&quot;]
+  measure q[0].readout IQPair(...) IQPair(...) name=&quot;q0/readout/m0&quot; fields=[&quot;state&quot;, &quot;iq&quot;]
 </code></pre>
 <ul>
 <li>Prepare on the drive bus, hold at a barrier, then read on the readout bus.</li>
+<li>The two <code>IQPair</code>s are the readout tone and the integration weights, written out in full.</li>
 <li>Each call appends exactly one node, and <code>body.walk()</code> hands them back in order.</li>
 <li>The tree is now in memory, and nothing has reached the rack.</li>
 </ul>
@@ -843,7 +846,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="59" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="59" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="anatomy-of-a-program">Anatomy of a program</h2>
 <p><img src="img/anatomy.svg" alt="" style="height:430px;" /></p>
-<p class="cap"><code>sweep</code> creates an axis, <code>average</code> collapses one, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
+<p class="cap"><code>sweep</code> creates an axis, <code>average</code> creates none, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="60" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="60" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
@@ -905,7 +908,7 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 <h2 id="averaging">Averaging</h2>
 <ul>
 <li><code>average(shots)</code> repeats the body and hands back the mean.</li>
-<li>It is the one block that removes a dimension instead of adding one.</li>
+<li>It is the one block that adds no dimension, where every <code>sweep</code> around it does.</li>
 <li>Amplifier noise and projection noise both fall as <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><msqrt><mi>N</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{N}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.1767em;vertical-align:-0.25em;"></span><span class="mord">1/</span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9267em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord mathnormal" style="margin-right:0.109em;">N</span></span></span><span style="top:-2.8867em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
 c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
 c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
@@ -1039,6 +1042,18 @@ a_pi true   : 0.6200                error:    -0.39%
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="73" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="73" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
+<h2 id="exercise-31">Exercise 3.1</h2>
+<blockquote>
+<p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Fit the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> amplitude from the rising branch of the Rabi curve, instead of halving the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</p>
+</blockquote>
+<ul>
+<li>Refit the points up to the maximum with the model written in terms of <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>a</mi><mn>90</mn></msub></mrow><annotation encoding="application/x-tex">a_{90}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">90</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>.</li>
+<li>A <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> pulse is usually taken as half the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</li>
+<li>On a real drive line, the measured value can differ by percent.</li>
+</ul>
+<footer>Programming a Superconducting Qubit · QCE 2026</footer>
+</section>
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="74" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="74" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="the-waveform-library">The waveform library</h2>
 <ul>
 <li>The library resolves each alias per bus, in three tiers, most specific first.</li>
@@ -1054,7 +1069,7 @@ a_pi true   : 0.6200                error:    -0.39%
 </code></pre>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="74" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="74" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="75" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="75" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="the-flux-arc">The flux arc</h2>
 <ul>
 <li><code>BusSchema.flux_tunable_transmon()</code> gives each qubit a third line, a DC bias.</li>
@@ -1076,7 +1091,7 @@ c0,-1.3,-5.3,8.7,-16,30c-10.7,21.3,-21.3,42.7,-32,64s-16,33,-16,33s-26,-26,-26,-
 s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,104,
 606zM1001 80h400000v40H1017.7z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.1561em;"><span></span></span></span></span></span></span></span></span></span></p><footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="75" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="75" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="76" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="76" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="two-loops">Two loops</h2>
 <ul>
 <li>Two <code>for</code> loops, written identically, on boxes that share nothing.</li>
@@ -1091,18 +1106,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 </code></pre>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="76" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="76" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
-<h2 id="exercise-31">Exercise 3.1</h2>
-<blockquote>
-<p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Fit the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> amplitude from the rising branch of the Rabi curve, instead of halving the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</p>
-</blockquote>
-<ul>
-<li>A <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi><mi mathvariant="normal">/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\pi/2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span><span class="mord">/2</span></span></span></span> pulse is usually taken as half the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> amplitude.</li>
-<li>On a real drive line, the measured value can differ by percent.</li>
-</ul>
-<footer>Programming a Superconducting Qubit · QCE 2026</footer>
-</section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" data-class="divider" lang="en-US" class="divider" data-marpit-pagination="77" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;--class:divider;" data-marpit-pagination-total="118" data-size="16:9"><p class="kicker">Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" data-class="divider" lang="en-US" class="divider" data-marpit-pagination="77" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;--class:divider;" data-marpit-pagination-total="118" data-size="16:9"><p class="kicker">Session 2 · Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
 <h1 id="coherence-and-feedback">Coherence and feedback</h1>
 <h3 id="t1-ramsey-echo-single-shots-and-active-reset">T1, Ramsey, echo, single shots, and active reset</h3>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
@@ -1292,7 +1296,7 @@ population before reset = 18.5%     population after reset = 1.0%
 <ul>
 <li>One <code>shot</code> variable swept with <code>qp.Range(0, 399, 1)</code>, and no <code>average</code>.</li>
 <li><code>check</code> asks for <code>state</code>, and the excited arm calls <code>x180</code> then measures again.</li>
-<li>Recover the population with <code>np.where(np.isnan(verify), check, verify)</code>.</li>
+<li>Recover the population with <code>np.where(np.isnan(verified), before, verified)</code>.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -1738,6 +1742,19 @@ body:
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="113" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="113" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
+<h2 id="exercise-61">Exercise 6.1</h2>
+<blockquote>
+<p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Add a vendor measurement field, then prove it is legal on one rack and rejected on another.</p>
+</blockquote>
+<ul>
+<li>Register the token <code>measure.fields.counts</code>.</li>
+<li>Measure with <code>fields=(&quot;counts&quot;, MF.STATE)</code> and print the <code>.qp</code> body.</li>
+<li>Validate against the reference platform, then against a rack without the token.</li>
+<li>Read the counts back and say why they are zero.</li>
+</ul>
+<footer>Programming a Superconducting Qubit · QCE 2026</footer>
+</section>
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="114" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="114" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="the-calibration-diff">The calibration diff</h2>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-diff"><span class="hljs-deletion">-  set_frequency q[0].readout 7200000000.0</span>
 <span class="hljs-addition">+  set_frequency q[0].readout 7200400000.0</span>
@@ -1755,7 +1772,7 @@ body:
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="114" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="114" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
+</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="115" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="115" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
 <h2 id="the-checker">The checker</h2>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code>$ python -m qprogram.lsp check rabi_hand_edited.qp   (exit 1)
   line 18: [error] parse-error: Line 18: bus path 'q[0].drve' does not resolve
@@ -1766,19 +1783,6 @@ body:
 <li>Diagnostics come out as JSON, and an error exits non-zero.</li>
 <li>It fits a pre-commit hook or a CI job, with no extra dependency.</li>
 <li>The message names the buses the chip has, because the file declares its schema.</li>
-</ul>
-<footer>Programming a Superconducting Qubit · QCE 2026</footer>
-</section>
-</foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="115" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="115" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="118" data-size="16:9">
-<h2 id="exercise-61">Exercise 6.1</h2>
-<blockquote>
-<p><img class="emoji" draggable="false" alt="🧩" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/1f9e9.svg" data-marp-twemoji=""/> Add a vendor measurement field, then prove it is legal on one rack and rejected on another.</p>
-</blockquote>
-<ul>
-<li>Register the token <code>measure.fields.counts</code>.</li>
-<li>Measure with <code>fields=(&quot;counts&quot;, MF.STATE)</code> and print the <code>.qp</code> body.</li>
-<li>Validate against the reference platform, then against a rack without the token.</li>
-<li>Read the counts back and say why they are zero.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -1797,7 +1801,7 @@ T2 echo (us)           15.8509     16.0000     0.9%
 <li>Each step consumes the answer measured by the one before it.</li>
 <li>T1, Ramsey and echo drive with the <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>π</mi></mrow><annotation encoding="application/x-tex">\pi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">π</span></span></span></span> pulse that Rabi fitted.</li>
 <li>The run leaves a <code>.qp</code> per step plus one <code>calibration.wfl</code>.</li>
-<li>Six primitives under all of it, assembled into one tree and run by a swappable platform.</li>
+<li>The six requirements from the opening under all of it, in one tree, run by a swappable platform.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
