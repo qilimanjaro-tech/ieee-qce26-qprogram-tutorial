@@ -2,13 +2,22 @@
 
 A [Marp](https://marp.app/) deck, written in Markdown. **The concepts live here.** The deck opens with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes a voltage, what a measurement really returns, and what decoherence costs, then argues why any of that needs a language of its own. Only after all of that does QProgram appear. The notebooks in [`../notebooks/`](../notebooks/) carry the code and explain the experiments; they leave the background to these slides.
 
-One hundred and eighteen slides, in four movements: logistics, the foundations block, the QProgram block, then nine to seventeen slides per tutorial part. Ten diagrams carry the structure.
+Eighty-one slides, in six movements, each opened by a divider slide except the first. Logistics is 7 slides. **The chip and the rack** is 26, and **Why a language of its own** is 6; both carry a `Concepts · slides only` kicker, because no notebook covers them. Then one movement per notebook: **Part 1** is 11, **Part 2** is 10, and **Part 3** is 19, each divider naming the notebook it belongs to. The close is 2. Ten diagrams carry the structure.
+
+The deck runs **before** each notebook is opened, and that is the rule to apply when adding a slide. A part movement is the zoomed-out why and how: the mental model, the reason the feature exists, the mistake it prevents, the number that makes it matter. The notebook is where the code is read call by call, so a slide that transcribes a cell or reprints a cell's output is a slide the room hears twice. Code earns a place on a slide only when the *shape* of the code is the claim, a barrier between two buses or the nesting of two loops or the line-per-statement layout of a `.qp` file, never because the arguments need reading. Physics with no notebook behind it lives in one of the two concept movements. The break between the two sessions lands after Part 2, so the whole second session is Part 3.
+
+Some material is better said than read, and [`INSTRUCTOR-NOTES.md`](INSTRUCTOR-NOTES.md) is where it goes. Five slides live there rather than in the deck, because a wall of physics prose is a slide the room reads while the presenter talks over it. The notes are keyed to the deck one slide at a time, so an entry either fills a named gap between two slides or belongs to a slide that is still there and carries a figure. Adding a slide that would have to be read rather than heard is the signal to write a note instead.
+
+The same rule reaches inside the diagrams. A figure carries labels that name a thing and numbers that are the point, and nothing the presenter is going to say out loud anyway, so no diagram holds a prose panel, an explanatory footer, or a caveat about its own drawing. Each keeps its 32px title and none carries a subtitle under it, because that line restated either the slide's own heading or the caption below the figure in every file that had one.
 
 One claim per slide, in a title of two to five plain words, under a body of three to five one-line bullets and at most one block: a figure, a code excerpt, a table, an output block, or a formula. Roughly forty words of prose is the working budget and fifty-five is the ceiling, because a slide that says everything leaves the speaker reading it aloud. Numbers belong in the tables, the code and the fit outputs rather than inside a sentence, and `tools/check_style.py` applies its sentence-shape budgets to this file and to the deck as well as to `sources/*.py`.
+
+Whether a slide fits is a second question, and `python tools/slide_fit.py` answers it without a browser. It lays every slide out arithmetically from the stylesheet above and prints the ones nearest to overflowing, so a new slide can be compared against the busiest slides the deck has always had rather than guessed at. The arithmetic exists because Marp's own PNG and PDF export needs a local Chrome.
 
 One rule of that checker matters while editing the deck. A paragraph is written on one line and never hard wrapped, because Marp Core turns a soft line break into a forced one, so a wrapped paragraph stops reflowing to the slide width and breaks wherever the author's editor happened to break it. `python tools/unwrap.py slides/qprogram_tutorial.md` fixes a file that picked up wraps.
 
 - [`qprogram_tutorial.md`](qprogram_tutorial.md): the deck source. Edit this.
+- [`INSTRUCTOR-NOTES.md`](INSTRUCTOR-NOTES.md): what to say and where, keyed to the deck slide by slide. It holds the five slides that are spoken rather than shown, and the prose that came off the ten diagrams.
 - `qprogram_tutorial.html`: the rendered deck, produced by the Marp CLI command below. It reads `img/` from alongside itself, so keep the two together.
 - [`img/`](img/): ten diagrams and three QR codes (`qr-tutorial.svg`, `qr-qprogram.svg`, `qr-docs.svg`).
 
@@ -16,24 +25,27 @@ One rule of that checker matters while editing the deck. A paragraph is written 
 |---|---|---|
 | `transmon.svg` | the circuit, the cosine well, and the ladder that crowds as you climb | The transmon |
 | `rack.svg` | the signal chain, rack to fridge to chip and back | The control rack |
-| `fridge.svg` | the stages, attenuation going down and amplification coming up | The fridge |
+| `fridge.svg` | the six stages, the attenuator at three of them going down, and the amplifiers ordered coldest first coming up | The fridge |
 | `rotation.svg` | carrier phase as the axis, envelope area as the angle | Axis and angle |
 | `dispersive.svg` | two dips $2\chi$ apart, the chain after the chip, and the IQ clouds | The readout chain |
-| `buses.svg` | instrument ports to bus names to chip, and what each bus kind accepts | One signal path |
+| `buses.svg` | instrument ports to bus names to chip lines, for two qubits over three instruments | One signal path |
 | `stack.svg` | the software layers, script to instruments | The architecture |
 | `timing.svg` | per-bus cursors, and what `sync` does about them | One clock per bus |
-| `anatomy.svg` | a Rabi program as a tree | Anatomy of a program |
+| `anatomy.svg` | a Rabi program as a tree, and the two arrays it returns | Anatomy of a program |
 | `plan.svg` | the real-time versus host-side split | Two domains |
 
-The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token, which Part 5 introduces and nothing before it mentions.
+The first five exist because most of the room writes circuits and has never seen a control rack. They come early, before the deck asks anyone to care about a capability token, which Part 3 introduces and nothing before it mentions.
 
 ### Diagrams worth adding
 
-One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
+Three gaps, listed so the decisions are visible rather than forgotten. None of them blocks the deck.
 
-- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans the flux-amplitude cut of one, so the figure could start there.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in **The chip and the rack** with no picture behind it. No notebook draws one, so this figure has to be drawn rather than harvested.
 
-An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated shots with a threshold taken from the data, and a schematic version would be strictly worse. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted.
+- **A rectangle and a diagonal**: a 21 by 41 grid of points with the ridge traced through 21 of them, which would carry the cost of the map and the shape of a lockstep pair in one picture. "A rectangle or a diagonal" in Part 2 carries it as a code shape and two numbers instead.
+- **Two signal chains side by side**: rack A and rack B, identical except the flux line, the framing device the whole capability half of Part 3 rests on. "Two racks" carries it as a three-row table.
+
+An IQ-plane schematic on its own is deliberately **not** drawn. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted, and a schematic of two clouds asserts a separation instead of showing one.
 
 ## Where the diagrams live
 
@@ -62,9 +74,11 @@ The deck uses KaTeX math (`$...$`), a custom teal theme in an inline `<style>` b
 
 ## Drawing a new diagram
 
-The ten diagrams are hand-written SVG on a `0 0 1600 900` viewBox, with a `<title>` and a prose `<desc>` for accessibility and the system font stack declared once on the root element. They share one palette with the deck: accent `#0f766e`, soft accent `#e6f4f1`, ink `#1c1c2e`, muted `#6a6a82`, panel `#f5f5fa`, white ground. Boxes are `rx="10"` with a 2px stroke, bands are `rx="14"`, and a box title is 24px bold over 20 to 22px detail lines.
+The ten diagrams are hand-written SVG 1600 units wide, with a `<title>` and a prose `<desc>` for accessibility and the system font stack declared once on the root element. They share one palette with the deck: accent `#0f766e`, soft accent `#e6f4f1`, ink `#1c1c2e`, muted `#6a6a82`, panel `#f5f5fa`, white ground. Boxes are `rx="10"` with a 2px stroke, bands are `rx="14"`, and a box title is 24px bold over 20 to 22px detail lines.
 
 Nothing goes below 18px in that coordinate space, because 900 units of height render at about 470 CSS pixels on the slide. Read `rack.svg` before writing a new one; it is the file the rest were matched to.
+
+The viewBox height is whatever the drawing needs and several are well under 900, because a diagram that lost a prose panel had its canvas trimmed rather than left half empty. The height matters to the slide: Marp sizes a figure by `![h:NNN]`, so a shorter viewBox renders wider at the same `h`, and a trimmed diagram needs its `h` recomputed or it overflows the slide sideways with no warning. `python tools/slide_fit.py` catches the vertical half of that mistake and nothing catches the horizontal half, so check the arithmetic: a figure at `![h:N]` is `N * 1600 / height` CSS pixels wide, and the slide gives it 1136.
 
 ## Regenerate the QR codes
 
