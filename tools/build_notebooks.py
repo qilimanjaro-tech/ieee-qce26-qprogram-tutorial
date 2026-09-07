@@ -204,11 +204,35 @@ def execute(path: Path, timeout: int = 900) -> None:
             "--execute",
             "--inplace",
             f"--ExecutePreprocessor.timeout={timeout}",
+            # Timings are wall-clock stamps on every cell, so leaving them on makes an
+            # unchanged source rebuild to a different file and buries the real diff.
+            "--ExecutePreprocessor.record_timing=False",
             str(path),
         ],
         check=True,
         env=env,
     )
+
+
+ADDRESS = re.compile(r" at 0x[0-9a-fA-F]+>")
+
+
+def normalise_addresses(notebook: dict) -> dict:
+    """Replace CPython object addresses in text output with a fixed placeholder.
+
+    A cell whose value is an object with no `__repr__` of its own emits `<Class at 0x...>`
+    alongside whatever rich output it carries. The address changes on every run, so without this
+    an unchanged source rebuilds to a different notebook and the diff shows a line that means
+    nothing. `Waveform._repr_html_` is the case in the tutorial: the picture beside it is
+    byte-stable and only the address moves.
+    """
+    for cell in notebook["cells"]:
+        for output in cell.get("outputs", []):
+            text = output.get("data", {}).get("text/plain")
+            if text is None:
+                continue
+            output["data"]["text/plain"] = [ADDRESS.sub(" at 0x...>", line) for line in text]
+    return notebook
 
 
 def count_figures(notebook: dict) -> int:
@@ -253,7 +277,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.execute:
             execute(solution)
-            done = json.loads(solution.read_text(encoding="utf-8"))
+            done = normalise_addresses(json.loads(solution.read_text(encoding="utf-8")))
+            write(solution, done)
             write(attendee, carry_outputs(done, to_notebook(cells, "stub")))
             figures = count_figures(done)
             print(f"  executed ({figures} figures) and copied outputs into notebooks/{name}")

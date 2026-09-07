@@ -72,7 +72,7 @@ r"""
 
 `qp.QProgram` is a builder. Every method you call on it appends one typed node to a tree and sends nothing anywhere, so what you hold afterwards is a value your own code can read, compare, rewrite, and save.
 
-A bus is the line a signal goes down, and the simplest way to name one is a plain string. The three programs in this section and the next are written that way, and section 1.4 replaces the strings with something checked.
+A bus is the line a signal goes down, and the simplest way to name one is a plain string. Every program in this section and the next is written that way, and section 1.4 replaces the strings with something checked.
 
 `label` names the program and `description` is a sentence for whoever reads it later. Both are optional and both ride into the file.
 """
@@ -117,7 +117,7 @@ Durations are nanoseconds, frequencies hertz, phases radians, and gain and offse
 | `get_parameter(bus, parameter)` | `GetParameter` | read one back. Returns a `Variable` the run fills in |
 | `call(fragment, *args, **kwargs)` | `Call` | invoke a named sub-program. Advanced |
 
-QProgram did not invent that vocabulary. It is close to the intersection of what commercial sequencers offer, given portable names, and the Advanced notebook adds to it through a vendor namespace rather than a patch to the core.
+QProgram did not invent that vocabulary. It is close to the intersection of what commercial sequencers offer, given portable names. A sequencer is the instrument that holds a pulse sequence in its own memory and plays it on its own clock with the host computer out of the loop, and the Advanced notebook adds to it through a vendor namespace rather than a patch to the core.
 
 Five block containers hold operations. `block()` is the plain one and appears below. `average(shots)` and `sweep(variable, source)` are the loops, and they compose in lockstep with `|`, all three in Basics. `if_`, `elif_`, and `else_` branch on a measurement, in Advanced.
 """
@@ -126,15 +126,15 @@ Five block containers hold operations. `block()` is the plain one and appears be
 r"""
 ### A sequence, start to finish
 
-The program below prepares the qubit and reads it out, and it uses most of the verbs you need for a day at the bench.
+The program below prepares the qubit and reads it out, and it uses most of the verbs you need for a day at the bench. A readout line is two paths through a mixer, so it wants a two-path waveform, and `IQZero` is the one-constructor spelling of a pulse with nothing on the second path. `fields=` picks which of a measurement's outputs come back, and the subsection after next takes it apart.
 
 `set_gain` and the `amplitude` inside a waveform are two different knobs: gain scales the whole output path and the amplitude shapes the envelope. `reset_phase` zeroes the oscillator phase so that every repetition starts from the same reference, which matters as soon as the phase the qubit accumulates is the thing being measured. `with program.block():` opens a plain container and changes nothing about what the statements inside it mean, so the preparation reads as one group.
 
-`wait` and `play` are the only two operations that book time. Instructions land on a clock grid, typically 4 ns wide, and QProgram rounds nothing onto it: a 3 ns wait reaches the platform as a 3, and the platform is where it is accepted or refused.
+`play`, `measure`, and `wait` are the operations that book time, the first two because they put a shape on the line and the third because it holds the line idle. Instructions land on a clock grid, typically 4 ns wide, and QProgram rounds nothing onto it: a 3 ns wait reaches the platform as a 3, and the platform is where it is accepted or refused.
 """
 
 # %%
-readout_pulse = IQPair(I=Square(amplitude=0.2, duration=2000), Q=Square(amplitude=0.0, duration=2000))
+readout_pulse = IQZero(Square(amplitude=0.2, duration=2000))  # a flat tone, nothing on the quadrature
 weights = IQPair(I=Square(amplitude=1.0, duration=2000), Q=Square(amplitude=1.0, duration=2000))
 pi_pulse = IQDrag(amplitude=A_PI, duration=40, sigma=10, beta=0.15)
 
@@ -155,7 +155,7 @@ print(qp.dumps(sequence))
 r"""
 ### The sync barrier
 
-Every bus keeps its own cursor, advanced only by the pulses and waits written to that bus, so two lines that have played different amounts have drifted apart by exactly the difference. A circuit has one global clock and a pulse program does not, and `sync` exists for that reason.
+Every bus keeps its own cursor, advanced only by the pulses, measurements, and waits written to that bus, so two lines that have played different amounts have drifted apart by exactly the difference. A circuit has one global clock and a pulse program does not, and `sync` exists for that reason.
 
 `sync(buses)` holds every listed bus until the furthest ahead has finished. A bare `sync()` covers every bus in the program, convenient in a short sequence and expensive in a long one, and `sync([])` raises rather than guess what you meant. The distinction matters later: the Advanced notebook shows a rewrite that a bare `sync()` quietly blocks.
 """
@@ -266,7 +266,7 @@ for description, mistake in (
     ("single channel on an IQ line", lambda: scratch.play(q[0].drive, Square(0.5, 40))),
     ("an IQ pair on a flux line", lambda: scratch.play(q[0].flux, readout_pulse)),
     ("no ADC on the bus", lambda: scratch.measure(q[0].drive, readout_pulse, weights)),
-    ("a reference from another schema", lambda: scratch.play(BusSchema.transmon().q[0].drive, "pi")),
+    ("a reference from another schema", lambda: scratch.play(BusSchema.transmon().q[0].drive, pi_pulse)),
 ):
     try:
         mistake()
@@ -318,7 +318,6 @@ Two more properties matter. Waveforms compare and hash by structure rather than 
 """
 
 # %%
-print("sampled peak of a 40 ns Gaussian:", round(Gaussian(0.5, 40, 8).peak_amplitude(), 4))
 print("trapezoidal area of a 100 ns square:", Square(0.5, 100).area())
 padded = FlatTop(0.5, 200, smooth_duration=20, buffer=10)
 print("buffer pads outside duration:", padded.get_duration(), "ns for duration=200, buffer=10")
@@ -331,6 +330,34 @@ r"""
 
 A `Ramp` is an envelope and only that, and the bus you send it down decides what it means. The channel check of section 1.4 is the only thing standing between a shape and a line, so the same `Square` is a readout tone on one bus and a flux excursion on another.
 """
+
+# %% [markdown]
+r"""
+### Deferring the numbers
+
+Look again at the `.qp` text of `sequence`. The amplitude 0.62 is welded into it, and that number came out of a calibration and moves as the chip drifts.
+
+`play` and `measure` also accept a string alias instead of a waveform. The program then says which pulse it wants, and the numbers arrive later from `with_waveforms`, which returns a new program and leaves the original alone. `body.waveforms()` is how you ask a program what it still needs, and the substitution is lenient about a name it does not recognise and strict about the shape, so the channel check of section 1.4 runs again at the bind rather than back at the `play`.
+
+A plain dict is the simplest thing to bind with. `qp.WaveformLibrary` is the same argument with a resolution order behind it, so one alias can mean a different amplitude on each qubit, and it has a text format of its own that keeps the calibration in a separate file from the experiment.
+"""
+
+# %%
+aliased = qp.QProgram(label="prepare_and_read", schema=schema)
+aliased.play(q[0].drive, "pi")
+aliased.sync([q[0].drive, q[0].readout])
+aliased.measure(q[0].readout, "readout", "weights", fields=(MF.IQ, MF.STATE))
+
+print("still unbound:", sorted(name for name in aliased.body.waveforms() if isinstance(name, str)))
+
+bound = aliased.with_waveforms({"pi": pi_pulse, "readout": readout_pulse, "weights": weights})
+print("after binding:", statement(bound, "play"))
+print("the original: ", statement(aliased, "play"))
+
+try:
+    aliased.with_waveforms({"pi": Gaussian(amplitude=A_PI, duration=40, sigma=10)})
+except qp.ValidationError as exc:
+    print("\nchecked at the bind:", exc)
 
 # %% [markdown]
 r"""
@@ -365,14 +392,15 @@ gallery = [
     Square(amplitude=0.2, duration=2000),  # a readout tone
     Gaussian(amplitude=0.5, duration=40, sigma=8),  # a short drive envelope
     FlatTop(amplitude=0.5, duration=200, smooth_duration=20),  # rise, hold, fall
-    Arbitrary(0.4 * np.hanning(120)),  # samples from optimal control or a fit
+    Arbitrary(0.4 * np.hanning(120) * np.cos(np.linspace(0, 6 * np.pi, 120))),  # your own samples
     Ramp(from_amplitude=0.0, to_amplitude=0.4, duration=200),  # a flux excursion
     SuddenNetZero(amplitude=0.4, duration=100, b=1.0, t_phi=20),  # a two-qubit gate pulse
 ]
 
 fig, panels = plt.subplots(1, len(gallery), figsize=(17, 2.4))
 for panel, waveform in zip(panels, gallery, strict=True):
-    waveform.plot(target=panel)  # the waveform draws itself onto the panel we opened for it
+    waveform.plot(target=panel)  # the waveform draws itself onto the panel you opened for it
+    panel.set_ylim(bottom=min(0.0, panel.get_ylim()[0]))  # so a flat shape reads as flat
     panel.set_title(f"{type(waveform).__name__}\n{waveform.get_duration()} ns", loc="left", fontsize=9)
 fig.tight_layout()
 plt.show()
@@ -397,41 +425,13 @@ print("IQZero leaves the quadrature silent:", IQZero(Square(0.2, 2000)).get_Q().
 
 # %% [markdown]
 r"""
-### Deferring the numbers
-
-Look again at the `.qp` text of `sequence`. The amplitude 0.62 is welded into it, and that number came out of a calibration and moves as the chip drifts.
-
-`play` and `measure` also accept a string alias instead of a waveform. The program then says which pulse it wants, and the numbers arrive later from `with_waveforms`, which returns a new program and leaves the original alone. `body.waveforms()` is how you ask a program what it still needs, and the substitution is lenient about a name it does not recognise and strict about the shape, so the channel check of section 1.4 runs again at the bind rather than back at the `play`.
-
-A plain dict is the simplest thing to bind with. `qp.WaveformLibrary` is the same argument with a resolution order behind it, so one alias can mean a different amplitude on each qubit, and it has a text format of its own that keeps the calibration in a separate file from the experiment.
-"""
-
-# %%
-aliased = qp.QProgram(label="prepare_and_read", schema=schema)
-aliased.play(q[0].drive, "pi")
-aliased.sync([q[0].drive, q[0].readout])
-aliased.measure(q[0].readout, "readout", "weights", fields=(MF.IQ, MF.STATE))
-
-print("still unbound:", sorted(name for name in aliased.body.waveforms() if isinstance(name, str)))
-
-bound = aliased.with_waveforms({"pi": pi_pulse, "readout": readout_pulse, "weights": weights})
-print("after binding:", statement(bound, "play"))
-print("the original: ", statement(aliased, "play"))
-
-try:
-    aliased.with_waveforms({"pi": Gaussian(amplitude=A_PI, duration=40, sigma=10)})
-except qp.ValidationError as exc:
-    print("\nchecked at the bind:", exc)
-
-# %% [markdown]
-r"""
 ## 1.7 The `.qp` file
 
 You have been reading `.qp` text since the first program. `qp.dumps` writes it and `qp.loads` reads it back, and `qp.save` and `qp.load` are the same pair against a file.
 
-Two properties are worth knowing before you commit one. Nothing is truncated, so a program holding an `Arbitrary` of 4000 samples writes 4000 samples, with no compression and no reference to an external array. And `dumps` raises `qp.SerializationError` rather than emit text it cannot read back, so a file that exists is a file that parses.
+Two properties are worth knowing before you commit one. Nothing is truncated, so a program holding an `Arbitrary` of 4000 samples writes 4000 samples, with no compression and no reference to an external array. And `dumps` raises `qp.SerializationError` on a value or an operation the format has no spelling for, rather than emit a placeholder that would drop the node on the way back in.
 
-The round trip is exact, and structural equality is how you check it. One trap comes with that: `QProgram` itself defines no `__eq__`, so the comparison reads `a.body == b.body` and never `a == b`.
+The body round trips exactly, and structural equality is how you check it. One trap comes with that: `QProgram` itself defines no `__eq__`, so the comparison reads `a.body == b.body` and never `a == b`. Two things about a program are not covered by that guarantee. A schema comes back as a plain `BusSchema` rather than the typed one you built from, with the same buses under it. And a symbolic expression buried inside a waveform constructor writes without a spelling the parser recognises, so fold or bind those before you save.
 """
 
 # %%
@@ -460,6 +460,8 @@ r"""
 Where the numbers come from is up to you. A measurement model is asked for one sample per shot, and `qp.MockMeasurementModel` covers most cases: `response` returns the noiseless complex point, `noise` is the gaussian sigma added per quadrature, `raw_samples` sets the length of the simulated ADC trace, and `seed` makes the run repeatable. The Basics notebook is where a model starts answering as a function of a swept variable.
 
 The program below has no variable in it, no loop around it, and no averaging, so it is one measurement and it returns one point.
+
+`result.get(handle)` hands that back as an `xarray.DataArray`, an array whose axes carry names and coordinates instead of bare positions. An integrated measurement always carries one extra axis called `IQ`, of length two, holding the two quadratures of the point, and `.sel(IQ="I")` below picks from it by name.
 """
 
 # %%
@@ -480,11 +482,12 @@ print("raw trace:            ", result.get(m_single, field=MF.RAW).shape, "sampl
 
 # %% [markdown]
 r"""
-`result.get(handle)` hands back an `xarray.DataArray`, and the raw trace is the one field here with an axis to plot against, because it carries one entry per time sample. `result.plot` reads the array's shape and picks the figure, so the same call that draws a line here draws a heatmap in Basics.
+The raw trace is the one field here with an axis to plot against, because it carries one entry per time sample. `result.plot` reads the array's shape and picks the figure, so the same call that draws a line here draws a heatmap in Basics, and it hands back the `Axes` exactly as a waveform does.
 """
 
 # %%
-result.plot(m_single, field=MF.RAW, title="One readout acquisition, as the ADC saw it")
+ax_raw = result.plot(m_single, field=MF.RAW, title="One readout acquisition, as the ADC saw it")
+ax_raw.axhline(0.0, color="grey", linewidth=0.6)
 plt.show()
 
 # %% [markdown]
@@ -555,7 +558,7 @@ r"""
 
 - **A program is data.** Every builder call appends one typed node and sends nothing anywhere, so `qp.dumps` can print the whole tree and `program.buses` and `body.elements` can be read at any point.
 - **A bus is a string.** A plain one works and is unchecked. A `BusSchema` hands back a `BusRef` that is still a string and carries `channel` and `acquires`, which reject a single-channel waveform on an IQ line, a `measure` on a bus with no ADC, and a reference borrowed from another schema.
-- **Twelve operations** cover the vocabulary. `measure` and `get_parameter` hand something back and the rest return `None`. `wait` and `play` are the only two that book time, and `sync` is what lines two buses back up.
+- **Twelve operations** cover the vocabulary. `measure` and `get_parameter` hand something back and the rest return `None`. `play`, `measure`, and `wait` are the three that book time, and `sync` is what lines two buses back up.
 - **Waveforms are data.** `envelope()` and `get_duration()` are the contract, `area()`, `peak_amplitude()`, `spectrum()`, and `plot()` come free, and `plot()` returns the `Axes` every reference line and annotation goes on. A string alias defers the numbers to `with_waveforms`, checked at the bind.
 - **`.qp` is the artifact.** `qp.loads(qp.dumps(p)).body == p.body`, so a diff of two files is a diff of two calibrations.
 - **`qp.simulate` runs it.** One measurement with no loop around it returns one point, one classified state, and one raw trace, and only the trace has an axis to be drawn against.

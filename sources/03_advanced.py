@@ -2,7 +2,7 @@
 r"""
 # 03 · Advanced
 
-Six sections, each one standing on its own. Every section builds its own programs and declares the numbers only it needs, so you can read them in any order and run any one of them straight after the two cells below.
+Six sections, each one standing on its own. Every section builds its own programs and declares the numbers only it uses, so you can read them in any order and run any one of them once the three setup cells below have run.
 
 Two are about writing less. A **fragment** factors a repeated sequence into a named, parameterized sub-program. A **conditional** lets a measurement decide what the program does next, inside the run rather than after it.
 
@@ -55,6 +55,8 @@ r"""
 
 Six names are used by more than one section, so they live here rather than in whichever section happens to reach one first. Two are bus names, the drive line and the readout line of a single qubit. `DRIVE_FREQ` is that qubit's transition frequency, the tone that rotates it between the two levels used as 0 and 1. The three `BIAS_` numbers describe a scan of the flux bias that tunes the same transition, in volts on the line that carries it.
 
+Both bus names are plain strings rather than schema references, because the first four sections are about the seams of the language and not about the chip. The checks of section 1.4 are therefore not in play until section 3.5 attaches a schema.
+
 Everything else a section needs is declared inside the section.
 """
 
@@ -63,7 +65,7 @@ DRIVE = "q0/drive"  # the qubit 0 drive line
 READOUT = "q0/readout"  # the qubit 0 readout line
 
 DRIVE_FREQ = 4.85e9  # Hz, the qubit 0 to 1 transition
-BIAS_START, BIAS_STOP, BIAS_POINTS = -0.05, 0.15, 41  # V, V, and how many steps between them
+BIAS_START, BIAS_STOP, BIAS_POINTS = -0.05, 0.15, 41  # V, V, and how many points across that span
 
 # %% [markdown]
 r"""
@@ -75,7 +77,7 @@ Three experiments that play the same two pulses want one definition of those pul
 """
 
 # %%
-A_PI = 0.5  # DAC units, the drive amplitude of a full 0 to 1 rotation
+PULSE_AMP = 0.5  # DAC units, a round number for the pulses this section plays
 
 
 @qp.fragment
@@ -85,8 +87,8 @@ def x_pulse(f, drive, amp):
 
 
 demo = qp.QProgram(label="one_call")
-demo.call(x_pulse, DRIVE, A_PI)  # positional, in declaration order
-demo.call(x_pulse, DRIVE, amp=A_PI / 2)  # or by keyword, Python's own binding rules
+demo.call(x_pulse, DRIVE, PULSE_AMP)  # positional, in declaration order
+demo.call(x_pulse, DRIVE, amp=PULSE_AMP / 2)  # or by keyword, Python's own binding rules
 
 print(qp.dumps(demo))
 
@@ -123,6 +125,7 @@ The decorated function is called once, when the decorator runs, and what it reco
 
 # %%
 N_PULSES = 3  # how many pulses the train holds, fixed when the fragment is defined
+PULSE_NS = 40  # ns, the length of one pulse in the train
 
 
 @qp.fragment
@@ -145,7 +148,7 @@ print("\n".join(line for line in qp.dumps(train).splitlines() if line.strip().st
 r"""
 ### `expand()`
 
-What does a call site look like once the definition has been put back into it? `expand()` answers. It returns a new program with every call replaced by a plain block holding the substituted body, and validation and execution run it for you, so it is the thing to print when you want to see what a compiler will get.
+`expand()` returns a new program with every call replaced by a plain block holding the substituted body, and validation and execution run it for you, so it is the thing to print when you want to see what a compiler will get.
 
 Two kinds of name cannot survive inlining as they are, and expansion rewrites both. A fragment declares variables of its own with the same `variable()` call a program uses, and each becomes `{fragment}_{id}` on the host, with a numeric suffix when two calls collide. A measurement's auto-generated name normally embeds its bus, and inside a fragment the bus is still a parameter, so the name is a plain `m0` and repeated calls are suffixed.
 
@@ -179,7 +182,7 @@ r"""
 
 # %%
 library = {
-    "pi": IQDrag(amplitude=A_PI, duration=40, sigma=10, beta=0.1),
+    "pi": IQDrag(amplitude=PULSE_AMP, duration=PULSE_NS, sigma=10, beta=0.1),
     "probe": IQPair(Square(1.0, 2000), Square(0.0, 2000)),
     "weights": IQPair(Square(1.0, 2000), Square(1.0, 2000)),
 }
@@ -201,7 +204,7 @@ r"""
 
 The experiment below sweeps the spacing of the train and reads the qubit out at every point. The pulses live in the fragment and the `measure` lives in the host program, so the handle stays an ordinary Python variable.
 
-The model is an exponential decay in the total time the sequence occupies, the shape a coherence measurement has from the outside. `T_DECAY` is the time constant.
+The model is an exponential decay in the total time the sequence occupies, the shape a coherence measurement has from the outside. The train holds `N_PULSES` repetitions of one wait plus one pulse, so the total is `N_PULSES * (spacing + PULSE_NS)` nanoseconds, and `T_DECAY` is the constant it decays with.
 """
 
 # %%
@@ -209,8 +212,9 @@ T_DECAY = 12_000.0  # ns, the time constant of the decay the model reports
 
 
 def decay(bus, env):
-    """Population against the total time the train occupies, which is 2 x N_PULSES x spacing."""
-    return 0.5 * (1.0 - np.exp(-2 * N_PULSES * env["spacing"] / T_DECAY))
+    """Population against the total time the train occupies, one wait plus one pulse per step."""
+    total_ns = N_PULSES * (env["spacing"] + PULSE_NS)
+    return 0.5 * np.exp(-total_ns / T_DECAY)
 
 
 experiment = qp.QProgram(label="pulse_train_scan")
@@ -236,7 +240,7 @@ Every experiment so far decided everything before the run started. `if_` breaks 
 
 `program.if_(condition)`, `program.elif_(condition)`, and `program.else_()` are context managers, and the three build one `Conditional` node. The condition is a comparison against a measurement's classified state, so `measure` has to have asked for `MF.STATE`.
 
-A measurement handle carries a `state` proxy whose `==` builds a comparison rather than answering a bool. A plain `Variable` cannot do that, because `Variable.__eq__` has to keep returning a bool so that variables can live in a set, and `qp.eq` is the symbolic spelling there. So the branch reads `if_(handle.state == 1)`. `qp.eq(handle.state, 1)` is accepted too and builds the same node, and it is redundant on a handle where it is the only option on a variable.
+A measurement handle carries a `state` proxy whose `==` builds a comparison rather than answering a bool, which a plain `Variable` cannot do for the reason Basics gave. So the branch reads `if_(handle.state == 1)`. `qp.eq(handle.state, 1)` is accepted too and builds the same node, redundant on a handle where it is the only option on a variable.
 """
 
 # %%
@@ -302,14 +306,14 @@ r"""
 
 A conditional adds no dimension to the result. Every measurement inside it keeps the shape it would have had outside, and the positions where its arm did not run hold `NaN`. Two arms that each measure therefore produce two arrays with complementary holes, and `combine_first` puts them back together. The holes are complementary only while the branch is decided outright at each point, as it is below. Average a point whose outcome is genuinely random and both arms hold a number there, and combining them keeps one and drops the other.
 
-The sweep below hands each arm half of the points, so the two patterns are easy to read.
+The sweep below hands each arm half of the four points, so the two patterns are easy to read.
 """
 
 # %%
 split = qp.QProgram(label="two_arms")
 level = split.variable("level", label="Herald level", units="DAC units")
 
-with split.sweep(level, qp.Linspace(0.0, 1.0, 5)):
+with split.sweep(level, qp.Linspace(0.0, 1.0, 4)):
     herald = split.measure(READOUT, "probe", "weights", name="herald", fields=(MF.STATE,))
     with split.if_(herald.state == 1):
         m_up = split.measure(READOUT, "probe", "weights", name="up", fields=(MF.STATE,))
@@ -333,7 +337,7 @@ print("dims", up_arm.dims, "so the conditional added no axis")
 r"""
 ### Active reset
 
-A qubit at 40 mK does not arrive in the ground state every time. A few percent of shots start excited, and waiting for them to decay costs several times the coherence time per shot. Measuring first and flipping only the shots that came back excited is faster, and it is the standard use of a conditional.
+A qubit does not arrive in the ground state every time. At 40 mK a 4.85 GHz transmon should be excited on well under one shot in a hundred, and real devices come in worse than that, so waiting for those shots to decay costs several times the coherence time on every repetition. Measuring first and flipping only the shots that came back excited is faster, and it is the standard use of a conditional. `P_HOT` below sits far above any real device at 30 percent, so that the before and the after separate at a glance.
 
 The measurement model below has state in it, and that state is beyond what `qp.MockMeasurementModel` can express, because the second measurement of a shot has to report the qubit the first measurement found after the corrective pulse has had its chance. A model is any object with a `sample(bus, env)` method, so this is a dozen lines.
 """
@@ -388,8 +392,16 @@ A conditional composes with everything else. A sweep or an average may sit outsi
 """
 
 # %%
-conditional = next(node for node in reset.body.walk() if isinstance(node, qp.blocks.Conditional))
-print("what a conditional asks a platform for:", sorted(conditional.required_capabilities()))
+composed = qp.QProgram(label="conditional_in_a_sweep")
+shot = composed.variable("shot")
+
+with composed.average(shots=50):
+    with composed.sweep(shot, qp.Range(0, 3, 1)):
+        seen = composed.measure(READOUT, "probe", "weights", fields=(MF.STATE,))
+        with composed.if_(seen.state == 1):
+            composed.play(DRIVE, "pi")
+
+print(qp.dumps(composed).split("body:")[1].rstrip())
 
 # %% [markdown]
 r"""
@@ -425,6 +437,12 @@ print("equal by structure:", HalfSine(0.42, 40) == HalfSine(0.42, 40))
 shape.plot()
 plt.show()
 
+try:
+    probe = qp.QProgram(label="unbound")
+    HalfSine(probe.variable("amp"), 40).envelope()
+except TypeError as exc:
+    print("a swept amplitude, before the fix in the next cell:", exc)
+
 # %% [markdown]
 r"""
 ### A parameter a sweep can bind
@@ -435,13 +453,6 @@ Two changes fix it. Annotate the parameter `float | qp.Expression`, and resolve 
 """
 
 # %%
-try:
-    probe = qp.QProgram(label="unbound")
-    HalfSine(probe.variable("amp"), 40).envelope()
-except TypeError as exc:
-    print("before the fix:", exc)
-
-
 def resolved(value):
     """A shape parameter's number, evaluated when a sweep has bound it."""
     return value.evaluate_or_raise() if isinstance(value, qp.Expression) else value
@@ -537,14 +548,14 @@ try:
 except ValueError as exc:
     print("already registered in this kernel:", exc)
 
-nodes = Chebyshev(4.80e9, 4.90e9, 7)
+nodes = Chebyshev(DRIVE_FREQ - 50e6, DRIVE_FREQ + 50e6, 7)
 print("values / GHz:", np.round(nodes.values() / 1e9, 4))
 print("tokens:      ", sorted(nodes.tokens()))
 print("under Repeat:", sorted(qp.Repeat(nodes, times=2).tokens()))
 
 edges = qp.QProgram(label="chebyshev_scan")
 edge_freq = edges.variable("freq", label="Drive frequency", units="Hz")
-with edges.sweep(edge_freq, Chebyshev(4.80e9, 4.90e9, 7)):
+with edges.sweep(edge_freq, Chebyshev(DRIVE_FREQ - 50e6, DRIVE_FREQ + 50e6, 7)):
     edges.set_frequency("q0/drive", edge_freq)
 
 print("\nin a program:", qp.dumps(edges).splitlines()[-2].strip())
@@ -553,7 +564,7 @@ print("\nin a program:", qp.dumps(edges).splitlines()[-2].strip())
 r"""
 ## 3.4 Vendor packages
 
-The two seams above add vocabulary the core could plausibly have shipped. This one is for vocabulary it must never ship, an operation that means something on one box in one rack and nothing anywhere else.
+A waveform and a sweep source add vocabulary the core could plausibly have shipped. This seam is for vocabulary it must never ship, an operation that means something on one box in one rack and nothing anywhere else.
 
 A vendor extension is a separate Python package that depends on `qprogram` and makes its registration calls at import time. Two are published, each in a repository of its own. `qprogram-qblox` carries the operations and the capability profile of one sequencer of a Qblox cluster, and `qprogram-qdac` does the same for one channel of a QDevil QDAC. Neither opens a socket, so both run on a laptop beside everything else here.
 
@@ -659,34 +670,33 @@ Two classes and four calls. An `Operation` subclass is the node that lands in th
 
 The operation below sets the pump tone of a parametric amplifier, one box sitting between the fridge and the digitizer. It belongs in nobody's vendor-agnostic language, and the seam exists for exactly that.
 
-`register_vendor_version` goes last on purpose. Registering the version marks a vendor active, so it doubles as the flag `qp.try_activate_vendor` reads and makes the whole block re-runnable with one guard.
+`register_vendor_version` goes last on purpose. Registering the version marks a vendor active, so it doubles as the flag `qp.try_activate_vendor` reads and makes the whole block re-runnable with one guard. The two class definitions sit inside that guard for the same reason: re-running a cell that defines a class makes a new class object, the registry would still point at the old one, and `qp.dumps` would then meet a node it does not recognise.
 """
 
 # %%
 PUMP_FREQ = 7.9e9  # Hz, the pump tone that gives this amplifier its best gain
 
 
-class SetPump(qp.operations.Operation):
-    """A host-side write of the amplifier pump tone on one readout line."""
-
-    def __init__(self, bus: str, frequency: float | qp.Expression) -> None:
-        self.bus = bus
-        self.frequency = frequency
-
-    def required_capabilities(self) -> set[str]:
-        return {"vendor.twpa.set_pump"} | qp.protocol.expression_tokens(self.frequency)
-
-
-class TwpaNamespace(qp.VendorNamespace):
-    """The methods reached as program.twpa.<operation>()."""
-
-    def set_pump(self, bus: str, frequency: float | qp.Expression) -> None:
-        self._append(SetPump(bus=bus, frequency=frequency))
-
-
 if qp.try_activate_vendor("twpa"):
     print("twpa is already registered in this kernel, nothing to do")
 else:
+
+    class SetPump(qp.operations.Operation):
+        """A host-side write of the amplifier pump tone on one readout line."""
+
+        def __init__(self, bus: str, frequency: float | qp.Expression) -> None:
+            self.bus = bus
+            self.frequency = frequency
+
+        def required_capabilities(self) -> set[str]:
+            return {"vendor.twpa.set_pump"} | qp.protocol.expression_tokens(self.frequency)
+
+    class TwpaNamespace(qp.VendorNamespace):
+        """The methods reached as program.twpa.<operation>()."""
+
+        def set_pump(self, bus: str, frequency: float | qp.Expression) -> None:
+            self._append(SetPump(bus=bus, frequency=frequency))
+
     qp.QProgram.register_vendor("twpa", TwpaNamespace)  # on the base class, never on a mixin
     qp.register_vendor_operation("twpa", "set_pump", SetPump)
     qp.register_capability_tokens("vendor.twpa.set_pump")
@@ -780,7 +790,7 @@ print("still abstract:", sorted(BenchtopRack.__abstractmethods__) or "nothing, a
 
 # %% [markdown]
 r"""
-The program it runs steps a flux bias and reads the qubit out at every point. The flux line is the one this rack drives with a slow DAC, and taking the real-time half of the flux slot away from an otherwise permissive descriptor is how that gets written down. `dataclasses.replace` on a frozen descriptor is the shortest way to record a machine that differs from one you already have.
+The program it runs steps a flux bias and reads the qubit out at every point. The flux line is the one this rack drives with a slow DAC, and taking the real-time half of the flux slot away from an otherwise permissive descriptor is how that gets written down. A descriptor holds one capability slot per kind of bus, each slot a real-time half named `rt` and a host half named `host`, and section 3.6 takes the shape apart in full. All this cell needs is that `rt=None` on the flux slot means the line has no sequencer behind it. `dataclasses.replace` on a frozen descriptor is the shortest way to record a machine that differs from one you already have.
 """
 
 # %%
@@ -900,7 +910,7 @@ print("read back into a variable:", attenuation.id, "=", attenuation.value)
 r"""
 ## 3.6 Capabilities, plans, and rewrites
 
-The descriptor the last section handed to a platform is where a machine writes down what it can run, and this section takes it apart.
+A capability descriptor is where a machine writes down what it can run, the object a platform hands the validator, and this section takes one apart.
 
 A `qp.PlatformCapabilities` has three fields. `bus` is a mapping keyed by the pair of element kind and bus kind, so `("q", "flux")` is a separate entry from `("q", "drive")`. `platform` answers for whatever names no bus, meaning the blocks and the expressions. `default_bus_profile` answers for every bus slot the map does not list, a plain string bus included, since a plain string carries no schema coordinate to route on.
 
@@ -1041,7 +1051,7 @@ print(qp.explain(bias_sweep, rack_caps))
 r"""
 `set_offset` routes to the flux slot, which has a host half only, so the operation is host-side, the sweep holding it went host-side, and the averaging above that followed. The `forced-host` warning reports exactly that, naming the block that fell and the child that pulled it. Severity is what you act on here, and a warning still runs: what fell is the averaging, so the round trip is paid two hundred times per bias point instead of once.
 
-The second annotation is the validator saying it can see a cheaper arrangement of the same experiment. That is the last part of this section.
+The second annotation is the validator saying it can see a cheaper arrangement of the same experiment, and the rewrite it points at closes the section.
 
 Take the operation away instead of its real-time half, and the row reads as running nowhere.
 """
@@ -1160,7 +1170,7 @@ print(qp.explain(regrouped, rack_caps))
 r"""
 The sweep is the outer block now, the `set_offset` has been hoisted to sit between the two, and the averaging is back in the sequencer with no warning left.
 
-The rewrite is opt-in, because it is not unconditionally equivalent. It takes all two hundred shots of one bias point before moving on, where the program as written interleaved passes over the whole sweep. The two are the same experiment for a stationary device and different under drift, so when you want the interleaving, do not call it. The hoisted `set_offset` also runs once per bias point rather than once per shot, right for a DC level and wrong for an operation with side effects, and the rewrite therefore hoists only a leading run of host-side-only operations and refuses to move one past an operation it would reorder against.
+The rewrite is opt-in, because it is not unconditionally equivalent. It takes all two hundred shots of one bias point before moving on, where the program as written interleaved passes over the whole sweep. The two are the same experiment for a stationary device and different under drift, so when you want the interleaving, do not call it. The hoisted `set_offset` also runs once per bias point rather than once per shot, right for a DC level and wrong for an operation with side effects. The rewrite therefore hoists only a leading run of host-side-only operations, and it refuses to move one past an operation it would reorder against.
 
 The pattern it matches is narrow, and the hint in the plan is how you find out in advance. The hint and the rewrite read the same test, so they cannot disagree: no hint, no change.
 """
@@ -1177,7 +1187,7 @@ nested_freq = nested.variable("freq", label="Drive frequency", units="Hz")
 with nested.average(shots=200):
     with nested.sweep(nested_bias, qp.Linspace(BIAS_START, BIAS_STOP, 11)):
         nested.set_offset(q[0].flux, nested_bias)
-        with nested.sweep(nested_freq, qp.Linspace(4.80e9, 4.90e9, 11)):
+        with nested.sweep(nested_freq, qp.Linspace(DRIVE_FREQ - 50e6, DRIVE_FREQ + 50e6, 11)):
             nested.set_frequency(q[0].drive, nested_freq)
             nested.play(q[0].drive, "pi")
             nested.measure(q[0].readout, "probe", "weights", name="m0", fields=(MF.STATE,))
@@ -1204,7 +1214,7 @@ for label, program, capabilities in cases:
 
 # %% [markdown]
 r"""
-The last three are worth a sentence each. A second sweep nested inside the first falls outside the shape the rewrite accepts. A bare `program.sync()` blocks it by pulling every bus into one domain intersection, so the sync lands host-side in the middle of a run of real-time operations and nothing can be hoisted across it, which makes one habit cost the whole rewrite and produce no error message anywhere. And a `DomainConstraint` route never produces the hint, because the constraint moves only the loop and leaves the operation's real-time support intact, so there is no host-side-only leading run to hoist.
+A second sweep nested inside the first falls outside the shape the rewrite accepts. A bare `program.sync()` blocks it by pulling every bus into one domain intersection, so the sync lands host-side in the middle of a run of real-time operations and nothing can be hoisted across it. One habit costs the whole rewrite, with no error message anywhere. And a `DomainConstraint` route never produces the hint, because the constraint moves only the loop and leaves the operation's real-time support intact, so there is no host-side-only leading run to hoist.
 """
 
 # %%
@@ -1218,7 +1228,7 @@ Add a measurement field to the language, then prove it is legal on one rack and 
 
 The `fields=` vocabulary is derived from the capability registry, so a readout that returns photon counts rather than an integrated point needs no new seam at all. One token registration widens `measure` itself.
 
-1. Print `sorted(qp.protocol.known_measurement_fields())` and then try `measure(..., fields=("counts", MF.STATE))` inside `try` and `except qp.ValidationError`. Print the message.
+1. Print `sorted(qp.protocol.known_measurement_fields())` and then try `measure(..., fields=("counts", MF.STATE))` inside `try` and `except qp.ValidationError`. Print the message, and print a note in the `else` branch instead, since a second run of the cell in one kernel finds the token already registered and the refusal cannot happen twice.
 2. Register the token with `qp.register_capability_tokens(qp.protocol.measurement_field_token("counts"))`, then print the known fields again.
 3. Build a program that measures with `fields=("counts", MF.STATE)` and print the measure line of its `.qp` text. Note which order the fields come back in.
 4. Validate it against `qp.reference_capabilities()` and show there are no diagnostics.
@@ -1236,6 +1246,8 @@ try:
     before.measure(q[0].readout, "probe", "weights", fields=("counts", MF.STATE))
 except qp.ValidationError as exc:
     print("\nrefused at the call:", exc)
+else:
+    print("\nan earlier run of this cell already registered the token, so nothing is refused")
 
 qp.register_capability_tokens(qp.protocol.measurement_field_token("counts"))
 print("\nfields the language accepts:", sorted(qp.protocol.known_measurement_fields()))

@@ -46,9 +46,9 @@ The Introduction declared three constants and used them as literals in a program
 
 `KAPPA` is the linewidth of the readout resonator, the full width at half maximum of its resonance in hertz. It sets how finely you have to step a frequency sweep to see the resonance at all. `RABI_RATE` says how strongly the drive couples to the qubit, in hertz of rotation rate per DAC unit of amplitude. It is the number that turns an amplitude on a cable into a rotation on the Bloch sphere, and it sets both how hard the qubit responds and how wide the response looks in frequency.
 
-Every model in this notebook is a short formula over these five numbers. Nothing is looked up, nothing is hidden, and every figure comes out of a function you can read.
+Every model that stands in for the chip is a short formula over these five numbers. Nothing is looked up, nothing is hidden, and every figure in sections 2.6 to 2.9 comes out of a function you can read.
 
-One thing is deliberately left out. Every `measure` below passes the string aliases `"readout"` and `"weights"` of section 1.6 rather than concrete shapes, and never binds them. The reference platform models measurements rather than pulses, so it never reads a readout envelope, and leaving the aliases unbound keeps the printed `.qp` text short enough to read. The measurement model is the only stand-in for the fridge.
+One thing is deliberately left out. Every `measure` below passes the string aliases `"readout"` and `"weights"` of section 1.5 rather than concrete shapes, and never binds them. The reference platform models measurements rather than pulses, so it never reads a readout envelope, and leaving the aliases unbound keeps the printed `.qp` text short enough to read. The measurement model is the only stand-in for the fridge.
 """
 
 # %%
@@ -141,7 +141,7 @@ except TypeError as exc:
 r"""
 ### Where an expression may appear
 
-Anywhere QProgram takes a number. Among the operations that means `set_frequency`, `set_gain`, `set_phase`, both paths of `set_offset`, the value of `set_parameter`, and the duration of `wait`. Among the waveforms it means every numeric constructor argument of every parameterized shape, with the samples of `Arbitrary`, the wrapping shapes, and `FlatTop`'s integer buffer as the exceptions.
+Anywhere QProgram takes a number. Among the operations that means `set_frequency`, `set_gain`, `set_phase`, both paths of `set_offset`, the value of `set_parameter`, and the duration of `wait`. Among the waveforms it means every numeric constructor argument of every parameterized shape, with the samples of `Arbitrary`, the shape a wrapper wraps, and `FlatTop`'s integer buffer as the exceptions.
 
 `play` and `measure` take a waveform rather than a number, so an expression reaches a pulse through the waveform's constructor. A shape built that way computes nothing until `envelope()` is called on it, and section 2.8 sweeps a pulse amplitude exactly this way.
 
@@ -344,7 +344,7 @@ r"""
 
 `with program.average(shots=N)` wraps a block and repeats it. The integrated point and the raw trace come back as means over the shots, the classified state comes back as the excited-state population, and the shot count appears nowhere in the shape of the result.
 
-Adding no dimension is not the same as costing nothing. `average` declares the same repetition flag a sweep does, so it occupies a repetition level on a sequencer like any other loop, and the Advanced notebook is where that turns into a platform limit.
+Adding no dimension is not the same as costing nothing. A sequencer runs each loop out of a hardware counter and has a fixed number of them, so `average` uses one exactly as a sweep does. The Advanced notebook is where a rack declares how many it has, under the name `max_loop_nesting`.
 """
 
 # %%
@@ -421,10 +421,11 @@ result = qp.simulate(spectroscopy, model=qp.MockMeasurementModel(response=s21, n
 iq = result.get(m_spec)
 
 print("dims:", iq.dims, "shape:", iq.shape)
-print("101 frequencies by two quadratures. The 200 shots are gone, since average collapsed them.")
 
 # %% [markdown]
 r"""
+One hundred and one frequencies by two quadratures. The two hundred shots are gone, because `average` collapsed them.
+
 ### The result model
 
 `qp.simulate` returns a `qp.QProgramResult`, which holds one record per `measure` in the program, in the order they were declared. Each record carries the bus it ran on, the name you gave it, and the fields that measurement asked for.
@@ -437,7 +438,7 @@ for record in result.measurements:
 
 # %% [markdown]
 r"""
-`result.get(measurement, bus=None, field=MF.IQ)` pulls one array out, and it resolves three spellings of the first argument. A handle says what it means and is the one to prefer. A plain name string selects the same record, and you reach for that after loading a program back from a `.qp` file in a session that never built it. An integer is positional sugar for declaration order. `bus=` narrows the candidates first, so `get(0, bus=q[1].readout)` means the first measurement on that bus, and `result.plot` takes all three spellings too.
+`result.get(measurement, bus=None, field=MF.IQ)` pulls one array out, and it resolves three spellings of the first argument. A handle says what it means and is the one to prefer. A plain name string selects the same record, and you reach for that after loading a program back from a `.qp` file in a session that never built it. An integer is positional sugar for declaration order. `bus=` narrows the candidates before any of the three is resolved, the thing a program measuring several qubits in one sweep needs, and `result.plot` takes all three spellings too.
 
 `field=` defaults to the integrated point. Ask for a field the measurement never requested and you get a `KeyError`, the default included, so a measurement declared with `fields=(MF.STATE,)` needs `field=MF.STATE` spelled out.
 
@@ -491,13 +492,16 @@ plt.show()
 result.plot(m_spec, channels="magnitude")
 plt.show()
 
+result.plot(m_spec, channels="phase")
+plt.show()
+
 # %% [markdown]
 r"""
 Everything past the bare call is a decision about the figure rather than about the data, and each one is either an argument you add or a method on the `Axes` that came back.
 
 `coords=` restates a coordinate for the figure alone and leaves the stored array untouched, and `Quantity(label, units, transform)` reads positionally in that order. A frequency axis wants gigahertz, and the restatement is a pair wherever there is a claim to falsify: on a coordinate that already declares `units="Hz"`, a transform alone would move the numbers under a label that still says hertz, and a unit alone would relabel numbers nobody moved. Both halves or neither.
 
-Because the drawn numbers moved, everything you hand the returned `Axes` afterwards is in the figure's units too, so both reference lines below are divided by `1e9`. `value=` restates the measured quantity the same way, and `style=` carries the choices about the drawing itself, so `Style(markers=True)` puts a marker at every sample.
+Because the drawn numbers moved, everything you hand the returned `Axes` afterwards is in the figure's units too, so both reference lines below are divided by `1e9`. `value=` restates the measured quantity the same way, and `style=` carries the choices about the drawing itself, so `Style(markers=True)` puts a marker at every sample. The thin red line sits inside the thick grey one because the argmin landed on the resonator to within one 200 kHz step, the best a grid of that spacing allows.
 """
 
 # %%
@@ -509,17 +513,21 @@ ax = result.plot(
     style=Style(markers=True),
     title="Resonator spectroscopy",
 )
+ax.axvline(F_READOUT / 1e9, color="grey", lw=3, label="true resonator")
 ax.axvline(f_dip / 1e9, color="tab:red", lw=1, label=f"argmin at {f_dip / 1e9:.4f} GHz")
-ax.axvline(F_READOUT / 1e9, color="grey", ls=":", label="true resonator")
 ax.legend(fontsize=8)
 plt.show()
 
 # %%
-for half_a_pair in (dict(transform=lambda v: v / 1e9), dict(units="GHz")):
-    try:
-        result.plot(m_spec, coords={"ro_freq": Quantity(**half_a_pair)})
-    except qp.ValidationError as exc:
-        print(exc, "\n")
+try:
+    result.plot(m_spec, coords={"ro_freq": Quantity(transform=lambda v: v / 1e9)})
+except qp.ValidationError as exc:
+    print(exc, "\n")
+
+try:
+    result.plot(m_spec, coords={"ro_freq": Quantity(units="GHz")})
+except qp.ValidationError as exc:
+    print(exc)
 
 # %% [markdown]
 r"""
@@ -615,7 +623,7 @@ a = mismatched.variable("a")
 b = mismatched.variable("b")
 
 pair_of_loops = mismatched.sweep(a, qp.Linspace(0, 1, 5)) | mismatched.sweep(b, qp.Linspace(0, 1, 6))
-print("the | itself:", type(pair_of_loops).__name__, "and no exception yet")
+print("composing the two loops raised nothing, even though their lengths differ")
 
 try:
     with pair_of_loops:
@@ -635,15 +643,13 @@ ridge = qp.QProgram(label="qubit_ridge", schema=schema)
 r_amp = ridge.variable("drive_amp", label="Drive amplitude", units="DAC units")
 r_freq = ridge.variable("drive_freq", label="Drive frequency", units="Hz")
 
-with ridge.average(shots=100):
+with ridge.average(shots=200):
     with ridge.sweep(r_amp, qp.Values(amps)) | ridge.sweep(r_freq, qp.Values(ridge_freqs)):
         ridge.set_frequency(q[0].drive, r_freq)
         ridge.play(q[0].drive, IQZero(Square(amplitude=r_amp, duration=20_000)))
         ridge.sync([q[0].drive, q[0].readout])
         m_ridge = ridge.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
 
-pair_block = ridge.body.elements[0].elements[0]
-print("block:", type(pair_block).__name__, "over", [loop.variable.id for loop in pair_block.loops])
 
 # %%
 ridge_result = qp.simulate(ridge, model=qp.MockMeasurementModel(p_excited=p_saturated, seed=11))
@@ -656,13 +662,15 @@ print("lowest population along the ridge:", round(float(ridge_pop.min()), 3), "a
 
 # %% [markdown]
 r"""
-One dimension carrying two coordinates is more than an axis can hold, and `plot` draws both rather than dropping one. The first variable of the pair goes along the bottom and the second on a twin scale across the top, in the order the loops were written, and those top ticks land on samples instead of round numbers because tick $k$ and sample $k$ are the same measurement. The twin takes its own `coords=` restatement, keyed by its own name.
+One dimension carrying two coordinates is more than an axis can hold, and `plot` draws both rather than dropping one. The first variable of the pair goes along the bottom and the second on a twin scale across the top, in the order the loops were written, and the top ticks sit at sample positions rather than at evenly spaced values, so they repeat here because the ridge barely moves in frequency. The twin takes its own `coords=` restatement, keyed by its own name.
+
+The trace itself should come out flat at one half. On resonance the saturated response is one half at every amplitude, so a flat trace is the confirmation that the argmax found the ridge on every row, and what rides on top of it is the shot noise of two hundred shots. The y limits are pinned below so the ceiling stays in the picture.
 
 `x=` drops the twin and asks for a bare axis instead, and once dropped, a `coords=` key naming the coordinate that is gone raises rather than doing nothing.
 """
 
 # %%
-ridge_result.plot(
+ax_ridge = ridge_result.plot(
     m_ridge,
     field=MF.STATE,
     coords={"drive_freq": Quantity("Peak frequency", "MHz from $f_{01}$", lambda v: (v - F01) / 1e6)},
@@ -670,6 +678,9 @@ ridge_result.plot(
     style=Style(markers=True),
     title="Walking the ridge",
 )
+ax_ridge.set_ylim(0.0, 0.6)
+ax_ridge.axhline(0.5, color="grey", ls=":", lw=1, label="the ceiling of one half")
+ax_ridge.legend(fontsize=8)
 plt.show()
 
 try:
@@ -682,7 +693,7 @@ except qp.ValidationError as exc:
 r"""
 ### 🧩 Exercise 2.1
 
-Take a cut through the map. Section 2.8 stepped the drive amplitude and the drive frequency together over a rectangle. Park the frequency on the transition instead and step the amplitude alone, far enough to drive the qubit all the way over and back.
+Take a cut through the map. Section 2.8 stepped the drive amplitude and the drive frequency over a rectangle. Park the frequency on the transition instead and step the amplitude alone, far enough to drive the qubit all the way over and back.
 
 A drive left on resonance rotates the qubit at a rate proportional to its amplitude, so the population follows $\sin^2$ rather than the saturated Lorentzian of 2.8. The model below is that curve, peaking at `A_PI` by construction.
 
@@ -691,7 +702,7 @@ A drive left on resonance rotates the qubit at a rate proportional to its amplit
 3. Inside the loop, `set_frequency` the drive bus to `F01`, then `play` an `IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.15)` on it. The variable goes inside the waveform, as in section 2.8.
 4. `sync` the drive and readout buses, then `measure` the readout bus with the `"readout"` and `"weights"` aliases and `fields=(MF.STATE,)`.
 5. Run it with `qp.MockMeasurementModel(p_excited=p_rabi, seed=17)` and print the dims and shape of the state array.
-6. Read the calibration off the rising branch rather than off the peak. Restrict to `amps <= 0.5`, find the amplitude whose population sits closest to one half, and double it. Print that beside `A_PI`.
+6. Take the swept amplitudes off the array with `rabi_pop.coords["amp"].values`, since `amps` is already in scope from section 2.8 and holds that map's twenty-one values. Then read the calibration off the rising branch rather than off the peak: keep the amplitudes at or below 0.5, find the one whose population sits closest to a half, and double it. Print that beside `A_PI`.
 7. Draw it with `style=Style(markers=True)` and `value=Quantity("Excited-state population")`, then put a dashed line on the returned axes at the amplitude you found.
 
 Step 6 is the interesting one. The top of a $\sin^2$ curve is flat, so shot noise moves an `argmax` by several grid points and the answer is worse than the grid. The half-way crossing sits on the steepest part of the same curve, where the same noise moves the answer by a fraction of one step. The amplitude axis needs no `coords=` at all, because DAC units are the units the program already declared.
@@ -738,7 +749,7 @@ ax_rabi.legend(fontsize=8)
 plt.show()
 
 # %% stub
-# TODO: sweep the drive amplitude on resonance and find the amplitude of the peak.
+# TODO: sweep the drive amplitude on resonance and read the full-rotation amplitude off it.
 # 1) rabi = qp.QProgram(label="rabi", schema=schema); declare amp with label and units
 # 2) with rabi.average(shots=200): with rabi.sweep(amp, qp.Linspace(0.0, 1.0, 41)):
 # 3)     set_frequency(q[0].drive, F01), then play IQDrag(amplitude=amp, duration=40, sigma=10,
@@ -747,7 +758,8 @@ plt.show()
 #        "weights" aliases and fields=(MF.STATE,)
 # 5) qp.simulate(rabi, model=qp.MockMeasurementModel(p_excited=p_rabi, seed=17)), then print the
 #    dims and shape of the state array
-# 6) rising = rabi_amps <= 0.5; take the amplitude whose population is closest to 0.5, double
+# 6) rabi_amps = rabi_pop.coords["amp"].values (not `amps`, which is section 2.8's); then
+#    rising = rabi_amps <= 0.5, take the amplitude whose population is closest to 0.5, double
 #    it, and print it beside A_PI
 # 7) plot with style=Style(markers=True) and value=Quantity("Excited-state population"), then
 #    ax.axvline at the amplitude you found
@@ -759,7 +771,7 @@ r"""
 - A **variable** is a hole in the program, declared with `program.variable(id, label=..., units=...)`. The label and the units follow the data out and name the axes of every figure, so declaring them once is the whole of plot labeling.
 - **Arithmetic on a variable builds a tree and computes nothing.** The tree re-evaluates every iteration, it may go anywhere QProgram takes a number, and it reaches a pulse through a waveform's constructor.
 - A **sweep source** says how the variable moves, and a sweep has three spellings: a source object, a `from_*` builder, and a bare list meaning `qp.Values`. `qp.Range` and `qp.Linspace` are linear, so a sequencer can run them from a register, and everything else is arbitrary.
-- **`average(shots)` adds no dimension.** It shrinks the noise on the integrated point, it turns the classified state from a 0 or a 1 into a population, and it still costs a repetition level on the sequencer.
+- **`average(shots)` adds no dimension.** It shrinks the noise on the integrated point, it turns the classified state from a 0 or a 1 into a population, and it still costs one of the sequencer's loop counters.
 - The **measurement model** is the only thing in a run that produces a number. `qp.MockMeasurementModel` covers most cases and any object with a `sample(bus, env)` method covers the rest.
 - **Results are xarray.** One dimension per enclosing sweep, outermost first, named after your variable ids, plus an `IQ` axis, plus one shared `"a|b"` dimension for a lockstep pair. `get` takes a handle, a name, or an integer, and `result.plot` picks a line for one swept dimension and a heatmap for two, then hands back the `Axes` your reference lines go on.
 """
@@ -768,5 +780,5 @@ r"""
 r"""
 ## Next
 
-**Advanced.** Six sections, each standing on its own. Two are about writing less: a fragment factors a repeated sequence out, and a conditional lets a measurement decide what the program does next. Two are about adding to the language: your own waveform and sweep source, and your own vendor operation beside the two published extension packages. And two are about the machine: implementing the platform interface, and reading the capability descriptor a platform publishes so a program can be checked and replanned before it is ever uploaded.
+**Advanced.** Six sections on extending the language and on describing the machine that runs it. Each one stands on its own, so read them in whatever order your rack makes urgent.
 """
