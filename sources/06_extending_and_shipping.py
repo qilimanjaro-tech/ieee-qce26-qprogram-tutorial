@@ -2,20 +2,21 @@
 r"""
 # 06 · Extending and shipping
 
-Every program so far used operations, waveforms, and sweep sources that ship with QProgram. Real labs run out of those on day one: a pulse shape the vendor's compiler already knows and the DSL does not, a room-temperature attenuator that no core operation will ever cover, a chevron scanned by centre and span instead of start and stop.
+Every program you wrote so far used vocabulary somebody else had registered. Part 6 adds to it, and then ships what it added.
 
-QProgram answers all three the same way. You write a class, you make one registration call, and the serializer, the parser, the validator, and the plotting layer pick it up with no change to the core.
+Three registries accept new classes. A **waveform** is a pulse shape, a **sweep source** is a sweep axis, and a **vendor namespace** carries operations the core will never have. Each one is a Python class, or two, plus the registration calls that put it in the language, one for a sweep source, two for a waveform, and four for a vendor operation.
 
-- register a **waveform**, a **sweep source**, and a **vendor namespace**, live in this notebook
-- watch the `require` line appear in the `.qp` text, and a rack that lacks the token refuse the program
-- diff two calibration runs and run the checker from a shell
-- run the whole bring-up as one capstone, a file per step and a calibration summary against the true device values
+- write all three, live in this notebook
+- watch the `require` line appear in the file, and a rack that lacks the token refuse the program
+- ship them as a package, so a `require` line loads the extension a file needs
+- diff two calibration runs, and run the checker from a shell
+- close with the whole bring-up as one script, a file per step and a table of measured against true
 """
 
 # %%
 # Run me first. A no-op when qprogram is already installed, an install when it is not
 # (a fresh Google Colab runtime, for example).
-# Section 6.2 loads a file that requires the qblox vendor, and the point of that cell is the import
+# Section 6.6 loads a file that requires the qblox vendor, and the point of that cell is the import
 # happening on demand, so probe for the distributions rather than importing them here.
 from importlib.util import find_spec
 
@@ -53,6 +54,7 @@ from scipy.optimize import curve_fit
 import qprogram as qp
 from qprogram import MeasurementField as MF
 from qprogram.buses import BusSchema
+from qprogram.operations import Play
 from qprogram.operations.operation import Operation
 from qprogram.plotting import LIGHT, Quantity, Style
 from qprogram.waveforms import IQDrag, IQPair, Square, Waveform
@@ -61,11 +63,11 @@ print("imports ready")
 
 # %% [markdown]
 r"""
-## 6.0 What we carry in
+## 6.0 The device
 
-The capstone runs the whole bring-up, so the six cells below collect what the earlier parts built: the device truth, the response models that stand in for the fridge, the pulse sequences from Part 4, and the helpers that turn one sweep and one fit into two lines. It is short because they exist.
+The same simulated chip as Parts 1 to 4, and the numbers to be recovered from nothing but simulated data, the three `cz_*` in 6.4 and the rest in the capstone in 6.9.
 
-The schema is the flux-tunable one this time, because the custom waveform in 6.1 is a flux pulse and a flux pulse needs a single-channel bus to live on.
+The schema is `BusSchema.flux_tunable_transmon()`, Part 3's, so `q[0]` carries a `flux` bus beside the drive and readout pair.
 """
 
 # %%
@@ -82,32 +84,659 @@ DEVICE = {
     "cz_amp_res": 0.42,  # flux amplitude that brings the pair into resonance
     "cz_slope": 1.2e9,  # Hz per unit flux amplitude
 }
-DETUNING = 0.5e6  # Hz, the detuning we put into the Ramsey on purpose
-P_HOT = 0.22  # residual excited-state population before reset
 
 schema = BusSchema.flux_tunable_transmon()
 q = schema.q
-PI = IQDrag(amplitude=DEVICE["q0_a_pi"], duration=40, sigma=10, beta=0.1)
-X90 = IQDrag(amplitude=DEVICE["q0_a_pi"] / 2, duration=40, sigma=10, beta=0.1)
-# Seed carriers. Steps 1 and 2 of the capstone measure both and rebind them, the same way
-# steps 3 replaces the seed pulses above.
-RO_FREQ = DEVICE["q0_fr"]
-DRIVE_FREQ = DEVICE["q0_f01"]
 
 print("buses on this chip:", [q[0].drive, q[0].readout, q[0].flux])
-print(f"pi pulse: IQDrag amplitude {PI.amplitude}, duration {PI.duration} ns")
-print(f"pi/2 pulse: IQDrag amplitude {X90.amplitude}, duration {X90.duration} ns")
 
 # %% [markdown]
 r"""
-The response models are the ones from Parts 2 to 4, unchanged. Each is a plain function of `env`, the dict of loop variables currently bound. None is physics from first principles, and each produces the shape a real scan produces, so the programs and the fits are the real part.
+## 6.1 A custom waveform
 
-Active reset needs something a `response` function cannot express, because the second measurement of a shot depends on what the first one saw. A `MeasurementModel` is any object with a `sample(bus, env)` method, called once per shot per measurement in program order, so a model is free to remember. A model that simulates an ADC also declares `raw_samples` and fills in the sample's `raw` trace; the models here leave both out.
+A `Waveform` subclass owes two methods. `envelope(resolution)` returns the samples, one per `resolution` nanoseconds, and `get_duration()` returns the length in nanoseconds. Nothing else is required, and nothing else in the class below is QProgram.
 
-A model cannot watch the executor, so it never learns which branch of a conditional ran. `ResetModel` assumes the program plays a pi pulse when the check reads 1, and the capstone program does exactly that.
+`HalfSine` is one half period of a sine, a shape the core does not ship.
 """
 
 # %%
+class HalfSine(Waveform):
+    """One half period of a sine, from zero up to the amplitude and back to zero."""
+
+    def __init__(self, amplitude: float, duration: int) -> None:
+        self.amplitude, self.duration = amplitude, duration
+
+    def envelope(self, resolution: int = 1) -> np.ndarray:
+        n = self.duration // resolution
+        return self.amplitude * np.sin(np.pi * np.arange(n) / n)
+
+    def get_duration(self) -> int:
+        return self.duration
+
+
+flux_pulse = HalfSine(amplitude=0.42, duration=40)
+
+print("duration:", flux_pulse.get_duration(), "ns")
+print("first four samples:", flux_pulse.envelope()[:4].round(4))
+
+# %% [markdown]
+r"""
+One call draws it.
+"""
+
+# %%
+flux_pulse.plot()
+
+# %% [markdown]
+r"""
+None of what the next cell prints is written in the class. It comes off `Waveform`, which derives every one of them from the two methods you wrote.
+"""
+
+# %%
+print("written on HalfSine:  ", sorted(name for name in vars(HalfSine) if not name.startswith("_")))
+print("inherited from Waveform:",
+      [name for name in ("plot", "area", "peak_amplitude", "rms_amplitude", "spectrum")
+       if name not in vars(HalfSine)])
+print(f"area {flux_pulse.area():.3f}, peak amplitude {flux_pulse.peak_amplitude():.3f}")
+print("two built the same way compare equal:", HalfSine(0.42, 40) == HalfSine(0.42, 40))
+
+# %% [markdown]
+r"""
+Part 3 drew one pulse over another by handing the `Axes` that came back to a second call as `target=`, and a class you wrote is no different.
+"""
+
+# %%
+ax = flux_pulse.plot()
+rotated = Style(theme=replace(LIGHT, series=LIGHT.series[1:] + LIGHT.series[:1]))
+Square(amplitude=0.42, duration=40).plot(target=ax, style=rotated)
+for line, name in zip(ax.lines, ("HalfSine(0.42, 40)", "Square(0.42, 40)"), strict=True):
+    line.set_label(name)
+ax.set_ylabel("Flux amplitude (DAC units)")
+ax.legend(frameon=False, fontsize=9)
+
+# %% [markdown]
+r"""
+### A parameter a sweep can bind
+
+Put a variable in the amplitude position and it does not arrive as a number. It arrives as a `qp.Expression`, and the multiplication inside `envelope` meets that instead of a float.
+"""
+
+# %%
+probe = qp.QProgram(label="probe", schema=schema)
+probe_amp = probe.variable("flux_amp", label="Flux amplitude", units="DAC units")
+
+try:
+    HalfSine(amplitude=probe_amp, duration=40).envelope()
+except TypeError as error:
+    print("TypeError:", error)
+
+# %% [markdown]
+r"""
+Two lines answer it. Annotate the parameter `float | qp.Expression`, and resolve it with `evaluate_or_raise()` at the point of use, which hands back whatever the enclosing sweep has bound. Every shape the core ships is written this way.
+
+Leave the pair out and nothing complains until a platform calls `envelope()`, and the failure is the `TypeError` above, raised out of the expression layer with a message that names neither the waveform nor the variable.
+
+The class below is the one the rest of the notebook uses, the same class with those two changes made.
+"""
+
+# %%
+class HalfSine(Waveform):
+    """One half period of a sine, with an amplitude a sweep may bind."""
+
+    def __init__(self, amplitude: float | qp.Expression, duration: int) -> None:
+        self.amplitude, self.duration = amplitude, duration
+
+    def envelope(self, resolution: int = 1) -> np.ndarray:
+        amplitude = self.amplitude
+        if isinstance(amplitude, qp.Expression):  # bound by the sweep this pulse sits in
+            amplitude = amplitude.evaluate_or_raise()
+        n = self.duration // resolution
+        return amplitude * np.sin(np.pi * np.arange(n) / n)
+
+    def get_duration(self) -> int:
+        return self.duration
+
+
+print("still a Waveform, so still plots:", callable(HalfSine(0.42, 40).plot))
+
+# %% [markdown]
+r"""
+### Registering it
+
+The class is a working Python object already. Two calls put it in the language.
+
+`qp.register_waveform` adds it to the serialization registry under its class name, so `qp.dumps` writes the constructor and `qp.loads` builds one back. The writer emits the object's public attributes and the parser rebuilds it through `__init__`, and that pairing costs the one constraint the whole seam rests on. The constructor arguments have to *be* the object's state. Store a parameter under a different attribute name, or compute state the constructor cannot reproduce, and the round trip breaks with no warning.
+
+`qp.register_waveform_token` maps the class to a capability token, so a rack that cannot generate the shape has a name to refuse it by. `register_waveform` hands the class straight back, which is why the spelling `@qp.register_waveform` above a class definition works too, and the token call takes a token as well so it stays an ordinary statement.
+
+Every registry in this part is global and keyed by name, so a registering cell runs once. Re-running one after editing its class raises a collision error, because the name is taken by the class you just replaced, and the way out is to restart the kernel.
+"""
+
+# %%
+qp.register_waveform(HalfSine)
+qp.register_waveform_token(HalfSine, "waveform.half_sine")
+
+one_pulse = qp.QProgram(label="one_pulse", schema=schema)
+one_pulse.play(q[0].flux, HalfSine(amplitude=0.42, duration=40))
+
+print("body:" + qp.dumps(one_pulse).split("body:", 1)[1].rstrip())
+print("round-trips:", qp.loads(qp.dumps(one_pulse)).body == one_pulse.body)
+print("the play asks for:", sorted(Play(q[0].flux, HalfSine(0.42, 40)).required_capabilities()))
+
+# %% [markdown]
+r"""
+## 6.2 A custom sweep source
+
+A sweep source is the second argument of `program.sweep`, and Part 2 used the ones the core ships. A subclass declares `KIND` and `TOKEN`, implements `length()` and `values()`, and keeps its parameters as public attributes so the text form derives itself the way the waveform's did.
+
+`Chevron` takes a centre, a span, and a number of points, the way a symmetric scan gets written down in the first place.
+"""
+
+# %%
+class Chevron(qp.SweepSource):
+    """`num` points spanning `span`, centred on `center`."""
+
+    KIND = "arbitrary"
+    TOKEN = "sweep.chevron"
+
+    def __init__(self, center: float, span: float, num: int) -> None:
+        self.center, self.span, self.num = center, span, num
+
+    def length(self) -> int:
+        return self.num
+
+    def values(self):
+        return np.linspace(self.center - self.span / 2, self.center + self.span / 2, self.num)
+
+
+scan = Chevron(center=0.42, span=0.20, num=21)
+
+print("length:", scan.length(), "· kind:", scan.KIND)
+print("values:", scan.values().round(3))
+
+# %% [markdown]
+r"""
+`qp.register_sweep_source` adds the class to the serialization registry under its name, and it puts the class's `TOKEN` in the capability registry too, where the waveform needed a second call for that. `tokens()` is the other thing a platform reads off a source.
+"""
+
+# %%
+qp.register_sweep_source(Chevron)
+
+print("tokens it asks a platform for:", sorted(scan.tokens()))
+print("wrapped in Rotate:      ", sorted(qp.Rotate(scan, 5).tokens()))
+
+# %% [markdown]
+r"""
+Two came back, the `TOKEN` the class declared and the `sweep.arbitrary` that `KIND` implies. A combinator unions its child's tokens with its own, so a rack missing `sweep.chevron` refuses the rotated chevron too.
+
+The source goes anywhere `qp.Linspace` goes, and the amplitude inside the loop below is the `Expression` the two lines added in 6.1 are there to resolve, on the day a compiler samples the envelope.
+"""
+
+# %%
+scan_program = qp.QProgram(label="chevron_scan", schema=schema)
+scan_amp = scan_program.variable("flux_amp", label="Flux amplitude", units="DAC units")
+
+with scan_program.sweep(scan_amp, Chevron(center=0.42, span=0.20, num=21)):
+    scan_program.play(q[0].flux, HalfSine(amplitude=scan_amp, duration=40))
+
+print("body:" + qp.dumps(scan_program).split("body:", 1)[1].rstrip())
+print("round-trips:", qp.loads(qp.dumps(scan_program)).body == scan_program.body)
+
+# %% [markdown]
+r"""
+## 6.3 A vendor namespace
+
+A vendor namespace is two classes. An `Operation` subclass is the node that lands in the tree, and it answers `required_capabilities()` with a token under its own vendor prefix. A `VendorNamespace` subclass is the method surface, where `self._append` puts a node into the program being built.
+
+The two seams above add vocabulary the core could plausibly have shipped, and this one is for vocabulary it must never ship. The operation below sets a programmable room-temperature attenuator on a drive line, one box in one rack, which belongs in nobody's vendor-agnostic DSL.
+"""
+
+# %%
+class SetAttenuation(Operation):
+    """Set the room-temperature attenuator on a drive line, in dB."""
+
+    def __init__(self, bus: str, db: float) -> None:
+        self.bus, self.db = bus, db
+
+    def required_capabilities(self) -> set[str]:
+        return {"vendor.fridge.set_attenuation"}
+
+
+class FridgeNamespace(qp.VendorNamespace):
+    def set_attenuation(self, bus: str, db: float) -> None:
+        self._append(SetAttenuation(bus=bus, db=db))
+
+
+print("SetAttenuation asks for:", SetAttenuation(q[0].drive, 20.0).required_capabilities())
+
+# %% [markdown]
+r"""
+Four registration calls put the pair in the language, and their names say what they do. One needs a note. `register_vendor_operation` teaches the writer and the parser, and the default parser reads your `__init__` signature, the same derivation the waveform leaned on.
+
+The printout below is the sum of the four. `program.fridge` resolves on an ordinary `QProgram`, the operation writes itself into the body, and the file grew a `require fridge 0.1` line under the header.
+"""
+
+# %%
+qp.QProgram.register_vendor("fridge", FridgeNamespace)
+qp.register_vendor_version("fridge", "0.1.0")
+qp.register_vendor_operation("fridge", "set_attenuation", SetAttenuation)
+qp.register_capability_tokens("vendor.fridge.set_attenuation")
+
+warm_up = qp.QProgram(label="warm_up", schema=schema)
+warm_up.fridge.set_attenuation(q[0].drive, 20.0)
+
+print(qp.dumps(warm_up))
+
+# %% [markdown]
+r"""
+## 6.4 All three in one program
+
+The program attenuates the drive line, then steps the flux amplitude and reads the qubit out. The vendor operation, the custom sweep source, and the custom waveform each appear in the text.
+"""
+
+# %%
+program = qp.QProgram(label="cz_chevron", description="flux-activated swap on the fridge rack", schema=schema)
+flux_amp = program.variable("flux_amp", label="Flux amplitude", units="DAC units")
+
+program.fridge.set_attenuation(q[0].drive, 20.0)
+with program.average(shots=200):
+    with program.sweep(flux_amp, Chevron(center=0.42, span=0.20, num=21)):
+        program.play(q[0].flux, HalfSine(amplitude=flux_amp, duration=40))
+        program.sync()
+        swap = program.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+
+text = qp.dumps(program)
+print(text)
+print("round-trips:", qp.loads(text).body == program.body)
+print("diagnostics from the reference platform:", qp.validate(program, qp.reference_capabilities())[0])
+
+# %% [markdown]
+r"""
+The `require` line is the contract, and 6.6 is where a lab without the extension installed finds out.
+
+The round trip needed no help from you. Each of the three is registered under its class name and serialized from its constructor signature, so the parser rebuilds all three off the text alone. The reference platform accepts every token in the registry, so the program validates and runs.
+"""
+
+# %%
+def p_swap(bus, env):
+    """Stand-in for the fridge: the pair exchanges its excitation near cz_amp_res."""
+    delta = (env["flux_amp"] - DEVICE["cz_amp_res"]) * DEVICE["cz_slope"]
+    omega = np.sqrt((2 * DEVICE["cz_g"]) ** 2 + delta**2)
+    contrast = (2 * DEVICE["cz_g"]) ** 2 / omega**2
+    return contrast * np.sin(np.pi * omega * 40 * 1e-9) ** 2
+
+
+chevron_run = qp.simulate(program, model=qp.MockMeasurementModel(p_excited=p_swap, seed=21))
+chevron_run.plot(swap, field=MF.STATE)
+
+# %% [markdown]
+r"""
+The x axis reads `Flux amplitude (DAC units)` because `flux_amp` was declared with a label and a unit, and the positions along it are the numbers `Chevron.values()` produced. Nothing else about that call named an axis.
+
+The model's own resonance goes on the axes that came back, beside a marker at every sample.
+"""
+
+# %%
+data = chevron_run.get(swap, field=MF.STATE)
+amps = data.coords["flux_amp"].values
+
+ax = chevron_run.plot(swap, field=MF.STATE, value=Quantity("Swap probability"), style=Style(markers=True))
+ax.lines[0].set_label("measured")
+ax.axvline(DEVICE["cz_amp_res"], linestyle="--", color=LIGHT.series[1], label="resonance in the model")
+ax.legend(frameon=False, fontsize=9)
+
+print(f"the scan peaks at {amps[data.values.argmax()]:.3f}, the model put resonance at {DEVICE['cz_amp_res']:.3f}")
+
+# %% [markdown]
+r"""
+## 6.5 A rack that refuses it
+
+Registering a token does not put the box in every rack. Part 5 wrote a descriptor down by subtracting one token from the live registry, and the same subtraction takes our attenuator away again.
+"""
+
+# %%
+from qprogram.protocol import CAPABILITY_REGISTRY
+
+no_fridge = frozenset(CAPABILITY_REGISTRY) - {"vendor.fridge.set_attenuation"}
+everything_else = qp.CompilerCapabilities(
+    profile="no-fridge", version=(0, 1, 0), capabilities=no_fridge, limits={}, predicates=(), vendor_versions={}
+)
+plain_rack = qp.BusCapabilities(rt=everything_else, host=everything_else)
+caps = qp.PlatformCapabilities(bus={}, platform=plain_rack, default_bus_profile=plain_rack)
+
+for d in qp.validate(program, caps)[0]:
+    print(f"[{d.severity}] {d.code}: {d.message}")
+    print("  at path:", qp.format_path(d.path))
+print()
+print(qp.explain(program, caps))
+
+# %% [markdown]
+r"""
+The missing capability comes back by name, with the path to the node that wanted it, before anything is uploaded and while the file stays legal QProgram everywhere else.
+
+### Publishing a profile
+
+"Everything the installed language knows about, minus one" describes no real machine, and it changes every time somebody installs a package. A shipped extension publishes a `qp.Profile` instead, the named and versioned bundle Part 5 reached by name with `CompilerCapabilities.from_profile`.
+
+A name, a version, an `extends`, and a token set are the four fields it asks for, and the smallest useful profile names a parent and adds a single token. `extends` makes the child accumulate the parent's capabilities and predicates while overriding its limits and vendor versions. `qprogram-base-v1` is the core bundle Part 5 resolved by name, so a platform profile that needs one more sweep shape declares only the difference.
+"""
+
+# %%
+FRIDGE_PLATFORM_V1 = qp.Profile(
+    name="fridge-platform-v1",
+    version=(0, 1, 0),
+    extends="qprogram-base-v1",  # the core bundle, plus the one sweep shape we registered above
+    capabilities=frozenset({"sweep.chevron"}),
+)
+
+qp.register_profile(FRIDGE_PLATFORM_V1)
+platform_half = qp.CompilerCapabilities.from_profile("fridge-platform-v1")
+
+print("qprogram-base-v1   ->", len(qp.CompilerCapabilities.from_profile("qprogram-base-v1").capabilities), "tokens")
+print("fridge-platform-v1 ->", len(platform_half.capabilities), "tokens, the parent plus sweep.chevron")
+
+# %% [markdown]
+r"""
+The bus half carries the operations, so it lists them rather than inheriting them, and it fills in two of the three fields the first profile left at their defaults. Registration is idempotent for an equal `Profile`, so a re-run is safe.
+"""
+
+# %%
+FRIDGE_BUS_V1 = qp.Profile(
+    name="fridge-bus-v1",
+    version=(0, 1, 0),
+    extends=None,
+    capabilities=frozenset(t for t in CAPABILITY_REGISTRY if t.startswith(("op.", "waveform.", "measure.")))
+    | {"vendor.fridge.set_attenuation"},
+    limits={"min_wait_duration_ns": 4},
+    vendor_versions={"fridge": (0, 1, 0)},
+)
+
+qp.register_profile(FRIDGE_BUS_V1)
+qp.register_profile(FRIDGE_BUS_V1)  # idempotent for an equal profile, so a re-run is safe
+bus_half = qp.CompilerCapabilities.from_profile("fridge-bus-v1")
+
+print("fridge-bus-v1      ->", len(bus_half.capabilities), "tokens")
+
+fridge_rack = qp.PlatformCapabilities(
+    bus={},
+    platform=qp.BusCapabilities(rt=platform_half, host=platform_half),
+    default_bus_profile=qp.BusCapabilities(rt=bus_half, host=bus_half),
+)
+print("\ndiagnostics from the rack we just published:", qp.validate(program, fridge_rack)[0])
+
+# %% [markdown]
+r"""
+## 6.6 Shipping an extension
+
+Everything above lived in a notebook cell. A shipped extension is a separate Python package that depends on `qprogram` and makes the same registration calls at import time. Two are published, each in a repository of its own, and Part 5 used both. `qprogram-qblox` adds six operations, four of them sequencer instructions and two of them host-side parameter writes that a platform realizes as slow-control settings. `qprogram-qdac` adds four, and its profile is what rack C of Part 5 was reaching for, with no `op.set_offset` in it and a vendor operation in its place. The empty real-time half was Part 5's own claim about the slot, since a package publishes profiles and never slots.
+
+### Entry points
+
+A package takes one step a cell cannot. It declares an entry point:
+
+```toml
+[project.entry-points."qprogram.vendors"]
+qblox = "qprogram_qblox"
+```
+
+Now `loads()` activates the extension on demand, and an archived file stays usable because of it. The file names the extensions it needs in its own header, and a fresh interpreter finds and loads them without the reader knowing what to import.
+
+Watch the namespace list cross the load below. Nothing here has imported `qprogram_qblox`, so `qblox` is absent before the call and present after it.
+"""
+
+# %%
+installed = {ep.name: ep.value for ep in entry_points(group="qprogram.vendors")}
+print("vendor entry points installed in this environment:", installed or "none")
+print("vendor namespaces registered before the load:", sorted(qp.QProgram._vendor_registry))
+
+needs_qblox = '#!QProgram 1.0\n\nrequire qblox 0.1\n\nbody:\n  qblox.acquire "readout" "weights" name="m0"\n'
+loaded = qp.loads(needs_qblox)
+
+print("vendor namespaces registered after the load: ", sorted(qp.QProgram._vendor_registry))
+print("the operation it rebuilt:", type(loaded.body.elements[0]).__name__,
+      "from", version("qprogram-qblox"))
+
+# %% [markdown]
+r"""
+Two ways for that to fail, and both name the problem rather than dropping an operation on the floor.
+
+A vendor nobody claims has no entry point to find. Version compatibility is checked at major.minor, where the file's major must equal the installed extension's major and its minor must be less than or equal to the installed minor. Patch is informational, and the writer truncates it. The asymmetry is deliberate. A file written against an older minor loads under a newer extension, because a minor bump adds vocabulary rather than removing it, and a file written against a newer one does not, because the operation it needs may not exist yet.
+"""
+
+# %%
+print("auto-activation of a vendor nobody claims:", qp.try_activate_vendor("acme_rack"))
+
+for label, text in (
+    ("a vendor nobody claims", 'require acme_rack 0.1\n\nbody:\n  wait "drive" 100\n'),
+    ("a minor this install is too old for", 'require qdac 0.9\n\nbody:\n  wait "drive" 100\n'),
+):
+    try:
+        qp.loads("#!QProgram 1.0\n\n" + text)
+    except qp.ParseError as error:
+        print(f"\n{label}:")
+        print(" ", error)
+
+# %% [markdown]
+r"""
+### 🧩 Exercise 6.1
+
+Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
+
+The measurement field vocabulary extends through the same registry as everything else, so a readout that returns counts rather than an IQ point needs no new seam.
+
+1. Register the token `measure.fields.counts`.
+2. Build a small program that measures with `fields=("counts", MF.STATE)` and print the body of its `.qp` text.
+3. Validate it against `qp.reference_capabilities()` and show there are no diagnostics.
+4. Validate it against a profile that lacks the token and print the error.
+5. Run it, read the `counts` field back, and explain in a comment why it is zero.
+"""
+
+# %% solution
+qp.register_capability_tokens("measure.fields.counts")
+
+counting = qp.QProgram(label="photon_counting", schema=schema)
+with counting.average(shots=8):
+    clicks = counting.measure(q[0].readout, "readout", "weights", fields=("counts", MF.STATE))
+print("body:" + qp.dumps(counting).split("body:", 1)[1].rstrip())
+
+print("\nreference platform:", qp.validate(counting, qp.reference_capabilities())[0])
+
+no_counts = frozenset(CAPABILITY_REGISTRY) - {"measure.fields.counts"}
+strict = qp.CompilerCapabilities(
+    profile="iq-only", version=(0, 1, 0), capabilities=no_counts, limits={}, predicates=(), vendor_versions={}
+)
+strict_bus = qp.BusCapabilities(rt=strict, host=strict)
+strict_caps = qp.PlatformCapabilities(bus={}, platform=strict_bus, default_bus_profile=strict_bus)
+for d in qp.validate(counting, strict_caps)[0]:
+    print("iq-only rack:", d.code, "-", d.message)
+
+counted = qp.simulate(counting, model=qp.MockMeasurementModel(p_excited=lambda bus, env: 0.3, seed=5))
+# The token makes the field legal and the executor allocates the array, but the reference platform
+# has no idea how to produce counts, so it leaves them at zero. A real compiler is what fills it in.
+print("counts:", counted.get(clicks, field="counts").values)
+print("state: ", counted.get(clicks, field=MF.STATE).values)
+
+# %% stub
+# TODO: add a vendor measurement field and prove it is legal on one rack and not on another.
+# 1) qp.register_capability_tokens("measure.fields.counts")
+# 2) Build a program with fields=("counts", MF.STATE) and print the body of its .qp text.
+# 3) qp.validate(program, qp.reference_capabilities()) should return no diagnostics.
+# 4) Build a CompilerCapabilities whose capabilities are the registry minus that one token, wrap it
+#    in BusCapabilities / PlatformCapabilities, validate again, and print the error.
+# 5) Simulate it, print the counts field, and say in a comment why it is zero.
+
+# %% [markdown]
+r"""
+## 6.7 The `.qp` file is the artifact
+
+A calibration is not a plot. It is the program that produced the plot, and the numbers that came out. `qp.save` writes the same line-oriented text Part 1 diffed.
+
+Below are two runs of the same Rabi experiment, one before a retune of the readout and one after. Read the diff and every change is a line somebody wrote, a `set_frequency` argument, a sweep endpoint, a shot count.
+"""
+
+# %%
+scratch = Path(tempfile.mkdtemp(prefix="qp-artifacts-"))
+
+
+def rabi_run(label, a_stop, ro_freq, shots):
+    program = qp.QProgram(label=label, schema=schema)
+    amp = program.variable("amp", label="Drive amplitude", units="DAC units")
+    program.set_frequency(q[0].readout, ro_freq)
+    with program.average(shots=shots):
+        with program.sweep(amp, qp.Linspace(0.0, a_stop, 41)):
+            program.play(q[0].drive, IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1))
+            program.sync()
+            program.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
+    return program
+
+
+baseline = rabi_run("rabi", 1.0, 7.2000e9, 200)
+retuned = rabi_run("rabi", 0.8, 7.2004e9, 400)
+qp.save(baseline, scratch / "rabi_baseline.qp")
+qp.save(retuned, scratch / "rabi_retuned.qp")
+
+before = (scratch / "rabi_baseline.qp").read_text().splitlines(keepends=True)
+after = (scratch / "rabi_retuned.qp").read_text().splitlines(keepends=True)
+print("".join(difflib.unified_diff(before, after, "rabi_baseline.qp", "rabi_retuned.qp", n=1)))
+
+# %% [markdown]
+r"""
+### The checker
+
+`python -m qprogram.lsp check <file>` runs the parser and the validator from a shell. A file that parses and validates prints an empty list and exits 0.
+
+Then break the retuned file the way a hand edit does, twice over. `average` becomes `avarage` and `q[0].drive` becomes `q[0].drve`.
+"""
+
+# %%
+def lsp(mode, path):
+    """Run `python -m qprogram.lsp <mode> <file>` the way CI would, and hand back exit code and text."""
+    done = subprocess.run(
+        [sys.executable, "-m", "qprogram.lsp", mode, str(path)],
+        capture_output=True, text=True, check=False,
+    )
+    return done.returncode, done.stdout
+
+
+broken = scratch / "rabi_hand_edited.qp"
+broken.write_text(
+    (scratch / "rabi_retuned.qp").read_text().replace("average", "avarage").replace("q[0].drive", "q[0].drve")
+)
+
+for path in (scratch / "rabi_retuned.qp", broken):
+    code, out = lsp("check", path)
+    print(f"{path.name}   exit {code}")
+    print(" ", out.strip())
+
+# %% [markdown]
+r"""
+Each entry carries the `severity`, `code`, and `message` Part 5 read off a `Diagnostic`, plus a zero-based `line` and `end_line` span for an editor to underline.
+
+The parser stops at the first error, so a file with two breaks in it takes two rounds to clear and one more to come back clean. The loop below repairs it from the checker output alone, taking the reported line number as the only clue about which repair applies.
+"""
+
+# %%
+repairs = {"avarage": "average", "drve": "drive"}
+
+for attempt in range(1, 5):
+    code, out = lsp("check", broken)
+    print(f"$ python -m qprogram.lsp check {broken.name}   (exit {code})")
+    found = json.loads(out)
+    if not found:
+        print("  no diagnostics")
+        break
+    first = found[0]
+    print(f"  line {first['line'] + 1}: [{first['severity']}] {first['code']}: {first['message']}")
+    culprit = broken.read_text().splitlines()[first["line"]]
+    for wrong, right in repairs.items():
+        if wrong in culprit:
+            broken.write_text(broken.read_text().replace(wrong, right, 1))
+
+print("\nrepaired file parses back to the program we wrote:", qp.loads(broken.read_text()).body == retuned.body)
+
+# %% [markdown]
+r"""
+The second message is the one the slides quote, and the distinction it draws is worth the read, since a typo is a quick repair and a bus that does not resolve may mean the file was written for a different chip.
+
+The same module has two more modes. `explain` prints the execution plan as a tree straight from a shell, the fastest way to answer why a loop is running host-side, and the cell below runs it on the file just repaired. `serve` speaks LSP over stdio and needs the `qprogram[lsp]` extra.
+
+The VS Code extension lives in the `qprogram-editors` repository and is published as `qilimanjaro.qprogram`. It is a thin front-end over that same `qprogram.lsp` module, so an editor squiggle cannot drift from what the parser accepts at load time. It highlights `.qp`, runs `check` on open, on save, and while you type, and adds a `qp: Explain execution plan` command.
+"""
+
+# %%
+code, plan = lsp("explain", broken)
+print(f"$ python -m qprogram.lsp explain {broken.name}   (exit {code})")
+print(plan)
+
+# %% [markdown]
+r"""
+## 6.8 Toward hardware
+
+Everything you ran today went through `ReferencePlatform`. A vendor platform is the same interface with a compiler behind it, and the interface asks for six members and nothing else.
+"""
+
+# %%
+print("must implement:  ", sorted(qp.PlatformProtocol.__abstractmethods__))
+print("already concrete:", sorted(name for name, value in vars(qp.PlatformProtocol).items()
+                                  if callable(value) and not name.startswith("_")
+                                  and name not in qp.PlatformProtocol.__abstractmethods__))
+
+# %% [markdown]
+r"""
+| member | what it answers |
+|---|---|
+| `get_bus_schema()` | which chip this rack is wired to |
+| `get_buses()` | the bus names it exposes |
+| `get_parameters(bus)` | the knobs on one bus |
+| `get_global_parameters()` | the knobs that belong to no bus |
+| `capabilities` | what it can and cannot do, as tokens, limits, and predicates |
+| `execute(program)` | run it and return a `QProgramResult` |
+
+Of the four already concrete, `validate` and `plan` delegate to the core validator and `explain` to the core plan renderer, so a platform gets Part 5's diagnostics without writing any. `stream` is the one a platform may leave alone.
+
+Six members is a small interface for a large job, and what a real platform does between `execute` and the result is deliberately unspecified. Lower the AST to a sequencer language, allocate registers and waveform memory, upload, arm the triggers, start the acquisition, and assemble the same xarray shapes. That work is where a vendor's expertise lives.
+
+The reference executor is the part QProgram does specify. It defines what the result of a program means, in code, so a vendor compiler can be tested by running the same program both ways and comparing the arrays. Part 2 said what it is not, and this is what it is for.
+"""
+
+# %%
+reference = qp.ReferencePlatform(schema=schema, parameters={"q0/drive.attenuation": 20.0})
+print("\nbuses:", reference.get_buses())
+print("parameters on q0/drive:", reference.get_parameters(q[0].drive))
+print("tokens in its platform slot:", len(reference.capabilities.platform.rt.capabilities))
+print("errors from validate on the chevron program:", reference.validate(program))
+
+# %% [markdown]
+r"""
+## 6.9 Capstone
+
+Everything the other five parts built comes together here. A program is data, so each step writes itself to a file. A sweep is data, so each axis labels itself from the variable that was declared. A result is data, so each panel draws itself. Together they turn a day of measurement into a script that runs unattended and leaves a directory somebody else can read.
+
+Seven steps, in the order a real chip gets brought up, each one a program saved as a `.qp` file:
+
+1. **Resonator spectroscopy**, for the readout frequency.
+2. **Qubit spectroscopy**, for f01.
+3. **Rabi**, for the pi amplitude.
+4. **T1**, from an inversion and a delay.
+5. **Ramsey**, for T2\* and the frequency error.
+6. **Hahn echo**, for T2.
+7. **Active reset**, a measurement and a conditional pi pulse.
+
+Single-shot readout is the one bring-up step with nothing of its own here. The reference executor classifies for you, so there is no threshold to fit, and 4.6 is where that calibration lives. On hardware it would sit between step 6 and step 7, because active reset cannot branch on a bit nobody calibrated.
+"""
+
+# %% [markdown]
+r"""
+### The stand-in fridge
+
+Six response models from Parts 2 to 4, unchanged, and a `ResetModel` in the shape of Part 4's for step 7. It needs the `sample(bus, env)` form because the second measurement of a shot depends on what the first one saw, and it alternates on a flag of its own where Part 4's read a `shot` coordinate.
+"""
+
+# %%
+DETUNING = 0.5e6  # Hz, the detuning step 5 puts into the Ramsey on purpose, wider than Part 4's
+P_HOT = 0.22  # residual excited-state population before reset
+
+
 def s21(bus, env):
     """Resonator transmission: a dip at f_r, kappa wide."""
     detuning = (env["ro_freq"] - DEVICE["q0_fr"]) / (DEVICE["q0_kappa"] / 2)
@@ -137,10 +766,6 @@ def p_echo(bus, env):
     return 0.5 + 0.5 * np.exp(-env["delay"] / DEVICE["q0_T2echo"])
 
 
-print("p_rabi at the pi amplitude:", round(p_rabi(None, {"amp": DEVICE["q0_a_pi"]}), 4))
-print("p_t1 after one T1:", round(p_t1(None, {"delay": DEVICE["q0_T1"]}), 4))
-
-# %%
 class ResetModel:
     """Two measurements per shot: the check, then the verify, which remembers the check."""
 
@@ -153,21 +778,23 @@ class ResetModel:
         if self.pending is None:  # the check
             state = int(self.rng.random() < self.p_hot)
             self.pending = state
-        else:  # the verify: a hot qubit got the pi pulse, a cold one was left alone
+        else:
+            # The verify. A model never learns which branch ran, so this one assumes the pi pulse
+            # went to the hot qubit and the cold one was left alone, which is what step 7 writes.
             was, self.pending = self.pending, None
             state = int(self.rng.random() > self.fidelity) if was else int(self.rng.random() < 0.01)
         return qp.MeasurementSample(i=1.0 if state else -1.0, q=0.0, state=state)
 
 
-peek = ResetModel(p_hot=0.5)  # a hot qubit, so the pattern shows up in six shots
-pairs = [(peek.sample(q[0].readout, {}).state, peek.sample(q[0].readout, {}).state) for _ in range(6)]
-print("(check, verify) per shot:", pairs)
+print("models ready:", [f.__name__ for f in (s21, p_spec, p_rabi, p_t1, p_ramsey, p_echo)], "and ResetModel")
 
 # %% [markdown]
 r"""
-Every experiment in the bring-up has the same skeleton: average, sweep one variable, do something, measure. `sweep_program` writes that skeleton and hands back the program and the measurement handle.
+### One skeleton for six scans
 
-It also declares the swept variable with a `label` and `units`. Both strings travel onto the xarray coordinate the executor builds, and `result.plot` reads them back off it, so a figure comes out with `Delay (ns)` under the x axis and nobody typed it. `AXES` holds the pair per variable, plus the unit the figure wants when it differs from the unit the instrument takes, because a delay is programmed in nanoseconds and read in microseconds. `OUT` is where the capstone drops its files.
+Every experiment in the bring-up has the same shape: average, sweep one variable, do something, measure. `sweep_program` writes that shape once and hands back the program and the measurement handle, and the "do something" arrives as an ordinary function of the program and the swept variable.
+
+It also declares the variable with the `label` and `units` Part 2 introduced, so every figure below labels itself. The rest of the cell is bookkeeping. `AXES` carries a third and fourth entry per variable, the unit the figure wants and the divisor that gets there, because a delay is programmed in nanoseconds and read in microseconds. `OUT` is where the capstone drops its files.
 """
 
 # %%
@@ -219,9 +846,18 @@ demo, _ = sweep_program(
 )
 print(qp.dumps(demo))
 
+# %% [markdown]
+r"""
+Five of the middles are the pulse sequences from Parts 3 and 4, each one a function of the program and the swept variable, which is all `sweep_program` asks for. Step 1's is one line, so it goes inline at the call. Two carriers and two pulses are seeded here so the functions have something to read, and steps 1 to 3 measure all four and replace them.
+"""
+
 # %%
-# The middles of the four experiments that need one: ordinary functions of the program and the swept
-# variable, which is all `sweep_program` asks for.
+PI = IQDrag(amplitude=DEVICE["q0_a_pi"], duration=40, sigma=10, beta=0.1)
+X90 = IQDrag(amplitude=DEVICE["q0_a_pi"] / 2, duration=40, sigma=10, beta=0.1)
+RO_FREQ = DEVICE["q0_fr"]
+DRIVE_FREQ = DEVICE["q0_f01"]
+
+
 def spec_tone(program, freq):
     program.set_frequency(q[0].readout, RO_FREQ)  # step 1 measured this
     program.set_frequency(q[0].drive, freq)
@@ -239,7 +875,7 @@ def t1_pulses(program, delay):
 
 def ramsey_pulses(program, delay):
     program.set_frequency(q[0].readout, RO_FREQ)
-    program.set_frequency(q[0].drive, DRIVE_FREQ + DETUNING)  # off resonance on purpose
+    program.set_frequency(q[0].drive, DRIVE_FREQ + DETUNING)
     program.play(q[0].drive, X90)
     program.wait(q[0].drive, delay)
     program.play(q[0].drive, X90)
@@ -248,13 +884,19 @@ def ramsey_pulses(program, delay):
 
 def echo_pulses(program, delay):
     program.set_frequency(q[0].readout, RO_FREQ)
-    program.set_frequency(q[0].drive, DRIVE_FREQ)  # on resonance, the pi pulse does the refocusing
+    program.set_frequency(q[0].drive, DRIVE_FREQ)
     program.play(q[0].drive, X90)
     program.wait(q[0].drive, delay / 2)
-    program.play(q[0].drive, PI)  # the pi pulse that refocuses the detuning
+    program.play(q[0].drive, PI)
     program.wait(q[0].drive, delay / 2)
     program.play(q[0].drive, X90)
     program.sync()
+
+
+def rabi_pulse(program, amp):
+    program.set_frequency(q[0].readout, RO_FREQ)
+    program.set_frequency(q[0].drive, DRIVE_FREQ)
+    program.play(q[0].drive, IQDrag(amp, 40, 10, 0.1))
 
 
 demo, _ = sweep_program("echo", "delay", qp.Range(0, 2000, 1000), echo_pulses, shots=1, fields=(MF.STATE,))
@@ -262,9 +904,11 @@ print("body:" + qp.dumps(demo).split("body:", 1)[1].rstrip())
 
 # %% [markdown]
 r"""
-The fits are one line each. `step` puts the pieces together: build the program, save the `.qp` file, run it, fit, and keep the result object so the capstone can draw all six sweeps at once.
+### One step, start to finish
 
-Keeping the result rather than a pair of arrays keeps `draw` short. It hands the drawing back to `result.plot`, which already knows which dimension is the sweep and what the variable was called, and `restated` says what unit to read it in. The fit goes over the top as an ordinary matplotlib call on the axes that comes back, so the delays divide by the same 1000 the axis did.
+The fits are one line each. `step` puts the pieces together: build the program, save the `.qp` file, run it, fit, and stash the result in `TRACES` so the capstone can draw all six sweeps at once. `draw` reads one entry back out, calls `result.plot`, and puts the fit on the axes that comes back, in the units `restated` asked the figure for.
+
+Keeping the whole result rather than a pair of arrays keeps `draw` short, because the result already knows which dimension is the sweep and what the variable was called.
 """
 
 # %%
@@ -327,560 +971,18 @@ def draw(name, target=None):
     return ax
 
 
-print("rabi shape at a_pi/2 and a_pi:", rabi(np.array([0.31, 0.62]), 0.62).round(3))
-print("decay shape after one tau:", round(float(decay(np.array([1.0]), 1.0)[0]), 3))
+print("what step stashes per run:", sorted(("result", "handle", "field", "var",
+                                            "channels", "measured", "x", "curve", "popt")))
+print("restated('delay') redraws the axis in:", restated("delay")["delay"].units)
+print("restated('amp'):", restated("amp"), "(the axis unit already matches)")
 
 # %% [markdown]
 r"""
-## 6.1 Three extension points
+### The run
 
-QProgram has three seams for new vocabulary, and they are orthogonal. Nothing in the core knows any vendor's name.
+Feeding each step into the next is the reason to run a bring-up as one script rather than cell by cell, where step 5 picks up whichever version of step 3 last ran. The comments below mark the three places a measured number replaces a seeded one.
 
-| You want | You write | You get for free |
-|---|---|---|
-| a pulse shape the DSL lacks | a `Waveform` subclass, `@qp.register_waveform` | `.qp` serialization from the constructor signature, structural equality, validation, plotting |
-| a sweep axis the DSL lacks | a `SweepSource` subclass, `@qp.register_sweep_source` | serialization, a capability token, lockstep length checks, xarray coordinates |
-| an operation the DSL will never have | an `Operation` plus a `VendorNamespace`, four registration calls | `program.<vendor>.<op>(...)`, a `require` line, a `vendor.<name>.<op>` token |
-
-The right-hand column costs one constraint. Serialization is derived by reading your `__init__` signature, so the constructor arguments have to *be* the object's state. Store a parameter under a different attribute name, or compute state the constructor cannot reproduce, and the round trip breaks with no warning.
-
-A fourth seam this notebook does not need: `qp.register_vendor_block` adds a block keyword with its own indented suite, for a vendor that ships control flow of its own.
-
-Registration is global and keyed by class name, so each of the three registration cells below runs once. Re-running one raises a collision error, and editing a class means restarting the kernel.
-"""
-
-# %% [markdown]
-r"""
-### A custom waveform
-
-Flux-activated two-qubit gates want a pulse that starts and ends at zero. The reason is the line rather than the gate. A flux line through a fridge is a filter with long time constants, so a step left at the end of a pulse comes back as a slow tail, and the next gate runs on a chip the previous gate detuned.
-
-A half sine is zero at both endpoints and takes one parameter. Its slope there is not zero, so it is continuous but not smooth, and labs chasing the last percent reach for a raised cosine. The DSL has a name for neither shape, though a vendor's compiler may well emit the half sine natively.
-
-A `Waveform` owes two methods. `envelope(resolution)` returns the samples and `get_duration()` returns the length in nanoseconds. `@qp.register_waveform` puts the class in the serialization registry under its own name, and `qp.register_waveform_token` gives it a capability token, so a platform gets to say whether it supports the shape.
-"""
-
-# %% [markdown]
-r"""
-### Sweeping a waveform parameter
-
-A parameter you intend to sweep is annotated `float | qp.Expression` and resolved with `evaluate_or_raise()` at the point of use. The program later in this section puts a swept variable in the amplitude position, and a bare multiplication would meet a `Variable` instead of a number. Every shape the core ships is written this way. Skip it and nothing complains until a real platform calls `envelope()`, and then it fails inside numpy with a message that names neither the waveform nor the variable.
-"""
-
-# %% [markdown]
-r"""
-### What the base class provides
-
-Read the next cell for what it does not contain. `HalfSine.plot()` appears nowhere in it, and neither do `area()`, `peak_amplitude()`, `spectrum()`, nor the Jupyter repr that draws the envelope when a bare `HalfSine(0.42, 40)` is the last line of a cell. All of it comes from `Waveform`, drawn through the same figure model and the same palette as every result here, so a pulse and the sweep it produced look like one experiment. Putting the core's `Square` beside it is a `target=` and a rotated palette.
-"""
-
-# %%
-@qp.register_waveform
-class HalfSine(Waveform):
-    """A single half period of a sine: zero at both ends, no ringing on the flux line."""
-
-    def __init__(self, amplitude: float | qp.Expression, duration: int) -> None:
-        self.amplitude, self.duration = amplitude, duration
-
-    def envelope(self, resolution: int = 1) -> np.ndarray:
-        amplitude = self.amplitude
-        if isinstance(amplitude, qp.Expression):  # bound by the sweep this pulse sits in
-            amplitude = amplitude.evaluate_or_raise()
-        n = self.duration // resolution
-        return amplitude * np.sin(np.pi * np.arange(n) / n)
-
-    def get_duration(self) -> int:
-        return self.duration
-
-
-qp.register_waveform_token(HalfSine, "waveform.half_sine")
-
-flux_pulse = HalfSine(amplitude=0.42, duration=40)
-ax = flux_pulse.plot()
-rotated = Style(theme=replace(LIGHT, series=LIGHT.series[1:] + LIGHT.series[:1]))
-Square(amplitude=0.42, duration=40).plot(target=ax, style=rotated)
-for line, name in zip(ax.lines, ("HalfSine(0.42, 40)", "Square(0.42, 40)"), strict=True):
-    line.set_label(name)
-ax.set_title("A shape the core does not ship", loc="left", fontsize=10)
-ax.set_ylabel("Flux amplitude (DAC units)")
-ax.legend(frameon=False, fontsize=9)
-
-print("written on HalfSine:", sorted(name for name in vars(HalfSine) if not name.startswith("_")))
-print("inherited from Waveform:",
-      [name for name in ("plot", "area", "peak_amplitude", "rms_amplitude", "spectrum")
-       if name not in vars(HalfSine)])
-print(f"area {flux_pulse.area():.3f}, peak amplitude {flux_pulse.peak_amplitude():.3f}")
-
-# %% [markdown]
-r"""
-### A custom sweep source
-
-A chevron scan is always written the same way in a lab notebook: a centre, a span, and how many points. `Range` and `Linspace` want endpoints, so every script grows the same two lines of arithmetic. A sweep source removes them.
-
-The contract is three declarations, and each has a real consumer:
-
-- `length()` is static. A parallel loop checks it before anything runs, and the executor sizes the result array with it.
-- `KIND` is `"linear"` or `"arbitrary"`, a claim about compilability. A sequencer generates a linear ramp in hardware, and everything else is uploaded as a table.
-- `values()` produces the numbers, for the interpreter, for the xarray coordinate, and for `optimize()`.
-
-All three have to be answerable before the sweep runs, and that is why a source cannot wrap a callable. `Chevron` computes its values from three stored numbers, so the length check, the honest `KIND`, and the round trip through text all fall out of the class below.
-"""
-
-# %%
-@qp.register_sweep_source
-class Chevron(qp.SweepSource):
-    """A symmetric scan around a centre, the way a chevron gets written on a whiteboard."""
-
-    KIND = "arbitrary"
-    TOKEN = "sweep.chevron"
-
-    def __init__(self, center: float, span: float, num: int) -> None:
-        self.center, self.span, self.num = center, span, num
-
-    def length(self) -> int:
-        return self.num
-
-    def values(self):
-        return np.linspace(self.center - self.span / 2, self.center + self.span / 2, self.num)
-
-
-scan = Chevron(center=0.42, span=0.20, num=21)
-print("length:", scan.length(), " kind:", scan.KIND)
-print("tokens it asks a platform for:", sorted(scan.tokens()))
-print("first three values:", scan.values()[:3].round(3))
-# A combinator unions its child's tokens with its own, so a platform missing `sweep.chevron`
-# refuses the rotation too.
-print("wrapped in Rotate:", sorted(qp.Rotate(scan, 5).tokens()))
-
-# %% [markdown]
-r"""
-### A vendor namespace
-
-The two seams above add vocabulary the core could plausibly have shipped. The third is for things the core must never ship. Our fridge has a programmable room-temperature attenuator on the drive line, one box in one rack, and `op.set_attenuation` has no business in a vendor-agnostic DSL.
-
-Four calls put it in the language anyway:
-
-1. `QProgram.register_vendor` makes `program.fridge` resolve at runtime, on any `QProgram`.
-2. `register_vendor_version` fixes the version that goes into the `require` line.
-3. `register_vendor_operation` teaches the writer and the parser about the operation. The default parser reads your `__init__` signature.
-4. `register_capability_tokens` puts the token in the registry, so a platform can say yes or no to it.
-
-A shipped extension makes all four calls in its package `__init__.py`, and publishes a profile besides. A token says an operation exists; a profile is the named and versioned bundle a rack points at to say which tokens it has. Importing the package is the activation step for all of it.
-"""
-
-# %%
-class SetAttenuation(Operation):
-    """Set the room-temperature attenuator on a drive line, in dB."""
-
-    def __init__(self, bus: str, db: float) -> None:
-        self.bus, self.db = bus, db
-
-    def required_capabilities(self) -> set[str]:
-        return {"vendor.fridge.set_attenuation"}
-
-
-class FridgeNamespace(qp.VendorNamespace):
-    def set_attenuation(self, bus: str, db: float) -> None:
-        self._append(SetAttenuation(bus=bus, db=db))
-
-
-qp.QProgram.register_vendor("fridge", FridgeNamespace)
-qp.register_vendor_version("fridge", "0.1.0")
-qp.register_vendor_operation("fridge", "set_attenuation", SetAttenuation)
-qp.register_capability_tokens("vendor.fridge.set_attenuation")
-
-# `_vendor_registry` is private and there is no public accessor for it yet. Reading it here is a
-# look behind the curtain, not an API to build on.
-print("vendor namespaces registered:", sorted(qp.QProgram._vendor_registry))
-print("SetAttenuation asks for:", SetAttenuation(q[0].drive, 20.0).required_capabilities())
-
-# %% [markdown]
-r"""
-### A flux-activated swap
-
-Two qubits at different frequencies barely interact. Push one with a flux pulse until it lands on the other and the pair exchanges excitations at a rate set by their coupling $g$. Sweep the flux amplitude around resonance and the swap probability after a fixed pulse follows the detuned Rabi formula,
-
-$$P_{\text{swap}} = \frac{(2g)^2}{\Omega^2}\sin^2(\pi \Omega t), \qquad \Omega = \sqrt{(2g)^2 + \Delta^2}$$
-
-with $\Delta$ the residual detuning, proportional to how far the flux amplitude sits from resonance. On resonance the prefactor is 1 and the pair swaps completely. Off resonance the oscillation goes faster and reaches less far, the pattern that gives a chevron its name once you add the duration axis. The amplitude at the peak is the number the scan exists to find.
-"""
-
-# %% [markdown]
-r"""
-### All three in one program
-
-The program attenuates the drive line, then steps the flux amplitude and reads the qubit out. The custom waveform, the custom sweep source, and the vendor operation all appear in the `.qp` text, and the file grew a `require fridge 0.1` line under the header. That line is the contract. A lab without the extension installed gets a `ParseError` naming the vendor it is missing, instead of a file that loads with an operation silently dropped.
-
-The file also round-trips. The parser rebuilds `HalfSine`, `Chevron`, and `fridge.set_attenuation` from the text with no help from you, because each is registered under its class name and serialized from its constructor signature. The reference platform accepts every token in the registry, so the program validates and runs.
-
-The figure is one call. `flux_amp` was declared with a label and a unit, so the axis reads `Flux amplitude (DAC units)`, and the positions along it are the numbers `Chevron.values()` produced. The dashed line is where the model put the resonance.
-"""
-
-# %%
-program = qp.QProgram(label="cz_chevron", description="flux-activated swap on the fridge rack", schema=schema)
-flux_amp = program.variable("flux_amp", label="Flux amplitude", units="DAC units")
-
-program.fridge.set_attenuation(q[0].drive, 20.0)
-with program.average(shots=200):
-    with program.sweep(flux_amp, Chevron(center=0.42, span=0.20, num=21)):
-        program.play(q[0].flux, HalfSine(amplitude=flux_amp, duration=40))
-        program.sync()
-        swap = program.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
-
-text = qp.dumps(program)
-print(text)
-print("round-trips:", qp.loads(text).body == program.body)
-print("diagnostics from the reference platform:", qp.validate(program, qp.reference_capabilities())[0])
-
-
-def p_swap(bus, env):
-    """Swap probability after a 40 ns half-sine flux pulse of the given amplitude."""
-    delta = (env["flux_amp"] - DEVICE["cz_amp_res"]) * DEVICE["cz_slope"]
-    omega = np.sqrt((2 * DEVICE["cz_g"]) ** 2 + delta**2)
-    contrast = (2 * DEVICE["cz_g"]) ** 2 / omega**2
-    return contrast * np.sin(np.pi * omega * 40 * 1e-9) ** 2
-
-
-chevron_run = qp.simulate(program, model=qp.MockMeasurementModel(p_excited=p_swap, seed=21))
-data = chevron_run.get(swap, field=MF.STATE)
-amps = data.coords["flux_amp"].values
-
-ax = chevron_run.plot(swap, field=MF.STATE, value=Quantity("Swap probability"), style=Style(markers=True))
-ax.lines[0].set_label("measured")
-ax.axvline(DEVICE["cz_amp_res"], linestyle="--", color=LIGHT.series[1], label="resonance in the model")
-ax.legend(frameon=False, fontsize=9)
-
-print(f"swap peaks at {amps[data.values.argmax()]:.3f}, resonance is at {DEVICE['cz_amp_res']:.3f}")
-
-# %% [markdown]
-r"""
-### A rack without the token
-
-Registering a token does not mean every rack has the box. Build a platform descriptor that knows everything except our attenuator, and the validator names what is missing and where it sits in the program, before anything is uploaded and while the file is still legal QProgram everywhere else.
-"""
-
-# %%
-from qprogram.protocol import CAPABILITY_REGISTRY
-
-no_fridge = frozenset(CAPABILITY_REGISTRY) - {"vendor.fridge.set_attenuation"}
-profile = qp.CompilerCapabilities(
-    profile="no-fridge", version=(0, 1, 0), capabilities=no_fridge, limits={}, predicates=(), vendor_versions={}
-)
-plain_rack = qp.BusCapabilities(rt=profile, host=profile)
-caps = qp.PlatformCapabilities(bus={}, platform=plain_rack, default_bus_profile=plain_rack)
-
-for d in qp.validate(program, caps)[0]:
-    print(f"[{d.severity}] {d.code}: {d.message}")
-    print("  at path:", qp.format_path(d.path))
-print()
-print(qp.explain(program, caps))
-
-# %% [markdown]
-r"""
-### Publishing a profile
-
-The descriptor above was assembled by subtracting one token from the live registry, and so was every rack in Part 5. That works in a notebook and describes no real machine, because "everything the installed language knows about, minus one" changes every time somebody installs a package.
-
-A shipped extension publishes a `qp.Profile` instead, a named and versioned bundle of tokens, limits, and predicates. Any rack reaches it by name through `CompilerCapabilities.from_profile`, which is how section 5.6 got `qblox-default-v1` and `qdac-default-v1` without either package being named in the call.
-
-`extends` names a parent, and the child accumulates the parent's capabilities and predicates while overriding its limits and vendor versions. `qprogram-base-v1` ships with the core and carries the block, expression, and sweep tokens, with no `op.*` among them, so a platform profile that needs one more sweep shape declares only the difference. Registration is idempotent for an equal `Profile`, so a re-run is safe.
-"""
-
-# %%
-FRIDGE_BUS_V1 = qp.Profile(
-    name="fridge-bus-v1",
-    version=(0, 1, 0),
-    extends=None,
-    capabilities=frozenset(t for t in CAPABILITY_REGISTRY if t.startswith(("op.", "waveform.", "measure.")))
-    | {"vendor.fridge.set_attenuation"},
-    limits={"min_wait_duration_ns": 4},
-    predicates=(),
-    vendor_versions={"fridge": (0, 1, 0)},
-)
-
-FRIDGE_PLATFORM_V1 = qp.Profile(
-    name="fridge-platform-v1",
-    version=(0, 1, 0),
-    extends="qprogram-base-v1",  # the core bundle, plus the one sweep shape we registered above
-    capabilities=frozenset({"sweep.chevron"}),
-    limits={},
-    predicates=(),
-    vendor_versions={},
-)
-
-qp.register_profile(FRIDGE_BUS_V1)
-qp.register_profile(FRIDGE_PLATFORM_V1)
-qp.register_profile(FRIDGE_BUS_V1)  # idempotent for an equal profile, so a re-run is safe
-
-bus_half = qp.CompilerCapabilities.from_profile("fridge-bus-v1")
-platform_half = qp.CompilerCapabilities.from_profile("fridge-platform-v1")
-
-print("qprogram-base-v1   ->", len(qp.CompilerCapabilities.from_profile("qprogram-base-v1").capabilities), "tokens")
-print("fridge-platform-v1 ->", len(platform_half.capabilities), "tokens, the parent plus sweep.chevron")
-print("fridge-bus-v1      ->", len(bus_half.capabilities), "tokens")
-
-fridge_rack = qp.PlatformCapabilities(
-    bus={},
-    platform=qp.BusCapabilities(rt=platform_half, host=platform_half),
-    default_bus_profile=qp.BusCapabilities(rt=bus_half, host=bus_half),
-)
-print("\ndiagnostics from the rack we just published:", qp.validate(program, fridge_rack)[0])
-
-# %% [markdown]
-r"""
-## 6.2 Vendor packages
-
-Everything above lived in a notebook cell. A shipped extension is a separate Python package that depends on `qprogram` and makes the same registration calls at import time. Two are published, each in a repository of its own, and Part 5 used both. `qprogram-qblox` adds six operations, four of them sequencer instructions and two of them host-side parameter writes that a platform realizes as slow-control settings. `qprogram-qdac` adds four, and is the rack B of Part 5 as a package rather than as a cell.
-"""
-
-# %% [markdown]
-r"""
-### Entry points
-
-A shipped package takes one step a notebook cell cannot. It declares an entry point:
-
-```toml
-[project.entry-points."qprogram.vendors"]
-qblox = "qprogram_qblox"
-```
-
-Now `loads()` activates the extension on demand. When it reaches a `require qblox 0.1` line for a vendor that is not registered yet, it looks up that entry-point group, imports the module, and the registration side effects run. An archived file stays usable because of it. The file names the extensions it needs in its own header, and a fresh interpreter finds and loads them without the reader knowing what to import.
-
-Watch the namespace list below cross the load. Nothing here has imported `qprogram_qblox`, so `qblox` is absent before the call and present after it.
-"""
-
-# %%
-installed = {ep.name: ep.value for ep in entry_points(group="qprogram.vendors")}
-print("vendor entry points installed in this environment:", installed or "none")
-print("vendor namespaces registered before the load:", sorted(qp.QProgram._vendor_registry))
-
-needs_qblox = '#!QProgram 1.0\n\nrequire qblox 0.1\n\nbody:\n  qblox.acquire "readout" "weights" name="m0"\n'
-loaded = qp.loads(needs_qblox)
-
-print("vendor namespaces registered after the load: ", sorted(qp.QProgram._vendor_registry))
-print("the operation it rebuilt:", type(loaded.body.elements[0]).__name__,
-      "from", version("qprogram-qblox"))
-
-# %% [markdown]
-r"""
-Two ways for that to fail, and both name the problem rather than dropping an operation on the floor.
-
-A vendor nobody claims has no entry point to find. Version compatibility is checked at major.minor, where the file's major must equal the installed extension's major and its minor must be less than or equal to the installed minor. Patch is informational, and the writer truncates it. The asymmetry is deliberate. A file written against an older minor loads under a newer extension, because a minor bump adds vocabulary rather than removing it, and a file written against a newer one does not, because the operation it needs may not exist yet.
-"""
-
-# %%
-print("auto-activation of a vendor nobody claims:", qp.try_activate_vendor("acme_rack"))
-
-for label, text in (
-    ("a vendor nobody claims", 'require acme_rack 0.1\n\nbody:\n  wait "drive" 100\n'),
-    ("a version this install cannot satisfy", 'require qdac 9.9\n\nbody:\n  wait "drive" 100\n'),
-):
-    try:
-        qp.loads("#!QProgram 1.0\n\n" + text)
-    except qp.ParseError as error:
-        print(f"\n{label}:")
-        print(" ", error)
-
-# %% [markdown]
-r"""
-### 🧩 Exercise 6.1
-
-Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
-
-A photon-counting readout returns counts rather than an IQ point, and the measurement field vocabulary extends through the same registry as everything else.
-
-1. Register the token `measure.fields.counts`.
-2. Build a small program that measures with `fields=("counts", MF.STATE)` and print the body of its `.qp` text.
-3. Validate it against `qp.reference_capabilities()` and show there are no diagnostics.
-4. Validate it against a profile that lacks the token and print the error.
-5. Run it, read the `counts` field back, and explain in a comment why it is zero.
-"""
-
-# %% solution
-qp.register_capability_tokens("measure.fields.counts")
-
-counting = qp.QProgram(label="photon_counting", schema=schema)
-with counting.average(shots=8):
-    clicks = counting.measure(q[0].readout, "readout", "weights", fields=("counts", MF.STATE))
-print("body:" + qp.dumps(counting).split("body:", 1)[1].rstrip())
-
-print("\nreference platform:", qp.validate(counting, qp.reference_capabilities())[0])
-
-no_counts = frozenset(CAPABILITY_REGISTRY) - {"measure.fields.counts"}
-strict = qp.CompilerCapabilities(
-    profile="iq-only", version=(0, 1, 0), capabilities=no_counts, limits={}, predicates=(), vendor_versions={}
-)
-strict_bus = qp.BusCapabilities(rt=strict, host=strict)
-strict_caps = qp.PlatformCapabilities(bus={}, platform=strict_bus, default_bus_profile=strict_bus)
-for d in qp.validate(counting, strict_caps)[0]:
-    print("iq-only rack:", d.code, "-", d.message)
-
-counted = qp.simulate(counting, model=qp.MockMeasurementModel(p_excited=lambda bus, env: 0.3, seed=5))
-# The token makes the field legal and the executor allocates the array, but the reference platform
-# has no idea how to produce counts, so it leaves them at zero. A real compiler is what fills it in.
-print("counts:", counted.get(clicks, field="counts").values)
-print("state: ", counted.get(clicks, field=MF.STATE).values)
-
-# %% stub
-# TODO: add a vendor measurement field and prove it is legal on one rack and not on another.
-# 1) qp.register_capability_tokens("measure.fields.counts")
-# 2) Build a program with fields=("counts", MF.STATE) and print the body of its .qp text.
-# 3) qp.validate(program, qp.reference_capabilities()) should return no diagnostics.
-# 4) Build a CompilerCapabilities whose capabilities are the registry minus that one token, wrap it
-#    in BusCapabilities / PlatformCapabilities, validate again, and print the error.
-# 5) Simulate it, print the counts field, and say in a comment why it is zero.
-
-# %% [markdown]
-r"""
-## 6.3 The `.qp` file is the artifact
-
-A calibration is not a plot. It is the program that produced the plot, and the numbers that came out. QProgram writes the program as line-oriented text, so the ordinary tools work on it: `diff`, code review, `git blame`, and a checker you can run in CI.
-
-Below are two runs of the same Rabi experiment, one before a retune of the readout and one after. Three things changed, and the diff names all three in the language of the experiment rather than in sequencer opcodes. The amplitude sweep stops lower, the readout frequency moved, and the shot count doubled.
-"""
-
-# %%
-scratch = Path(tempfile.mkdtemp(prefix="qp-artifacts-"))
-
-
-def rabi_run(label, a_stop, ro_freq, shots):
-    program = qp.QProgram(label=label, schema=schema)
-    amp = program.variable("amp", label="Drive amplitude", units="DAC units")
-    program.set_frequency(q[0].readout, ro_freq)
-    with program.average(shots=shots):
-        with program.sweep(amp, qp.Linspace(0.0, a_stop, 41)):
-            program.play(q[0].drive, IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1))
-            program.sync()
-            program.measure(q[0].readout, "readout", "weights", fields=(MF.STATE,))
-    return program
-
-
-baseline = rabi_run("rabi", 1.0, 7.2000e9, 200)
-retuned = rabi_run("rabi", 0.8, 7.2004e9, 400)
-qp.save(baseline, scratch / "rabi_baseline.qp")
-qp.save(retuned, scratch / "rabi_retuned.qp")
-
-before = (scratch / "rabi_baseline.qp").read_text().splitlines(keepends=True)
-after = (scratch / "rabi_retuned.qp").read_text().splitlines(keepends=True)
-print("".join(difflib.unified_diff(before, after, "rabi_baseline.qp", "rabi_retuned.qp", n=1)))
-
-# %% [markdown]
-r"""
-### The checker
-
-`python -m qprogram.lsp check <file>` parses the file with the production parser, validates the result against the reference platform, and prints JSON diagnostics. It exits 1 when it finds any, so it drops into a pre-commit hook or a CI job with no extra dependencies.
-
-The cell below breaks the retuned file the way a hand edit does, twice over. `average` becomes `avarage` and `q[0].drive` becomes `q[0].drve`, and the loop repairs the file from the checker output alone, taking the reported line number as the only clue about which repair applies. The parser stops at the first error, so it takes one round per break plus one more to see a clean file.
-
-Read the two messages rather than the loop. The first names the keyword it did not recognize and lists the header forms that are legal instead. The second names the path that failed to resolve and the buses the chip actually has, because a `.qp` file declares its own schema. A typo is a quick repair, and a missing bus means the file was written for a different chip.
-"""
-
-# %%
-broken = scratch / "rabi_hand_edited.qp"
-broken.write_text(
-    (scratch / "rabi_retuned.qp").read_text().replace("average", "avarage").replace("q[0].drive", "q[0].drve")
-)
-repairs = {"avarage": "average", "drve": "drive"}
-
-
-def lsp(mode, path):
-    """Run `python -m qprogram.lsp <mode> <file>` the way CI would, and hand back exit code and text."""
-    done = subprocess.run(
-        [sys.executable, "-m", "qprogram.lsp", mode, str(path)],
-        capture_output=True, text=True, check=False,
-    )
-    return done.returncode, done.stdout
-
-
-for attempt in range(1, 5):
-    code, out = lsp("check", broken)
-    print(f"$ python -m qprogram.lsp check {broken.name}   (exit {code})")
-    found = json.loads(out)
-    if not found:
-        print("  no diagnostics")
-        break
-    first = found[0]
-    print(f"  line {first['line'] + 1}: [{first['severity']}] {first['code']}: {first['message']}")
-    culprit = broken.read_text().splitlines()[first["line"]]
-    for wrong, right in repairs.items():
-        if wrong in culprit:
-            broken.write_text(broken.read_text().replace(wrong, right, 1))
-
-print("\nrepaired file parses back to the program we wrote:", qp.loads(broken.read_text()).body == retuned.body)
-
-# %% [markdown]
-r"""
-The same module has two more modes. `explain` prints the execution plan as a tree straight from a shell, the fastest way to answer why a loop is running host-side, and the cell below runs it on the file just repaired. `serve` speaks LSP over stdio and needs the `qprogram[lsp]` extra.
-
-The VS Code extension lives in the `qprogram-editors` repository and is published as `qilimanjaro.qprogram`. It is a thin front-end over that same `qprogram.lsp` module, so an editor squiggle cannot drift from what the parser accepts at load time. It highlights `.qp`, runs `check` on open, on save, and while you type, and adds a `qp: Explain execution plan` command.
-"""
-
-# %%
-code, plan = lsp("explain", broken)
-print(f"$ python -m qprogram.lsp explain {broken.name}   (exit {code})")
-print(plan)
-
-# %% [markdown]
-r"""
-## 6.4 Toward hardware
-
-Everything you ran today went through `ReferencePlatform`. A vendor platform is the same interface with a compiler behind it. `PlatformProtocol` has six abstract members and asks for nothing else:
-
-| member | what it answers |
-|---|---|
-| `get_bus_schema()` | which chip this rack is wired to |
-| `get_buses()` | the bus names it exposes |
-| `get_parameters(bus)` | the knobs on one bus |
-| `get_global_parameters()` | the knobs that belong to no bus |
-| `capabilities` | what it can and cannot do, as tokens, limits, and predicates |
-| `execute(program)` | run it and return a `QProgramResult` |
-
-`validate`, `plan`, and `explain` come with default implementations that delegate to the core validator, so a platform gets structured diagnostics without writing any. `stream` is optional.
-
-Six members is a small interface for a large job. What a real platform does between `execute` and the result is deliberately unspecified: lower the AST to its sequencer language, allocate registers and waveform memory, upload, arm the triggers, start the acquisition, and assemble the same xarray shapes. That work is where a vendor's expertise lives.
-"""
-
-# %% [markdown]
-r"""
-### The reference executor
-
-The last step is the one QProgram does specify, and the reference executor is how. It defines what the result of a program *means*, in code, so a vendor compiler can be tested by running the same program both ways and comparing the arrays. Without an oracle, "does this compiler produce the right answer" has no operational definition. With one, it is a test suite. The reference executor models no timing and no waveform physics. It is the semantics of the language, not a simulator of your fridge.
-"""
-
-# %%
-print("must implement:", sorted(qp.PlatformProtocol.__abstractmethods__))
-print("provided by default: validate, plan, explain; optional: stream")
-
-reference = qp.ReferencePlatform(schema=schema, parameters={"q0/drive.attenuation": 20.0})
-print("\nbuses:", reference.get_buses())
-print("parameters on q0/drive:", reference.get_parameters(q[0].drive))
-print("tokens in its platform slot:", len(reference.capabilities.platform.rt.capabilities))
-print("errors from validate on the chevron program:", reference.validate(program))
-
-# %% [markdown]
-r"""
-## 6.5 Capstone
-
-The three code cells below are what the other five parts were for. A program is data, so each step writes itself to a file. A sweep is data, so each axis labels itself from the variable that was declared. A result is data, so each panel draws itself. Together they turn a day of measurement into a script that runs unattended and leaves a directory somebody else can read.
-
-Seven steps, in the order a real chip gets brought up, each one a program saved as a `.qp` file:
-
-1. **Resonator spectroscopy.** Find the readout frequency. Nothing else works without it.
-2. **Qubit spectroscopy.** A long saturation tone, and the population tells you where f01 is.
-3. **Rabi.** Sweep the drive amplitude and read the pi amplitude off the fit.
-4. **T1.** Invert, wait, measure.
-5. **Ramsey.** Two pi/2 pulses with a deliberate detuning, which gives T2\* and the frequency error.
-6. **Hahn echo.** A pi pulse in the middle refocuses the detuning, which gives T2.
-7. **Active reset.** Measure, and play a pi pulse only if the qubit came back excited.
-
-Single-shot readout is the one row of the bring-up table with no step of its own here. The reference executor classifies for you, so there is no threshold to fit, and Part 4 is where that calibration lives. On hardware it would sit between step 6 and step 7, because active reset cannot branch on a bit nobody calibrated.
-"""
-
-# %% [markdown]
-r"""
-Every step after the first two runs on the carriers those two measured. `RO_FREQ` parks the readout where step 1 found the resonator, `DRIVE_FREQ` is the carrier step 2 fitted, and steps 4 to 6 drive with the pi pulse step 3 produced rather than the seed pulse from the top of the notebook. Feeding each step into the next is the reason to run a bring-up as one script rather than cell by cell, where step 5 picks up whichever version of step 3 last ran.
-
-The delays in steps 4 to 6 change the result only because the measurement model reads `env["delay"]`. The reference executor has no timing model. On hardware the delay is the physics; here it is an argument.
+The delays in steps 4 to 6 change the result only because the measurement model reads `env["delay"]`. The reference executor has no timing model. On hardware the delay is the physics, and here it is an argument.
 """
 
 # %%
@@ -902,12 +1004,6 @@ f_01, _, _, _ = step(
 )
 CAL["f_01 (GHz)"] = (f_01 / 1e9, DEVICE["q0_f01"] / 1e9)
 DRIVE_FREQ = f_01  # and every drive tone from here uses the carrier step 2 found
-
-def rabi_pulse(program, amp):
-    program.set_frequency(q[0].readout, RO_FREQ)
-    program.set_frequency(q[0].drive, DRIVE_FREQ)
-    program.play(q[0].drive, IQDrag(amp, 40, 10, 0.1))
-
 
 (a_pi,) = step(
     "03_rabi", "amp", qp.Linspace(0.0, 1.0, 41), rabi_pulse,
@@ -950,11 +1046,19 @@ print(f"excited population: {before:.3f} before reset ({P_HOT} in the model), {a
 
 # %% [markdown]
 r"""
-Now the report. The calibration table is the deliverable, and putting the measured column next to the true one is a habit worth keeping even when there is no true column. On hardware you compare against the previous calibration, and a number that moved by more than its error bar is either physics or a bug.
+One step, drawn on its own, before all six go into a grid.
+"""
 
-The fitted pulses go out beside it in a `.wfl` library, so the next run loads these numbers from a file instead of from a literal somebody pasted into a script.
+# %%
+draw("03_rabi")
 
-The six panels underneath split the work the way every figure here has. matplotlib owns the grid, because a layout of six panels follows from nothing a single result knows. Each panel is drawn by the result that owns it, handed its axes as `target=`, and each axis reads its label and its unit off the variable the program declared. The fits go on top as ordinary calls on the axes that came back.
+# %% [markdown]
+r"""
+### The report
+
+The calibration table is the deliverable, and the fitted pulses go out beside it in a `.wfl` library, so the next run loads these numbers from a file instead of from a literal somebody pasted into a script.
+
+The six panels underneath split the work the way every figure in this tutorial has. matplotlib owns the grid, because a layout of six panels follows from nothing a single result knows, and each panel is drawn by the result that owns it into the axes it was handed as `target=`.
 """
 
 # %%
@@ -983,18 +1087,22 @@ plt.show()
 r"""
 ## Recap
 
-- Three extension seams cover new vocabulary: a `Waveform`, a `SweepSource`, and a vendor `Operation` behind a `VendorNamespace`. Each is a class plus a registration call, and each gets serialization, validation, and a capability token with no change to the core. A fourth, `register_vendor_block`, does the same for a vendor's own control flow, and a fifth, `register_profile`, publishes the token bundle a rack reaches by name.
-- The token makes an extension safe. A rack that lacks it refuses the program with a named diagnostic and a path, before anything reaches an instrument, and the file stays legal QProgram everywhere else.
-- Entry points make a `.qp` file self-describing. The `require` line names the vendor, and `loads()` imports the extension that claims it.
-- The `.qp` file is the artifact you keep. It diffs, it reviews, and `python -m qprogram.lsp check` turns it into a CI job.
-- The capstone recovered f_r, f01, the pi amplitude, T1, T2\*, the detuning, and T2 from simulated data, wrote a file per step, drew every panel through the result that produced it, and put the fitted pulses in a `.wfl` library.
+- **A waveform is a class and two methods.** `envelope(resolution)` and `get_duration()` are all a `Waveform` subclass owes, and `plot`, `area`, `peak_amplitude`, `rms_amplitude`, `spectrum`, and structural equality arrive off the base class. `qp.register_waveform` puts the shape in the file format and `qp.register_waveform_token` gives a rack a name to refuse it by. A parameter a sweep will bind is annotated `float | qp.Expression` and resolved with `evaluate_or_raise()`.
+- **A sweep source is a class and two methods.** `length()` and `values()`, plus the `KIND` and `TOKEN` declarations, and `qp.register_sweep_source` registers the token along with the class.
+- **A vendor operation is two classes and four calls.** An `Operation` for the node and a `VendorNamespace` for the method surface, then `register_vendor`, `register_vendor_version`, `register_vendor_operation`, and `register_capability_tokens`. `register_profile` publishes the token bundle a rack reaches by name.
+- **Serialization is derived from `__init__`.** All three seams read the constructor signature, so the constructor arguments have to be the object's state.
+- **The token makes an extension safe.** A rack that lacks it refuses the program with a named diagnostic and a path, before anything reaches an instrument, and the file stays legal QProgram everywhere else.
+- **Entry points make a `.qp` file self-describing.** The `require` line names the vendor, and `loads()` imports the extension that claims it. A vendor nobody claims and a version this install cannot satisfy both fail by name.
+- **The `.qp` file is the artifact you keep.** It diffs, it reviews, and `python -m qprogram.lsp check` turns it into a CI job.
+- **A platform is six members.** `get_bus_schema`, `get_buses`, `get_parameters`, `get_global_parameters`, `capabilities`, and `execute` are the whole of `PlatformProtocol`, with `validate`, `plan`, and `explain` defaulted and `stream` optional. The reference executor defines what a program's result means, so a vendor compiler has an oracle to be tested against.
+- **The capstone recovered f_r, f01, the pi amplitude, T1, T2\*, the detuning, and T2 from simulated data**, wrote a file per step, drew every panel through the result that produced it, and put the fitted pulses in a `.wfl` library.
 """
 
 # %% [markdown]
 r"""
 ## Next
 
-The published documentation at qilimanjaro-tech.github.io/qprogram carries the normative material in its Reference section, `docs/reference/qp-format.md` covers the text format, and `src/qprogram/grammar/qp.lark` is the machine-readable grammar. `docs/developer/vendor-extensions.md` walks a vendor package end to end, and `qprogram-qdac` is the smallest complete one worth copying.
+The published documentation at qilimanjaro-tech.github.io/qprogram carries the normative material in its Reference section, `docs/reference/qp-format.md` covers the text format, and `src/qprogram/grammar/qp.lark` is the machine-readable grammar. `docs/developer/vendor-extensions.md` walks a vendor package end to end, and `qprogram-qdac` is the smallest complete one worth copying. A seam this notebook had no use for is there too: `qp.register_vendor_block` adds a block keyword with its own indented suite, for a vendor that ships control flow of its own.
 
 One idea to carry forward. The program, the plan, the result, and the calibration are all data, and everything this tutorial did followed from that. A program you can serialize is a program you can diff, review, check in CI, and hand to a different machine. A plan you can print is a performance question you can answer before you spend fridge time on it. A result that carries its own coordinates draws itself and puts a fit on the right axis. A calibration in a file is a number with a provenance rather than a literal somebody remembers typing.
 """
