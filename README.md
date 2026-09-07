@@ -8,7 +8,7 @@ Tutorial ID: 126 · Two 90-minute sessions · Presented by [Qilimanjaro Quantum 
 
 This repository holds the notebooks, slides, and setup instructions for the tutorial. Materials are published here ahead of the session and stay available afterward.
 
-The tutorial follows the order a real qubit gets brought up: find the readout resonator, find the qubit, calibrate a pi pulse, measure coherence, add feedback, then port the whole calibration to a different rack. Each experiment introduces the QProgram feature it needs, so the library arrives one problem at a time instead of as a feature tour.
+The material is three notebooks. **Introduction** covers what a pulse program is made of, meaning the operation vocabulary, the bus schemas that check it, the waveforms it plays, the text format it serializes to, and the software platform that runs it. **Basics** adds the variables, sweep sources, and averaging that turn one sequence into an experiment, along with the labeled arrays that come back from a run. **Advanced** is six independent sections on fragments, measurement-conditioned control flow, extending the language with your own waveform and sweep source, vendor extension packages, implementing the platform interface, and reading the capability descriptor a machine publishes.
 
 ---
 
@@ -31,7 +31,7 @@ By the end of the tutorial, participants will be able to design, validate, seria
 | Path | What it is |
 |------|------------|
 | [`setup/README.md`](setup/README.md) | Install instructions (pip, uv, or Google Colab). Start here. |
-| [`notebooks/`](notebooks/) | The seven tutorial notebooks (`00_setup` to `06_extending_and_shipping`), attendee versions whose exercise cells are a numbered `# TODO`, with every other cell's output already in place. |
+| [`notebooks/`](notebooks/) | The three tutorial notebooks (`01_introduction`, `02_basics`, `03_advanced`), attendee versions whose exercise cells are a numbered `# TODO`, with every other cell's output already in place. |
 | [`notebooks/solutions/`](notebooks/solutions/) | The same notebooks with the exercises solved. |
 | [`slides/`](slides/) | The Marp deck (`qprogram_tutorial.md`) and its diagrams. See [`slides/README.md`](slides/README.md). |
 | [`sources/`](sources/) | The percent-format Python sources the notebooks are built from. Edit these, never the `.ipynb` files. |
@@ -41,23 +41,21 @@ By the end of the tutorial, participants will be able to design, validate, seria
 
 ## Schedule
 
-| | Part | Experiments |
-|---|------|-------------|
-| | Setup ([`00_setup`](notebooks/00_setup.ipynb), run it before the session) | readout pulse, one resonator scan |
-| 1 | The program is data ([`01_pulse_programs`](notebooks/01_pulse_programs.ipynb)) | readout pulse and acquisition, then a pi pulse before the readout |
-| 2 | Sweeps and results ([`02_sweeps_and_results`](notebooks/02_sweeps_and_results.ipynb)) | resonator spectroscopy, punchout |
-| 3 | Finding the qubit ([`03_finding_the_qubit`](notebooks/03_finding_the_qubit.ipynb)) | qubit spectroscopy, Rabi, flux arc |
-| 4 | Coherence and feedback ([`04_coherence_and_feedback`](notebooks/04_coherence_and_feedback.ipynb)) | T1, Ramsey, Hahn echo, single-shot readout, active reset |
-| 5 | One program, many machines ([`05_one_program_many_machines`](notebooks/05_one_program_many_machines.ipynb)) | describing a rack that cannot run the flux arc, rebuilding it from two published vendor profiles, then porting the program onto it |
-| 6 | Extending and shipping ([`06_extending_and_shipping`](notebooks/06_extending_and_shipping.ipynb)) | custom waveform, custom sweep source, vendor profile and namespace, full bring-up capstone |
+| | Part | What it covers |
+|---|------|----------------|
+| 1 | Introduction ([`01_introduction`](notebooks/01_introduction.ipynb)) | a program is data, the twelve operations, bus schemas and what they catch, waveforms, plotting, the `.qp` file, and one measurement run on the reference platform |
+| 2 | Basics ([`02_basics`](notebooks/02_basics.ipynb)) | variables and symbolic expressions, the eight sweep sources, `average(shots)`, the measurement model and the result model, then one swept variable, two of them nested, and two of them in lockstep |
+| 3 | Advanced ([`03_advanced`](notebooks/03_advanced.ipynb)) | fragments, conditionals and active reset, registering a waveform and a sweep source, the two vendor packages and a namespace of your own, implementing `PlatformProtocol`, and `PlatformCapabilities` with `qp.validate`, `qp.explain`, and `qp.optimize` |
 
-The notebooks carry more material than a live session gets through, and the excess is deliberate. They are also the thing attendees take home, so the sections a live session drops are the ones worth having in writing.
+The first two cells of the Introduction are the environment check. Run them before the session, and if the version numbers print, you are ready.
+
+The notebooks carry more material than a live session gets through, and the excess is deliberate. They are also the thing attendees take home, so the sections a live session drops are the ones worth having in writing. Every section of the Advanced notebook stands on its own, so a session can take them in any order or leave any of them for the flight home.
 
 ---
 
 ## Everything runs on your laptop
 
-No hardware, no cloud account, no instrument driver. QProgram ships `ReferencePlatform`, a pure-Python interpreter reachable through the `qp.simulate(program, model=...)` one-liner, and every notebook runs end to end on it. Parts 5 and 6 install `qprogram-qblox` and `qprogram-qdac`, which are not drivers. They carry the operations, capability profiles, and serialization for two real instruments and nothing that opens a socket, so they run on a laptop like the rest. Each experiment supplies a small measurement model that plays the part of the fridge: it is handed the loop variables currently bound and returns one sample per shot.
+No hardware, no cloud account, no instrument driver. QProgram ships `ReferencePlatform`, a pure-Python interpreter reachable through the `qp.simulate(program, model=...)` one-liner, and every notebook runs end to end on it. The Advanced notebook installs `qprogram-qblox` and `qprogram-qdac`, which are not drivers. They carry the operations, capability profiles, and serialization for two real instruments and nothing that opens a socket, so they run on a laptop like the rest. Each experiment supplies a small measurement model that plays the part of the fridge: it is handed the loop variables currently bound and returns one sample per shot.
 
 The simulator has limits worth knowing before you trust anything it prints. It produces plausible numbers rather than physics from first principles, and it models no pulse shapes and no timing at all. It is there so that the *program* you write and the *analysis* you run on the results are the real thing, which is where the engineering work in a control stack lives.
 
@@ -84,23 +82,24 @@ No prior experience with QProgram, pulse programming, or any specific quantum ha
 Upon completing this tutorial, attendees will be able to:
 
 1. Explain how circuit-level quantum gates map to timed control signals on superconducting quantum hardware.
-2. Write pulse programs against typed bus schemas, using the waveform library and the timing and parameter-control operations.
-3. Parameterize experiments with symbolic expressions and sweeps, expressing standard characterization routines such as Rabi, relaxation, coherence, and spectroscopy.
-4. Compose multi-dimensional experiments with parallel sweeps, and branch on measurement outcomes for feedback.
-5. Factor recurring sequences into reusable, parameterized fragments.
-6. Port a program across qubits and naming conventions, and bind calibration data to it separately from the experiment logic.
-7. Run programs on QProgram's reference executor and work with the labeled result arrays it returns.
-8. Read a platform's capability declaration, interpret validation diagnostics and the resulting execution plan, and serialize programs to the portable text format.
+2. Write pulse programs against typed bus schemas, using the waveform vocabulary and the timing and parameter-control operations.
+3. Parameterize experiments with symbolic expressions and sweep sources, including a swept parameter inside a pulse envelope.
+4. Compose multi-dimensional and lockstep experiments, and branch on a measurement outcome to change what the program does next.
+5. Factor recurring sequences into reusable, parameterized fragments, and know what inlining one renames.
+6. Run programs on QProgram's reference executor and work with the labeled result arrays it returns.
+7. Extend the language with a waveform, a sweep source, and a vendor operation of their own, and understand how a shipped extension is loaded by the file that needs it.
+8. Implement the six-member platform interface a back-end has to satisfy, and serialize programs to the portable text format.
+9. Read a platform's capability declaration, interpret validation diagnostics and the resulting execution plan, and predict what the built-in rewrite will and will not do.
 
 ---
 
 ## Format
 
-The two halves of the material do different jobs. The slides carry the physics and the concepts: what a transmon is, what the fridge and the rack around it are for, how a gate becomes a voltage, what a measurement really returns, and why any of that needs a language of its own. The notebooks carry the code. They build one experiment at a time, explain what that experiment measures and why it comes in this order, and leave the background to the deck. The coding is instructor-led, and each part carries one exercise on a real problem, placed where the notebook has taught enough to attempt it. The attendee notebooks leave that cell blank and `notebooks/solutions/` has the answer. Every example runs on QProgram's reference executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
+The two halves of the material do different jobs. The slides carry the physics and the concepts: what a transmon is, what the fridge and the rack around it are for, how a gate becomes a voltage, what a measurement really returns, and why any of that needs a language of its own. The notebooks carry the code. They build up the language one piece at a time and leave the background to the deck. The coding is instructor-led, and each notebook carries one exercise on a real problem, placed where it has taught enough to attempt it. The attendee notebooks leave that cell blank and `notebooks/solutions/` has the answer. Every example runs on QProgram's reference executor, so no hardware, GPU, or network access is needed for any part of the tutorial.
 
 The figures come from the library. `result.plot(measurement)` draws whatever the array's shape asks for, a line per quadrature, a heatmap, or an IQ scatter, and hands back the Matplotlib `Axes` it drew on, so a fit, a reference line, or an annotation is one more call. `waveform.plot()` draws an envelope through the same palette, which is why a pulse and the sweep it produced look like one experiment. That is the whole reason the notebooks reach for Matplotlib as rarely as they do.
 
-QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform and result plotting. The tutorial adds SciPy for the curve fits in Parts 3, 4, 5, and 6. [`setup/README.md`](setup/README.md) covers all of it, whether you install locally with pip or uv or run the notebooks on Google Colab, and `notebooks/00_setup.ipynb` is the pass/fail check that your environment is ready.
+QProgram depends only on NumPy and xarray, with Matplotlib as an optional `viz` extra for waveform and result plotting, and the tutorial adds nothing to that. [`setup/README.md`](setup/README.md) covers the install, whether you use pip or uv locally or run the notebooks on Google Colab, and the first two cells of `notebooks/01_introduction.ipynb` are the pass/fail check that your environment is ready.
 
 ---
 
@@ -125,7 +124,7 @@ Flavie holds an MEng in Aerospace Engineering from the University of Bristol. Sh
 ## Related projects
 
 - **[QProgram](https://github.com/qilimanjaro-tech/qprogram)** is the hardware-agnostic DSL for pulse-level quantum programming covered in this tutorial, including its reference software executor, capability and diagnostics layer, and text serialization format. The documentation is at [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram).
-- **[qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox)** and **[qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac)** are vendor extensions: separate packages that add hardware-specific operations and capability profiles for Qblox control instruments and QDevil QDAC flux biasing. Parts 5 and 6 build a rack out of the two and read their packaging, and neither talks to an instrument.
+- **[qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox)** and **[qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac)** are vendor extensions: separate packages that add hardware-specific operations and capability profiles for Qblox control instruments and QDevil QDAC flux biasing. The Advanced notebook reads both, watches a file load one of them on demand, and then registers a third namespace of its own, and neither package talks to an instrument.
 - **[QiliSDK](https://github.com/qilimanjaro-tech/qilisdk)** is Qilimanjaro's open-source Python framework for designing and executing analog, digital, and hybrid quantum algorithms, unifying circuit-based and Hamiltonian-based workflows behind a single backend-agnostic API. It is the algorithm-level counterpart to QProgram's pulse level.
 
 ---

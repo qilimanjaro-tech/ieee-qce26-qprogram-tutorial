@@ -10,7 +10,7 @@ separated by `# %%` markers:
     # %% stub              a code cell that appears only in notebooks/ (attendee version)
 
 Markdown lives in string literals and stub cells are comments, so every source file runs as a
-plain script. That is the point: `python sources/03_finding_the_qubit.py` executes the same code
+plain script. That is the point: `python sources/02_basics.py` executes the same code
 the notebook does, which is how the material is verified.
 
 Usage:

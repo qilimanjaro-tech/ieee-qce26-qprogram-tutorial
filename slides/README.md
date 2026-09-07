@@ -31,9 +31,9 @@ The first five exist because most of the room writes circuits and has never seen
 
 One gap, listed so the decision is visible rather than forgotten. It does not block the deck.
 
-- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. Part 6 of the notebooks scans the flux-amplitude cut of one, so the figure could start there.
+- **A two-qubit gate figure**: the flux excursion that brings $|11\rangle$ and $|02\rangle$ together, beside the chevron a calibration scan of it produces. "Two-qubit gates" is currently carried by a two-row table, and it is the one slide in the foundations block with no picture behind it. No notebook draws one, so this figure has to be drawn rather than harvested.
 
-An IQ-plane schematic on its own is deliberately **not** drawn. Part 4 plots 1200 real simulated shots with a threshold taken from the data, and a schematic version would be strictly worse. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted.
+An IQ-plane schematic on its own is deliberately **not** drawn. `dispersive.svg` carries the frequency-domain picture instead, which is the half that makes $2\chi/\kappa$ obvious rather than asserted, and a schematic of two clouds asserts a separation instead of showing one.
 
 ## Where the diagrams live
 

@@ -112,11 +112,11 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 ## Follow along
 
-- **Local**: `pip install "qprogram[viz]==0.1.0" scipy`, Python 3.11 to 3.14.
+- **Local**: `pip install "qprogram[viz]==0.1.0"`, Python 3.11 to 3.14.
 - **Colab**: the first cell of each notebook installs what is missing.
-- Parts 5 and 6 add two vendor packages, and their own first cells install them.
+- The Advanced notebook adds two vendor packages, and its own first cell installs them.
 - No hardware and no cloud account, since the reference platform ships in the wheel.
-- Open and run `notebooks/00_setup.ipynb` now. Its last cell draws a dip near 7.2 GHz.
+- Open `notebooks/01_introduction.ipynb` now. Its first two cells are the environment check.
 
 ---
 
@@ -134,24 +134,24 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 | Part | Notebook | Topic | Time |
 |---|---|---|---|
 | | | opening, the chip, and the language | 25 min |
-| 1 | `01_pulse_programs` | The program is data | 20 min |
-| 2 | `02_sweeps_and_results` | Sweeps, averaging, and results | 20 min |
-| 3 | `03_finding_the_qubit` | Finding the qubit | 25 min |
-| 4 | `04_coherence_and_feedback` | Coherence, single shots, feedback | 30 min |
-| 5 | `05_one_program_many_machines` | Capabilities, plans, porting | 30 min |
-| 6 | `06_extending_and_shipping` | Extending, shipping, capstone | 20 min |
+| 1 | `01_introduction` | The program is data | 20 min |
+| 2 | `02_basics` | Sweeps, averaging, and results | 20 min |
+| 3 | `02_basics` | Finding the qubit | 25 min |
+| 4 | `03_advanced` | Coherence and feedback | 30 min |
+| 5 | `03_advanced` | Capabilities and plans | 30 min |
+| 6 | `03_advanced` | Extending the language | 20 min |
 | | | questions and close | 10 min |
 
-Two sessions, and the break between them lands after Part 3.
+Two sessions, and the break between them lands after Part 3. Three notebooks carry the code for all six parts, and the physics of the middle three is on these slides.
 
 ---
 
 ## What you will build
 
-- a **calibrated qubit**: resonator frequency, qubit frequency, and a $\pi$ pulse (Parts 2 and 3)
-- **coherence numbers**: $T_1$, $T_2^{*}$, and $T_2$ echo (Part 4)
-- **single-shot readout** and **active reset** (Part 4)
-- the **same calibration ported to a second rack** (Part 5)
+- a **pulse program** you can read, diff, save and load again (Part 1)
+- a **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** along its ridge (Parts 2 and 3)
+- **active reset**, where one measurement decides the next pulse (Part 4)
+- a **platform of your own**, and the **execution plan** a rack's capabilities produce (Part 5)
 - your **own waveform, sweep source, and vendor operation** (Part 6)
 
 ---
@@ -614,7 +614,7 @@ assert qp.loads(qp.dumps(program)).body == program.body
 
 <!-- _class: divider -->
 
-<p class="kicker">Part 1 · notebooks/01_pulse_programs.ipynb</p>
+<p class="kicker">Part 1 · notebooks/01_introduction.ipynb</p>
 
 # The program is data
 
@@ -725,17 +725,18 @@ after binding: play q[0].drive IQDrag(amplitude=0.62, duration=40, sigma=10, bet
 
 ## Exercise 1.1
 
-> 🧩 Build a two-qubit prepare-and-read sequence, then let the schema catch a `measure` on a drive line.
+> 🧩 Bias the flux line, prepare the qubit, read it out, and round-trip the program through a file.
 
-- One program, both drives at their own `f01`, then a bare `sync()`.
-- Measure both readout buses and print the two handle names.
-- The names tell you how per-bus numbering works.
+- One program: `set_offset` on the flux bus, `set_frequency` on the other two.
+- `sync` the drive and readout buses by name, then `measure`.
+- Save it, load it back, and compare the two bodies.
+- Then measure the flux bus, and let the schema say why not.
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Part 2 · notebooks/02_sweeps_and_results.ipynb</p>
+<p class="kicker">Part 2 · notebooks/02_basics.ipynb</p>
 
 # Sweeps and results
 
@@ -846,17 +847,17 @@ measurements: 25 against 1025 for the full map
 
 ## Exercise 2.1
 
-> 🧩 Scan both readout resonators in one lockstep sweep, and explain the single 41-long dimension that comes back.
+> 🧩 Park the drive on resonance, step its amplitude, and calibrate a full rotation from the curve.
 
-- Declare `f0` and `f1`, and sweep them in parallel over their own bands.
-- Write one response function, since `bus` says which resonator answers.
-- Print the dims of each record and the dip frequency it found.
+- The swept variable goes inside the `IQDrag`, not into an operation.
+- Read the half rotation off the rising branch, then double it.
+- An `argmax` on a flat maximum is worse than the grid; the crossing is not.
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Part 3 · notebooks/03_finding_the_qubit.ipynb</p>
+<p class="kicker">Part 3 · notebooks/02_basics.ipynb</p>
 
 # Finding the qubit
 
@@ -914,16 +915,6 @@ a_pi true   : 0.6200                error:    -0.39%
 
 ---
 
-## Exercise 3.1
-
-> 🧩 Fit the $\pi/2$ amplitude from the rising branch of the Rabi curve, instead of halving the $\pi$ amplitude.
-
-- Refit the points up to the maximum with the model written in terms of $a_{90}$.
-- A $\pi/2$ pulse is usually taken as half the $\pi$ amplitude.
-- On a real drive line, the measured value can differ by percent.
-
----
-
 ## The waveform library
 
 - The library resolves each alias per bus, in three tiers, most specific first.
@@ -970,7 +961,7 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 <!-- _class: divider -->
 
-<p class="kicker">Session 2 · Part 4 · notebooks/04_coherence_and_feedback.ipynb</p>
+<p class="kicker">Session 2 · Part 4 · notebooks/03_advanced.ipynb</p>
 
 # Coherence and feedback
 
@@ -1114,19 +1105,9 @@ population before reset = 18.5%     population after reset = 1.0%
 
 ---
 
-## Exercise 4.1
-
-> 🧩 Build active reset on 400 single shots and report the excited population before and after.
-
-- One `shot` variable swept with `qp.Range(0, 399, 1)`, and no `average`.
-- `check` asks for `state`, and the excited arm calls `x180` then measures again.
-- Recover the population with `np.where(np.isnan(verified), before, verified)`.
-
----
-
 <!-- _class: divider -->
 
-<p class="kicker">Part 5 · notebooks/05_one_program_many_machines.ipynb</p>
+<p class="kicker">Part 5 · notebooks/03_advanced.ipynb</p>
 
 # One program, many machines
 
@@ -1340,19 +1321,9 @@ moved:    ['q1/drive', 'q1/flux', 'q1/readout']
 
 ---
 
-## Exercise 5.1
-
-> 🧩 Port the two-dimensional flux arc to a rack that names its buses `drive_q0` style, and check the diagnostics still match.
-
-- Rebind with `BusNaming("{kind}_{element}{index}")` and print the buses before and after.
-- Validate against `caps` and compare the codes with the original's.
-- Run `qp.optimize` and name the diagnostic that predicted the outcome.
-
----
-
 <!-- _class: divider -->
 
-<p class="kicker">Part 6 · notebooks/06_extending_and_shipping.ipynb</p>
+<p class="kicker">Part 6 · notebooks/03_advanced.ipynb</p>
 
 # Extending and shipping
 
@@ -1474,7 +1445,7 @@ qblox = "qprogram_qblox"
 
 ---
 
-## Exercise 6.1
+## Exercise 3.1
 
 > 🧩 Add a vendor measurement field, then prove it is legal on one rack and rejected on another.
 
