@@ -33,7 +33,7 @@ By the end of the tutorial, participants will be able to design, validate, seria
 | [Setup](#setup) | Install instructions (pip, uv, or Google Colab). Start here. |
 | [`notebooks/`](notebooks/) | The three tutorial notebooks (`01_introduction`, `02_basics`, `03_advanced`), attendee versions whose exercise cells are a numbered `# TODO`, with every other cell's output already in place. |
 | [`notebooks/solutions/`](notebooks/solutions/) | The same notebooks with the exercises solved. |
-| [`slides/`](slides/) | The Marp deck (`qprogram_tutorial.md`) and its diagrams. See [`slides/README.md`](slides/README.md). |
+| [`slides/`](slides/) | The deck: the [Marp](https://marp.app/) source (`qprogram_tutorial.md`), the rendered `qprogram_tutorial.html`, and the diagrams in `img/`. See [Slides](#slides) below. |
 
 ---
 
@@ -164,6 +164,14 @@ Three lines of expected output. The version is read through `importlib.metadata`
 The first two cells of the Introduction are the environment check. Run them before the session, and if the version numbers print, you are ready.
 
 The notebooks carry more material than a live session gets through, and the excess is deliberate. They are also the thing attendees take home, so the sections a live session drops are the ones worth having in writing. Every section of the Advanced notebook stands on its own, so a session can take them in any order or leave any of them for the flight home.
+
+---
+
+## Slides
+
+The deck is where the concepts live. It opens with the physics and the hardware, a transmon, the fridge and the rack around it, how a gate becomes a voltage, what a measurement really returns, and what decoherence costs, then argues why any of that needs a language of its own. Only after all of that does QProgram appear. Eighty-one slides in six movements, each opened by a divider slide except the first: logistics is 7, **The chip and the rack** is 26, and **Why a language of its own** is 6, both of those carrying a `Concepts · slides only` kicker because no notebook covers them. Then one movement per notebook, **Part 1** at 11, **Part 2** at 10, and **Part 3** at 19, each divider naming the notebook it belongs to. The close is 2, and ten diagrams carry the structure.
+
+To read the deck, open [`slides/qprogram_tutorial.html`](slides/qprogram_tutorial.html) with the `img/` folder beside it, since it loads the diagrams from there. Arrow keys navigate, `f` goes fullscreen, and `p` opens the presenter view. To edit it, the easiest route is VS Code with the "Marp for VS Code" extension, which gives live preview, presenter mode, and one-click export to HTML, PDF, or PPTX.
 
 ---
 
