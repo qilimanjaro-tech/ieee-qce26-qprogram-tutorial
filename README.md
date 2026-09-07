@@ -33,7 +33,7 @@ By the end of the tutorial, participants will be able to design, validate, seria
 | [`setup/README.md`](setup/README.md) | Install instructions (pip, uv, or Google Colab). Start here. |
 | [`notebooks/`](notebooks/) | The three tutorial notebooks (`01_introduction`, `02_basics`, `03_advanced`), attendee versions whose exercise cells are a numbered `# TODO`, with every other cell's output already in place. |
 | [`notebooks/solutions/`](notebooks/solutions/) | The same notebooks with the exercises solved. |
-| [`slides/`](slides/) | The Marp deck (`qprogram_tutorial.md`) and its diagrams. See [`slides/README.md`](slides/README.md). |
+| [`slides/`](slides/) | The Marp deck (`qprogram_tutorial.md`), its diagrams, and the instructor notes. See [`slides/README.md`](slides/README.md). |
 | [`sources/`](sources/) | The percent-format Python sources the notebooks are built from. Edit these, never the `.ipynb` files. |
 | [`tools/`](tools/) | The notebook builder, the house-style checker, the paragraph unwrapper, and the slide-fit estimator. |
 

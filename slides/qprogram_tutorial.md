@@ -202,26 +202,6 @@ $$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
 
 ---
 
-## The design ratio
-
-- $E_J/E_C$ large puts the phase deep in the cosine well.
-- Stray charge then stops shifting the levels.
-- Charge dispersion falls as $e^{-\sqrt{8E_J/E_C}}$, anharmonicity only as $-E_C$.
-- Above roughly 50 the charge sensitivity has gone.
-- The ratio trades charge noise against gate speed.
-
----
-
-## Why 5 GHz
-
-- The thermal scale $hf/k_B$ at $f_{01}$ is 233 mK.
-- A 10 mK stage sits far below it.
-- The band is also where coax, circulators and generators can be bought.
-- Real devices sit warmer, at 40 to 60 mK, leaving about one percent excited.
-- Part 3 resets that population rather than waiting for it.
-
----
-
 ## Tuning with flux
 
 - Split the junction into a loop of two and the effective $E_J$ becomes tunable.
@@ -238,16 +218,6 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 ![h:470](img/rack.svg)
 
 <p class="cap">Three lines down to the chip and one line back, with attenuation going in and gain coming out.</p>
-
----
-
-## Attenuation
-
-- A 50 ohm resistor at room temperature radiates into every mode.
-- At the drive frequency that is 1300 photons per mode.
-- The qubit sits on one of them.
-- Each stage's attenuator therefore re-thermalizes the line to its own plate.
-- Microwatts at the generator arrive as femtowatts at the chip.
 
 ---
 
@@ -378,28 +348,6 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 - Optimal is the difference between the mean $|0\rangle$ and $|1\rangle$ responses.
 - That difference is taken sample by sample across the record.
 - The window then weights the part where the two states separate.
-
----
-
-## Readout fidelity
-
-- The resonator has to fill before the return says anything, at rate $\kappa$.
-- Integrating longer beats down the amplifier noise, and $T_1$ caps the window.
-- Cloud separation $d$ grows with photon number and with $2\chi/\kappa$.
-- Information per photon peaks near $2\chi = \kappa$, and this chip sits at 2.4.
-- The error is an erfc of $d$ against the cloud width $\sigma$.
-
-$$\varepsilon = \tfrac{1}{2}\,\mathrm{erfc}\!\left(\frac{d}{2\sqrt{2}\,\sigma}\right) \qquad 4\sigma \to 2\% \qquad 6\sigma \to 0.1\%$$
-
----
-
-## How hard to read out
-
-$$n_{\text{crit}} = \frac{\Delta^2}{4g^2} \approx 37 \ \text{photons on this chip}$$
-
-- More photons separate the two clouds, so the temptation is to turn the tone up.
-- The dispersive approximation has a limit, and the limit is a photon number.
-- Below it the resonator reports the qubit, above it it sits on bare $f_r$ and reports nothing.
 
 ---
 
@@ -1015,6 +963,16 @@ $ python -m qprogram.lsp check flux_sweep.qp   (exit 1)
 - One token registration widens `measure` itself, because the `fields=` vocabulary is read off the capability registry.
 - The token makes the field legal and the executor allocates the array for it.
 - Nothing in the reference platform knows how to produce a photon count, so the counts come back zero.
+
+---
+
+## Where to go next
+
+- **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram) · **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
+- The Reference section is normative, and `qp.lark` is the machine-readable grammar.
+- Read `qprogram-qblox` or `qprogram-qdac` before writing your own extension.
+- Write a rule your lab cares about as a predicate.
+- Issues and pull requests are welcome.
 
 ---
 <!-- _class: lead -->
