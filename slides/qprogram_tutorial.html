@@ -515,7 +515,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="36" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="36" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
 <h2 id="one-dialect-per-rack">One dialect per rack</h2>
 <ul>
-<li>A paper travels between labs, and the control code behind it never has.</li>
+<li>A paper travels between labs, and the control code behind it stays in the lab that wrote it.</li>
 <li>Every vendor ships its own sequencer dialect.</li>
 <li>They are assembly shaped, because an FPGA has to meet every clock edge.</li>
 <li>Loops come out of registers, and waveform memory is addressed by hand.</li>
@@ -629,18 +629,18 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 <li><code>measure</code> plays the readout tone and integrates what comes back, in one call.</li>
 <li>The second waveform is the integration window, and a flat window of ones is the default here.</li>
 <li>The reduction is a choice you make in the program: the ADC trace, the integrated point, the classified bit, or all three.</li>
-<li>Ask for a field you never requested and it is a <code>KeyError</code> hours after the run.</li>
+<li>Ask for a field you never requested and it is a <code>KeyError</code>.</li>
 <li>A handle is a name, so a result is indexed by what you called the measurement.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="46" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="46" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="a-typo-costs-a-cooldown">A typo costs a cooldown</h2>
+<h2 id="a-schema-not-a-string">A schema, not a string</h2>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-python">program.measure(q[<span class="hljs-number">0</span>].drive, <span class="hljs-string">&quot;readout&quot;</span>, <span class="hljs-string">&quot;weights&quot;</span>)
 -&gt; Bus <span class="hljs-string">&#x27;q0/drive&#x27;</span> does <span class="hljs-keyword">not</span> support acquisition (acquires=<span class="hljs-literal">False</span>).
 </code></pre>
 <ul>
-<li>A raw string bus name builds, prints, saves, and finds you out once the fridge is cold.</li>
+<li>A raw string bus name builds, prints and saves, and nothing checks it until the run.</li>
 <li>A <code>BusSchema</code> hands back a reference that is still a string and carries two facts about copper.</li>
 <li>Which shape the line takes, real-valued or two-path, and whether an ADC listens to it.</li>
 <li>Both become an error on the line that made the mistake, and raw strings skip both on purpose.</li>
@@ -658,7 +658,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="48" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="48" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="the-file-is-the-experiment">The file is the experiment</h2>
+<h2 id="a-file-you-can-diff">A file you can diff</h2>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-diff"><span class="hljs-deletion">-    play &quot;q0/drive&quot; IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)</span>
 <span class="hljs-addition">+    play &quot;q0/drive&quot; IQDrag(amplitude=0.31, duration=40, sigma=10, beta=0.15)</span>
 </code></pre>
@@ -676,7 +676,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 <li><code>qp.simulate(program, model=...)</code> walks the tree in pure Python.</li>
 <li>It models the shape of the experiment: the nesting, the repetition, one record per <code>measure</code>.</li>
 <li>It models no timing and no waveform physics, so <code>wait</code> changes no number.</li>
-<li>The program you write and the analysis you run on the results are the real thing, and that is where the engineering work lives.</li>
+<li>The program you write and the analysis you run on the results are the same ones a rack would run, and that is where the work lives.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -713,7 +713,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="54" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="54" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="values-are-an-object">Values are an object</h2>
+<h2 id="a-source-not-a-list">A source, not a list</h2>
 <table>
 <thead>
 <tr>
@@ -741,7 +741,7 @@ s76,-153,76,-153s77,-151,77,-151c0.7,0.7,35.7,202,105,604c67.3,400.7,102,602.7,1
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="55" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="55" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="shots-are-the-last-knob">Shots are the last knob</h2>
+<h2 id="averaging-over-shots">Averaging over shots</h2>
 <ul>
 <li><code>average(shots)</code> repeats the body and hands back the mean, and the shot count is nowhere in the shape.</li>
 <li>Amplifier noise and projection noise both fall as <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi mathvariant="normal">/</mi><msqrt><mi>N</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{N}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.1767em;vertical-align:-0.25em;"></span><span class="mord">1/</span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9267em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord mathnormal" style="margin-right:0.109em;">N</span></span></span><span style="top:-2.8867em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
@@ -762,7 +762,7 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="56" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="56" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="the-only-numbers">The only numbers</h2>
+<h2 id="the-measurement-model">The measurement model</h2>
 <ul>
 <li>The interpreter asks a measurement model for one sample per shot, and every measured number in a run comes from it.</li>
 <li>Every figure in the notebook therefore comes out of five constants and three short formulas you can read.</li>
@@ -777,7 +777,6 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <li>A 20 MHz window in 200 kHz steps puts about seven samples across a 1.5 MHz resonance.</li>
 <li>An argmin can never beat the step size, so that grid locates the resonator to 200 kHz.</li>
 <li>A finer answer costs either a finer grid or a fit to the shape of the curve.</li>
-<li>Choosing a grid is choosing which part of the answer you are willing to quantise.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -804,7 +803,7 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <li>Nested <code>with</code> statements are nested loops, so a two-deep nest is a rectangle of points.</li>
 <li><code>|</code> advances both on the same tick instead, and one dimension comes back carrying two coordinates.</li>
 <li>The map cost 861 points at 200 shots, and most of them sat off resonance.</li>
-<li>Walking the ridge is 21 points over the same body, and you can only walk a ridge you have found.</li>
+<li>Walking the ridge is 21 points over the same body, once the map has found it.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
@@ -827,7 +826,7 @@ M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">�
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="62" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="62" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="write-it-once">Write it once</h2>
+<h2 id="one-definition-many-call-sites">One definition, many call sites</h2>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-text">fragment x_pulse(drive, amp):
   play drive IQDrag(amplitude=amp, duration=40, sigma=10, beta=0.1)
 
@@ -849,7 +848,7 @@ body:
 excited after:  0.029
 </code></pre>
 <ul>
-<li>A branch inside the shot is the one thing a host round trip cannot fake, because the decision has to land before the qubit relaxes.</li>
+<li>A branch inside the shot cannot be faked by a host round trip, because the decision has to land before the qubit relaxes.</li>
 <li>The condition is one comparison of one classified state against an integer, and nothing wider.</li>
 <li>Passive reset idles several <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>T</mi><mn>1</mn></msub></mrow><annotation encoding="application/x-tex">T_1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> before every shot. Active reset measures first and flips only the shots that came back excited.</li>
 <li>One extra measurement and one conditional pulse take 30 percent hot down to 3.</li>
@@ -885,7 +884,7 @@ excited after:  0.029
 </tbody>
 </table>
 <ul>
-<li>A language that cannot be extended gets forked, and a fork is not portable.</li>
+<li>A language that cannot be extended gets forked, and a fork stops being portable.</li>
 <li>A capability token is a dotted name a rack can refuse the node by.</li>
 <li>The extension travels inside the file, so a colleague loads it without knowing what to import.</li>
 <li>A swept parameter arrives as a <code>qp.Expression</code>, so a shape that does not resolve it fails inside numpy naming neither the waveform nor the variable.</li>
@@ -930,7 +929,7 @@ vendor.qdac.set_offset   qblox False qdac True
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="67" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="67" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="what-a-platform-owes">What a platform owes</h2>
+<h2 id="what-a-platform-supplies">What a platform supplies</h2>
 <ul>
 <li>Six questions: the chip it is wired to, the buses it exposes, the knobs per bus and platform wide, what it can run, and <code>execute</code>.</li>
 <li>Only the last one is work. <code>validate</code>, <code>plan</code> and <code>explain</code> arrive already written off the descriptor.</li>
@@ -1131,15 +1130,15 @@ vendor.qdac.set_offset   qblox False qdac True
 <ul>
 <li>A bare <code>sync()</code> pulls every bus into one domain intersection.</li>
 <li>The flux bus has no real-time half, so that sync lands host side in the middle of a run of real-time operations.</li>
-<li>Nothing can be hoisted across it, and the rewrite is lost with no error message anywhere.</li>
+<li>Nothing can be hoisted across it, and the rewrite is lost with no error message.</li>
 <li>Naming the two buses you mean keeps the sync real time and the rewrite alive.</li>
 </ul>
 <footer>Programming a Superconducting Qubit · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Programming a Superconducting Qubit · QCE 2026" lang="en-US" data-marpit-pagination="77" style="--paginate:true;--footer:Programming a Superconducting Qubit · QCE 2026;" data-marpit-pagination-total="81" data-size="16:9">
-<h2 id="a-predicate-is-your-bench">A predicate is your bench</h2>
+<h2 id="a-rule-about-your-own-wiring">A rule about your own wiring</h2>
 <ul>
-<li>A predicate is code, and it is where a lab writes down a fact about its own wiring that no vendor could have known.</li>
+<li>A predicate is code, and it is where a lab writes down a fact about its own wiring that no vendor profile carries.</li>
 <li>This rack's flux DAC will not go past a tenth of a volt, and that number lives in a predicate.</li>
 <li>The validation context is what makes the rule expressible, because the values live in the loop that binds the variable.</li>
 <li>It yields a <code>Diagnostic</code> to refuse, or a <code>DomainConstraint</code> that moves a loop host side rather than failing the program.</li>

@@ -449,7 +449,7 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 ## One dialect per rack
 
-- A paper travels between labs, and the control code behind it never has.
+- A paper travels between labs, and the control code behind it stays in the lab that wrote it.
 - Every vendor ships its own sequencer dialect.
 - They are assembly shaped, because an FPGA has to meet every clock edge.
 - Loops come out of registers, and waveform memory is addressed by hand.
@@ -546,19 +546,19 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 - `measure` plays the readout tone and integrates what comes back, in one call.
 - The second waveform is the integration window, and a flat window of ones is the default here.
 - The reduction is a choice you make in the program: the ADC trace, the integrated point, the classified bit, or all three.
-- Ask for a field you never requested and it is a `KeyError` hours after the run.
+- Ask for a field you never requested and it is a `KeyError`.
 - A handle is a name, so a result is indexed by what you called the measurement.
 
 ---
 
-## A typo costs a cooldown
+## A schema, not a string
 
 ```python
 program.measure(q[0].drive, "readout", "weights")
 -> Bus 'q0/drive' does not support acquisition (acquires=False).
 ```
 
-- A raw string bus name builds, prints, saves, and finds you out once the fridge is cold.
+- A raw string bus name builds, prints and saves, and nothing checks it until the run.
 - A `BusSchema` hands back a reference that is still a string and carries two facts about copper.
 - Which shape the line takes, real-valued or two-path, and whether an ADC listens to it.
 - Both become an error on the line that made the mistake, and raw strings skip both on purpose.
@@ -574,7 +574,7 @@ program.measure(q[0].drive, "readout", "weights")
 
 ---
 
-## The file is the experiment
+## A file you can diff
 
 ```diff
 -    play "q0/drive" IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
@@ -593,7 +593,7 @@ program.measure(q[0].drive, "readout", "weights")
 - `qp.simulate(program, model=...)` walks the tree in pure Python.
 - It models the shape of the experiment: the nesting, the repetition, one record per `measure`.
 - It models no timing and no waveform physics, so `wait` changes no number.
-- The program you write and the analysis you run on the results are the real thing, and that is where the engineering work lives.
+- The program you write and the analysis you run on the results are the same ones a rack would run, and that is where the work lives.
 
 ---
 
@@ -632,7 +632,7 @@ program.measure(q[0].drive, "readout", "weights")
 
 ---
 
-## Values are an object
+## A source, not a list
 
 | `KIND` | what it promises |
 |---|---|
@@ -646,7 +646,7 @@ program.measure(q[0].drive, "readout", "weights")
 
 ---
 
-## Shots are the last knob
+## Averaging over shots
 
 - `average(shots)` repeats the body and hands back the mean, and the shot count is nowhere in the shape.
 - Amplifier noise and projection noise both fall as $1/\sqrt{N}$, so halving the noise costs four times the time.
@@ -655,7 +655,7 @@ program.measure(q[0].drive, "readout", "weights")
 
 ---
 
-## The only numbers
+## The measurement model
 
 - The interpreter asks a measurement model for one sample per shot, and every measured number in a run comes from it.
 - Every figure in the notebook therefore comes out of five constants and three short formulas you can read.
@@ -669,7 +669,6 @@ program.measure(q[0].drive, "readout", "weights")
 - A 20 MHz window in 200 kHz steps puts about seven samples across a 1.5 MHz resonance.
 - An argmin can never beat the step size, so that grid locates the resonator to 200 kHz.
 - A finer answer costs either a finer grid or a fit to the shape of the curve.
-- Choosing a grid is choosing which part of the answer you are willing to quantise.
 
 ---
 
@@ -697,7 +696,7 @@ with program.sweep(amp, ...) | program.sweep(freq, ...):   # a diagonal
 - Nested `with` statements are nested loops, so a two-deep nest is a rectangle of points.
 - `|` advances both on the same tick instead, and one dimension comes back carrying two coordinates.
 - The map cost 861 points at 200 shots, and most of them sat off resonance.
-- Walking the ridge is 21 points over the same body, and you can only walk a ridge you have found.
+- Walking the ridge is 21 points over the same body, once the map has found it.
 
 ---
 
@@ -722,7 +721,7 @@ $$P(a) = \sin^2\!\left(\frac{\pi a}{2 a_\pi}\right)$$
 
 ---
 
-## Write it once
+## One definition, many call sites
 
 ```text
 fragment x_pulse(drive, amp):
@@ -747,7 +746,7 @@ excited before: 0.305
 excited after:  0.029
 ```
 
-- A branch inside the shot is the one thing a host round trip cannot fake, because the decision has to land before the qubit relaxes.
+- A branch inside the shot cannot be faked by a host round trip, because the decision has to land before the qubit relaxes.
 - The condition is one comparison of one classified state against an integer, and nothing wider.
 - Passive reset idles several $T_1$ before every shot. Active reset measures first and flips only the shots that came back excited.
 - One extra measurement and one conditional pulse take 30 percent hot down to 3.
@@ -762,7 +761,7 @@ excited after:  0.029
 | a sweep axis the DSL lacks | a `SweepSource` subclass | serialization, a capability token, length checks, coordinates |
 | an operation the DSL will never have | an `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a capability token |
 
-- A language that cannot be extended gets forked, and a fork is not portable.
+- A language that cannot be extended gets forked, and a fork stops being portable.
 - A capability token is a dotted name a rack can refuse the node by.
 - The extension travels inside the file, so a colleague loads it without knowing what to import.
 - A swept parameter arrives as a `qp.Expression`, so a shape that does not resolve it fails inside numpy naming neither the waveform nor the variable.
@@ -808,7 +807,7 @@ vendor.qdac.set_offset   qblox False qdac True
 
 ---
 
-## What a platform owes
+## What a platform supplies
 
 - Six questions: the chip it is wired to, the buses it exposes, the knobs per bus and platform wide, what it can run, and `execute`.
 - Only the last one is work. `validate`, `plan` and `explain` arrive already written off the descriptor.
@@ -926,14 +925,14 @@ vendor.qdac.set_offset   qblox False qdac True
 
 - A bare `sync()` pulls every bus into one domain intersection.
 - The flux bus has no real-time half, so that sync lands host side in the middle of a run of real-time operations.
-- Nothing can be hoisted across it, and the rewrite is lost with no error message anywhere.
+- Nothing can be hoisted across it, and the rewrite is lost with no error message.
 - Naming the two buses you mean keeps the sync real time and the rewrite alive.
 
 ---
 
-## A predicate is your bench
+## A rule about your own wiring
 
-- A predicate is code, and it is where a lab writes down a fact about its own wiring that no vendor could have known.
+- A predicate is code, and it is where a lab writes down a fact about its own wiring that no vendor profile carries.
 - This rack's flux DAC will not go past a tenth of a volt, and that number lives in a predicate.
 - The validation context is what makes the rule expressible, because the values live in the loop that binds the variable.
 - It yields a `Diagnostic` to refuse, or a `DomainConstraint` that moves a loop host side rather than failing the program.
