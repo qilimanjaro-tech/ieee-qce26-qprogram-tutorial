@@ -277,7 +277,7 @@ for description, mistake in (
 r"""
 The two spellings mix. A program can be mostly schema-backed with one odd line slotted in by name, and you lose the checks for that line and keep them everywhere else. One thing does change with the spelling: measurement names are allocated per bus for a `BusRef` and from a single global counter for a raw string, which is the difference between `q0/readout/m0` here and the bare `m0` in section 1.3.
 
-A schema also decides how a bus is spelled, through a `BusNaming` pattern over three placeholders. The pattern lives in the file next to the structural form, so a program written for one rack's naming convention can be re-resolved for another without touching the body.
+A schema also decides how a bus is spelled, through a `BusNaming` pattern over three placeholders. The pattern lives in the file next to the structural form, so `program.rebind` can re-resolve a program written for one rack's naming convention against another without touching the body. The `.qp` text still says `q[0].readout` afterwards, because the path form is structural and the spelled string is derived from the pattern.
 """
 
 # %%
@@ -289,8 +289,13 @@ m_checked = checked.measure(q[0].readout, readout_pulse, weights, fields=(MF.IQ,
 
 print("handle, schema-backed:", m_checked.name)
 print("handle, raw string:   ", m0.name)
-print("\ndefault naming:", BusNaming().resolve("q", 0, "flux"))
-print("another rack:  ", BusNaming("{kind}_{element}{index}").resolve("q", 0, "flux"))
+
+other_rack = BusSchema.flux_tunable_transmon(naming=BusNaming("{kind}_{element}{index}"))
+ported = checked.rebind(schema=other_rack)
+
+print("\nas built: ", sorted(checked.buses))
+print("rebound:  ", sorted(ported.buses))
+print("the body still reads:", statement(ported, "play"))
 
 # %% [markdown]
 r"""
