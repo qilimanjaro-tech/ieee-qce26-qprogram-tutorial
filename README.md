@@ -1,6 +1,4 @@
-# Programming a Superconducting Qubit
-
-**Pulse-Level Control and Calibration with QProgram**
+# Pulse-level Programming with QProgram
 
 Tutorial at [IEEE Quantum Week 2026](https://qce.quantum.ieee.org/2026/) (IEEE International Conference on Quantum Computing and Engineering), Toronto, Canada.
 

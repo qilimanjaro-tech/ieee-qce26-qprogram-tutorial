@@ -3,8 +3,8 @@ marp: true
 size: 16:9
 paginate: true
 math: katex
-title: Programming a Superconducting Qubit with QProgram
-footer: 'Programming a Superconducting Qubit · QCE 2026'
+title: Pulse-level Programming with QProgram
+footer: 'Pulse-level Programming with QProgram · QCE 2026'
 
 ---
 
@@ -71,9 +71,7 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 <!-- _paginate: false -->
 <!-- _footer: '' -->
 
-# Programming a Superconducting Qubit
-
-<p class="sub">Pulse-Level Control and Calibration with QProgram</p>
+# Pulse-level Programming with QProgram
 
 <p class="meta">IEEE Quantum Week · QCE 2026</p>
 
