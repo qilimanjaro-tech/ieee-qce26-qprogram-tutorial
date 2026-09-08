@@ -110,7 +110,7 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 ## Follow along
 
-- **Local**: `pip install "qprogram[viz]==0.1.0"`, Python 3.11 to 3.14.
+- **Local**: `pip install "qprogram[viz]==0.2.0"`, Python 3.11 to 3.14.
 - **Colab**: the first cell of each notebook installs what is missing.
 - The Advanced notebook adds two vendor packages, and its own first cell installs them.
 - No hardware and no cloud account, since the reference platform ships in the wheel.
@@ -769,7 +769,7 @@ excited after:  0.029
 ## One portable file
 
 ```text
-#!QProgram 1.0
+#!QProgram 0.2
 
 require twpa 0.1
 

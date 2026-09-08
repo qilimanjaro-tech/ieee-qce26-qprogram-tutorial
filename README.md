@@ -37,11 +37,11 @@ By the end of the tutorial, participants will be able to design, validate, seria
 
 ## Setup
 
-Please install **before the session** and open `notebooks/01_introduction.ipynb`. Its first two cells are a pass/fail check: if they print a supported Python version and `qprogram 0.1.0`, you are ready.
+Please install **before the session** and open `notebooks/01_introduction.ipynb`. Its first two cells are a pass/fail check: if they print a supported Python version and `qprogram 0.2.0`, you are ready.
 
 You have two options, **local** or **Google Colab**. Either is fine; pick whichever you prefer. Nothing in this tutorial talks to hardware, so there is no lab access to arrange and no credentials to collect.
 
-> **QProgram 0.1.0 is pre-release.** It is an alpha library and the tutorial is pinned to that exact version, along with the two vendor extension packages the Advanced notebook reads. All three are on PyPI. Pinning matters more than usual here, because an alpha library is allowed to move under you.
+> **QProgram 0.2.0 is pre-release.** It is an alpha library and the tutorial is pinned to that exact version, along with the two vendor extension packages the Advanced notebook reads. All three are on PyPI. Pinning matters more than usual here, because an alpha library is allowed to move under you.
 
 ### Option A: local install
 
@@ -57,18 +57,18 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 # 2. install QProgram and a notebook UI if you do not have one
-pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 jupyterlab
+pip install "qprogram[viz]==0.2.0" qprogram-qblox==0.2.0 qprogram-qdac==0.2.0 jupyterlab
 
 # 3. launch Jupyter and open notebooks/01_introduction.ipynb
 jupyter lab
 ```
 
-The `0.1.0` tag is what the notebooks are verified against. To track the source instead, each distribution installs from its own repository:
+The `0.2.0` tag is what the notebooks are verified against. To track the source instead, each distribution installs from its own repository:
 
 ```bash
-pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.1.0" \
-            "qprogram-qblox @ git+https://github.com/qilimanjaro-tech/qprogram-qblox@0.1.0" \
-            "qprogram-qdac @ git+https://github.com/qilimanjaro-tech/qprogram-qdac@0.1.0" \
+pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.2.0" \
+            "qprogram-qblox @ git+https://github.com/qilimanjaro-tech/qprogram-qblox@0.2.0" \
+            "qprogram-qdac @ git+https://github.com/qilimanjaro-tech/qprogram-qdac@0.2.0" \
             jupyterlab
 ```
 
@@ -77,7 +77,7 @@ pip install "qprogram[viz] @ git+https://github.com/qilimanjaro-tech/qprogram@0.
 ```bash
 uv venv --python 3.13
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-uv pip install "qprogram[viz]==0.1.0" qprogram-qblox==0.1.0 qprogram-qdac==0.1.0 jupyterlab
+uv pip install "qprogram[viz]==0.2.0" qprogram-qblox==0.2.0 qprogram-qdac==0.2.0 jupyterlab
 jupyter lab
 ```
 
@@ -116,7 +116,7 @@ from importlib.metadata import version
 import qprogram as qp
 from qprogram.buses import BusSchema
 
-print("qprogram", version("qprogram"))                     # 0.1.0
+print("qprogram", version("qprogram"))                     # 0.2.0
 
 schema = BusSchema.transmon()
 program = qp.QProgram(label="smoke", schema=schema)
@@ -138,8 +138,8 @@ Three lines of expected output. The version is read through `importlib.metadata`
 | Symptom | Fix |
 |---------|-----|
 | `ERROR: Could not find a version that satisfies the requirement qprogram` | Almost always an unsupported interpreter: the distributions require Python 3.11 or newer. Check `python --version` first, then use the `git+https://` line above. |
-| `ModuleNotFoundError: No module named 'qprogram_qdac'` | The Advanced notebook needs it: `pip install qprogram-qdac==0.1.0 qprogram-qblox==0.1.0`. The other two run without both. |
-| `pip` picks an old resolver or fails on the extras syntax | Upgrade pip first: `pip install -U pip`. Keep the quotes around `"qprogram[viz]==0.1.0"`; some shells eat the brackets. |
+| `ModuleNotFoundError: No module named 'qprogram_qdac'` | The Advanced notebook needs it: `pip install qprogram-qdac==0.2.0 qprogram-qblox==0.2.0`. The other two run without both. |
+| `pip` picks an old resolver or fails on the extras syntax | Upgrade pip first: `pip install -U pip`. Keep the quotes around `"qprogram[viz]==0.2.0"`; some shells eat the brackets. |
 | `python --version` is 3.10 or older | Make a fresh environment on a supported interpreter: `uv venv --python 3.13`. On Colab: Runtime > Change runtime type. |
 | `ModuleNotFoundError: No module named 'matplotlib'` | The `viz` extra is missing: `pip install "qprogram[viz]"`. |
 | `python -m qprogram.lsp serve` fails to import | The `lsp` extra is missing: `pip install "qprogram[lsp]"`. The `check` and `explain` modes do not need it. |
