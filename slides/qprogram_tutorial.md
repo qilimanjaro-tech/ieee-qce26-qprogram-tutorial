@@ -216,6 +216,7 @@ section img { display: block; margin: 0 auto; }
 | **FPGA** | Field-programmable gate array |
 | **IQ** | In-phase / quadrature |
 | **LC** | Inductor-capacitor (circuit) |
+| **LO** | Local oscillator |
 
 ---
 
@@ -355,6 +356,14 @@ $$Q(t) = \beta\,\dot{I}(t)$$
 
 ---
 
+## The IQ mixer
+
+![h:470](img/mixer.svg)
+
+<p class="cap">Two envelopes on two DACs, one oscillator split ninety degrees, and one tone whose amplitude and phase are set independently.</p>
+
+---
+
 ## Virtual Z gates
 
 - A $Z$ rotation turns the frame the instrument already keeps.
@@ -413,71 +422,6 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 - Optimal is the difference between the mean $|0\rangle$ and $|1\rangle$ responses.
 - That difference is taken sample by sample across the record.
 - The window then weights the part where the two states separate.
-
----
-
-## Coherence times
-
-| | This chip | What it measures |
-|---|---|---|
-| $T_1$ | 18 us | Energy leaving the qubit and not coming back |
-| $T_2^{*}$ | 9 us | Plus every source of frequency wander, unfiltered |
-| $T_2$ echo | 16 us | Plus a $\pi$ pulse in the middle, refocusing slow noise |
-
-$$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
-
-- Relaxation feeds half its rate into dephasing, so $T_2 \le 2T_1$ always.
-- Pure dephasing $T_\varphi$ is the rest, and the gap between the last two rows is its slow part.
-
----
-
-## Three coherence experiments
-
-| Experiment | The sequence | What it isolates |
-|---|---|---|
-| Inversion recovery | $\pi$, wait, read | $T_1$, energy leaving and not coming back |
-| Ramsey | $\pi/2$, wait, $\pi/2$, read | $T_2^{*}$, and the drive frequency error as a fringe |
-| Hahn echo | $\pi/2$, wait, $\pi$, wait, $\pi/2$, read | $T_2$, with slow noise refocused |
-
-- Only the middle of the sequence changes, and that is why a **fragment** earns its place.
-- Ramsey runs deliberately off resonance, so the fringe rate reads out the frequency error.
-- Sweep out to about three time constants, since later points measure only noise.
-
----
-
-## Noise sources
-
-- **Two-level defects** in the junction oxide and every metal interface.
-- **Quasiparticles**, broken Cooper pairs raised by stray infrared and cosmic rays.
-- **$1/f$ flux noise**, the reason a tunable qubit has a sweet spot.
-- **Purcell decay** down the readout line, at rate $\kappa(g/\Delta)^2$.
-- All four drift, so one coherence number is a snapshot.
-
----
-
-## The device
-
-| | | |
-|---|---|---|
-| $f_{01}$ = 4.85 GHz | $f_r$ = 7.20 GHz | $\Delta$ = $-2.35$ GHz |
-| $\kappa$ = 1.5 MHz ($Q_L$ = 4800) | $\chi$ = $-1.8$ MHz | $2\chi/\kappa$ = 2.4 |
-| $T_1$ = 18 us | $T_2^{*}$ = 9 us | $T_2$ = 16 us |
-
-Every fit you run has to land on these, and a circuit carries none of them.
-
----
-
-## Six measured numbers
-
-A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply this.
-
-```text
-40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6200,  sigma 10 ns,  beta 0.15
-```
-
-- Nothing in `X(q0)` names a line, a carrier, or an envelope.
-- The carrier and the amplitude came out of their own scans, and the rest are choices.
-- They drift, so the scans are run again.
 
 ---
 
@@ -912,7 +856,7 @@ vendor.qdac.set_offset   qblox False qdac True
 | Real time, active reset | About 10 us | **0.08 s** |
 | Host, one round trip per execution | About 1 ms | **8.2 s** |
 
-- $T_1$ is 18 us on this chip, so passive reset spends 90 of those 92 microseconds waiting.
+- The qubit lifetime $T_1$ is 18 us on this chip, so passive reset spends 90 of those 92 microseconds waiting.
 - A host round trip costs three orders of magnitude more than a real-time one.
 - Which one you get is a property of the rack, and the rest of this part makes it visible.
 
