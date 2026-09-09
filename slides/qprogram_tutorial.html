@@ -1162,21 +1162,23 @@ python -m qprogram.lsp explain flux_sweep.qp
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="76" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="76" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
-<h2 id="exercise-31-a-custom-measurement-field">Exercise 3.1: a custom measurement field</h2>
+<h2 id="exercise-31-a-custom-waveform-in-a-conditional-sequence">Exercise 3.1: a custom waveform in a conditional sequence</h2>
 <ul>
-<li>Register <code>measure.fields.counts</code> to make <code>&quot;counts&quot;</code> available to <code>measure</code>.</li>
-<li>Request both <code>&quot;counts&quot;</code> and <code>MeasurementField.STATE</code>.</li>
-<li>Validate against descriptors that support the field and omit it.</li>
-<li>The reference platform allocates the custom field but leaves it at zero. A supporting platform must supply the measured values.</li>
+<li>Define and register <code>TwoStepPulse</code>: full amplitude for the first half, half amplitude for the second.</li>
+<li>Use the waveform in a fragment that accepts an amplitude parameter.</li>
+<li>Set the flux bias with <code>qdac.set_offset</code> before the readout.</li>
+<li>Use <code>if_</code>/<code>else_</code> to call the fragment with different amplitudes based on the measured state.</li>
+<li>Inspect the <code>.qp</code> text before and after expanding the fragment calls.</li>
 </ul>
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="77" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>
-<li><strong>Docs</strong>: <a href="https://qilimanjaro-tech.github.io/qprogram">qilimanjaro-tech.github.io/qprogram</a> · <strong>Source</strong>: <a href="https://github.com/qilimanjaro-tech/qprogram">github.com/qilimanjaro-tech/qprogram</a></li>
+<li><strong>Docs</strong>: <a href="https://qilimanjaro-tech.github.io/qprogram">qilimanjaro-tech.github.io/qprogram</a></li>
+<li><strong>Source</strong>: <a href="https://github.com/qilimanjaro-tech/qprogram">github.com/qilimanjaro-tech/qprogram</a></li>
 <li>The Reference section is normative, and <code>qp.lark</code> is the machine-readable grammar.</li>
-<li>Read <code>qprogram-qblox</code> or <code>qprogram-qdac</code> before writing your own extension.</li>
+<li>Read <a href="https://github.com/qilimanjaro-tech/qprogram-qblox">github.com/qilimanjaro-tech/qprogram-qblox</a>`` or <a href="https://github.com/qilimanjaro-tech/qprogram-qdac">github.com/qilimanjaro-tech/qprogram-qdac</a> before writing your own extension.</li>
 <li>Write a rule your lab cares about as a predicate.</li>
 <li>Issues and pull requests are welcome.</li>
 </ul>

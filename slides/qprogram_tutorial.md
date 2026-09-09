@@ -977,21 +977,23 @@ python -m qprogram.lsp explain flux_sweep.qp
 
 ---
 
-## Exercise 3.1: a custom measurement field
+## Exercise 3.1: a custom waveform in a conditional sequence
 
-- Register `measure.fields.counts` to make `"counts"` available to `measure`.
-- Request both `"counts"` and `MeasurementField.STATE`.
-- Validate against descriptors that support the field and omit it.
-- The reference platform allocates the custom field but leaves it at zero. A supporting platform must supply the measured values.
+- Define and register `TwoStepPulse`: full amplitude for the first half, half amplitude for the second.
+- Use the waveform in a fragment that accepts an amplitude parameter.
+- Set the flux bias with `qdac.set_offset` before the readout.
+- Use `if_`/`else_` to call the fragment with different amplitudes based on the measured state.
+- Inspect the `.qp` text before and after expanding the fragment calls.
 
 
 ---
 
 ## Where to go next
 
-- **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram) · **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
+- **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram)
+- **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
 - The Reference section is normative, and `qp.lark` is the machine-readable grammar.
-- Read `qprogram-qblox` or `qprogram-qdac` before writing your own extension.
+- Read [github.com/qilimanjaro-tech/qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox)`` or [github.com/qilimanjaro-tech/qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac) before writing your own extension.
 - Write a rule your lab cares about as a predicate.
 - Issues and pull requests are welcome.
 
