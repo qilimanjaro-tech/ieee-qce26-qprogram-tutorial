@@ -395,7 +395,7 @@ Two-qubit gates use the coupling between qubits to make their evolution depend o
 
 | Approach | Control mechanism | Example |
 |---|---|---|
-| **Flux tuning** | Tune a qubit near the avoided crossing between $|11\rangle$ and $|02\rangle$ to accumulate a conditional phase | Controlled-Z gate |
+| **Flux tuning** | Tune a qubit near the avoided crossing between $\|11\rangle$ and $\|02\rangle$ to accumulate a conditional phase | Controlled-Z gate |
 | **Microwave driving** | Drive one qubit near its neighbour's frequency to produce a state-dependent rotation | Cross-resonance gate |
 
 - Flux tuning can move a qubit away from a sweet spot and increase its sensitivity to flux noise.
