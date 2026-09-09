@@ -171,42 +171,41 @@ section img { display: block; margin: 0 auto; }
 
 ## Follow along
 
-- **Full setup**: see the README, QR code above. Install, troubleshooting, the `uv` option.
-- No hardware and no cloud account, since the reference platform ships in the wheel.
-- Open `notebooks/01_introduction.ipynb` now. Its first two cells are the environment check.
+- Follow the **README** linked by the QR code above for installation instructions, troubleshooting, and the `uv` setup option.
+- The examples run locally using the reference platform included in the package. You do not need hardware or a cloud account.
+- Open `notebooks/01_introduction.ipynb` and run the first two cells to check your environment.
 
 ---
 
 ## How we work
 
-- The slides are the map, and the notebooks are the work.
-- One part per notebook: each opens on a few slides, then moves into the notebook and one exercise.
-- `notebooks/` holds the `# TODO` cells, `notebooks/solutions/` the answers.
+- Each section starts with slides that introduce the main ideas, followed by notebook examples and an exercise.
+- Complete the `# TODO` cells in `notebooks/`. Solutions are available in `notebooks/solutions/`.
 
 | Topic | Notebook | Time |
 |---|---|---|
-| Background: the chip, the rack, and why a language of its own | | 40 min |
-| Operations, schemas, waveforms, and the `.qp` file | `01_introduction` | 25 min |
+| Background: superconducting qubits, control hardware, and pulse programming | | 40 min |
+| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 25 min |
 | Variables, sweeps, and results | `02_basics` | 25 min |
 | **Break** | | |
-| Fragments, feedback, extending, and the machine | `03_advanced` | 75 min |
-| Questions and close | | 10 min |
+| Fragments, feedback, extensions, and platforms | `03_advanced` | 75 min |
+| Questions and closing discussion | | 10 min |
 
 ---
 
 ## What you will build
 
-- A **pulse program** you can read, save, load and diff (`01_introduction`)
-- A **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** (`02_basics`)
-- **Active reset**, one measurement deciding the next pulse (`03_advanced`)
-- Your **own waveform, sweep source, and vendor operation** (`03_advanced`)
-- A **platform** of your own, and a rack's **execution plan** (`03_advanced`)
+- A **pulse program** you can inspect, save, reload, and compare across versions (`01_introduction`).
+- A **resonator frequency scan**, a **two-dimensional parameter map**, and a **sweep that changes two parameters together** (`02_basics`).
+- An **active reset sequence** that uses a measurement result to decide whether to apply a correction pulse (`03_advanced`).
+- A custom **waveform**, **sweep source**, and **vendor operation** (`03_advanced`).
+- A simple **platform implementation**, with an **execution plan** that describes how the program would run (`03_advanced`).
 
 ---
 
 ## Acronyms
 
-| Acronym | Stands for |
+| Acronym | Meaning |
 |---|---|
 | **ADC** | Analog-to-digital converter |
 | **AST** | Abstract syntax tree |
@@ -214,49 +213,54 @@ section img { display: block; margin: 0 auto; }
 | **DRAG** | Derivative removal by adiabatic gate |
 | **DSL** | Domain-specific language |
 | **FPGA** | Field-programmable gate array |
-| **IQ** | In-phase / quadrature |
-| **LC** | Inductor-capacitor (circuit) |
+| **IQ** | In-phase and quadrature |
+| **LC** | Inductor-capacitor circuit |
 | **LO** | Local oscillator |
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Concepts · slides only</p>
+<p class="kicker">Lecture introduction</p>
 
-# The chip and the rack
+# The chip and the control hardware
 
-### What a gate has to become before an instrument can emit it
+### How electrical signals control and measure a superconducting qubit
 
 ---
 
-## The harmonic problem
+## The LC oscillator
 
-- What you calibrate is an LC circuit on a chip at 10 mK.
-- Its energy levels are evenly spaced.
-- A tone driving $|0\rangle \to |1\rangle$ drives $|1\rangle \to |2\rangle$ as hard.
-- So no two levels can be addressed alone, and there is no qubit yet.
+- An LC circuit contains a capacitor and an inductor. Energy oscillates between the capacitor's electric field and the inductor's magnetic field.
+- In the quantum description, an ideal LC oscillator has **equally spaced energy levels**.
+- The transitions $|0\rangle \to |1\rangle$ and $|1\rangle \to |2\rangle$ therefore have the same frequency.
+- To address the lowest two levels selectively, we need a circuit with **unequal level spacings**.
+
+<!-- Reference: Krantz et al., A quantum engineer's guide to superconducting qubits (2019), https://arxiv.org/abs/1904.06560. -->
 
 ---
 
 ## The Josephson junction
 
-- A Josephson junction replaces the inductor.
-- Two aluminium films with a nanometre of oxide between them.
-- Its current goes as $I_c\sin\varphi$, so it is nonlinear.
-- Its inductance therefore depends on the current already flowing.
-- It is the only nonlinear element in the circuit.
+- A Josephson junction consists of two superconductors separated by a thin insulating barrier.
+- It acts as a **nonlinear inductor**, replacing the linear inductor in our oscillator.
+- The supercurrent follows $I = I_c\sin\varphi$, where $I_c$ is the critical current and $\varphi$ is the superconducting phase difference across the junction.
+- This nonlinearity makes the energy levels unequally spaced, allowing us to distinguish the qubit transition from higher transitions.
 
 ---
 
 ## Anharmonicity
 
-$$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
+Ignoring offset charge, the circuit Hamiltonian is
 
-- A parabola gives evenly spaced rungs.
-- A cosine well gets shallower as you climb, so the rungs crowd.
-- $f_{01}$ and $f_{12}$ then differ by the anharmonicity $\alpha$, here $-300$ MHz.
-- A pulse narrower in spectrum than $|\alpha|$ addresses the bottom two levels.
+$$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi.$$
+
+- $E_C$ is the charging energy and $E_J$ the Josephson energy; $\hat n$ and $\hat\varphi$ describe the Cooper-pair number and phase difference.
+- The cosine potential gives smaller level spacings at higher energies.
+- The **anharmonicity** is $\alpha = f_{12} - f_{01}$. For example, $\alpha = -300\ \text{MHz}$ places the second transition 300 MHz below the qubit transition.
+- Keeping the pulse bandwidth well below $|\alpha|$ helps avoid exciting $|2\rangle$.
+
+<!-- Reference: Koch et al., Charge-insensitive qubit design derived from the Cooper pair box (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
@@ -264,18 +268,22 @@ $$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
 
 ![h:440](img/transmon.svg)
 
-<p class="cap">A capacitor across a Josephson junction, and the crowded ladder the cosine well gives it.</p>
+<p class="cap">A transmon combines a Josephson junction with a large shunt capacitor. The capacitor reduces sensitivity to charge noise, while the junction provides the unequal level spacings needed to address the qubit transition.</p>
 
 ---
 
 ## Tuning with flux
 
-- Split the junction into a loop of two and the effective $E_J$ becomes tunable.
-- A DC bias threads flux through that loop and moves $f_{01}$.
-- The curve is a square root of a cosine, and its flat top is the **sweet spot**.
-- There the slope against bias vanishes, so flux noise stops moving the frequency.
+- Replacing the single junction with two junctions in a superconducting loop makes the effective Josephson energy tunable.
+- Current in a nearby flux line changes the magnetic flux through the loop, shifting $f_{01}$.
+- For a symmetric junction pair, an approximate tuning curve is
 
-$$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
+$$f_{01}(V) \approx f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}.$$
+
+- $V_0$ is a bias at the maximum frequency; $V_\Phi$ is the voltage period.
+- At a **sweet spot**, the slope is zero, reducing sensitivity to small flux fluctuations. Higher-order sensitivity remains.
+
+<!-- This approximation neglects the charging-energy correction and breaks down near the frequency minima. Reference: Koch et al. (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
@@ -283,47 +291,51 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 ![h:470](img/rack.svg)
 
-<p class="cap">Three lines down to the chip and one line back, with attenuation going in and gain coming out.</p>
+<p class="cap">The control electronics generate microwave and flux signals for the chip. The readout electronics digitise the returning signal after amplification.</p>
 
 ---
 
-## The fridge
+## The dilution refrigerator
 
 ![h:480](img/fridge.svg)
 
-<p class="cap">Attenuation stage by stage going down, and the coldest amplifier sets the noise figure for the rest.</p>
+<p class="cap">The refrigerator cools the chip to millikelvin temperatures. Attenuators and filters reduce incoming noise; low-noise amplifiers strengthen the weak readout signal on its way out.</p>
 
 ---
 
-## Three lines
+## Control and readout lines
 
-| Line | What runs on it | What it does |
+| Line | Example signal | Purpose |
 |---|---|---|
-| **Drive** | A microwave tone near $f_{01}$ = 4.85 GHz | Rotates the state |
-| **Readout** | A microwave tone near $f_r$ = 7.20 GHz | Interrogates a resonator coupled to the qubit |
-| **Flux** | A slow, near-DC voltage through a coil | Moves $f_{01}$ |
+| **Drive** | A microwave pulse near $f_{01} = 4.85\ \text{GHz}$ | Rotate the qubit state |
+| **Readout** | A microwave pulse near $f_r = 7.20\ \text{GHz}$ | Probe a resonator coupled to the qubit |
+| **Flux** | A DC bias or a timed flux pulse | Adjust the qubit frequency |
 
-- The drive line has no ADC, so nothing sent down it comes back.
-- Every operation today writes a voltage onto one of these three lines.
+- These frequencies are illustrative; actual values come from device calibration.
+- In the notebooks, **buses** identify the signal paths used for control and acquisition.
 
 ---
 
 ## The rotating frame
 
-- The Bloch vector precesses about $z$ at the qubit frequency.
-- Move to a frame spinning about $z$ at the drive frequency.
-- On resonance the precession stops and the state holds still.
-- The instrument keeps that frame as a running phase on each output.
+- In the laboratory frame, the qubit's relative phase evolves at its transition frequency.
+- We describe the state in a frame rotating at the drive frequency, so the remaining free precession depends on the **detuning**.
+- On resonance, this free precession vanishes. An applied drive still rotates the state.
+- The control electronics track a phase reference so that successive pulses have the intended relative phases.
 
 ---
 
-## Area and phase
+## Pulse area and phase
 
-$$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
+For an ideal resonant pulse with a fixed phase,
 
-- The Rabi rate $\Omega(t)$ is proportional to the envelope, so only the area matters.
-- Half the amplitude is half the area, so `X/2` is the same shape halved.
-- The carrier phase $\phi$ is the azimuth, so `Y` is `X` advanced 90 degrees.
+$$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t,$$
+
+where $\Omega(t)$ is the angular Rabi frequency, in radians per second.
+
+- The **pulse area** determines the rotation angle. In the linear response regime, halving the amplitude halves the angle.
+- The **drive phase** determines the rotation axis in the equatorial plane. A 90-degree phase shift changes an $X$ rotation into a $Y$ rotation under the chosen phase convention.
+- On hardware, pulse amplitudes and phases are calibrated to implement the desired gates.
 
 ---
 
@@ -331,28 +343,30 @@ $$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
 
 ![h:480](img/rotation.svg)
 
-<p class="cap">The carrier phase picks the axis in the equatorial plane, the envelope area picks the angle.</p>
+<p class="cap">For an ideal resonant pulse with fixed phase, the drive phase sets the rotation axis in the equatorial plane, and the envelope area sets the rotation angle.</p>
 
 ---
 
 ## Leakage
 
-- A transmon is a ladder, not a two-level system.
-- The $|1\rangle \to |2\rangle$ transition sits $|\alpha|$ below the one you drive.
-- Population reaches it at order $(\Omega/\alpha)^2$, so a faster gate leaks more.
-- Most comes back, and what stays is leakage no later gate recovers.
-- A square edge is broadband and feeds the transition you are avoiding.
+- A transmon has more than two energy levels. We use $|0\rangle$ and $|1\rangle$ as the computational states.
+- Its $|1\rangle \to |2\rangle$ transition lies $|\alpha|$ below the qubit transition.
+- Short or abruptly switched pulses have broad spectra and can excite this unwanted transition.
+- Population left outside the computational states at the end of a gate is called **leakage**.
+- Smooth envelopes and pulse corrections help reduce leakage while keeping gates short.
 
 ---
 
 ## DRAG
 
-$$Q(t) = \beta\,\dot{I}(t)$$
+$$Q(t) = \beta\,\frac{\mathrm{d}I(t)}{\mathrm{d}t}$$
 
-- DRAG adds a second envelope on the quadrature 90 degrees from the one you play.
-- Its shape is the derivative of the in-phase envelope.
-- It cancels the leading transfer into $|2\rangle$ and the phase error left behind.
-- First order gives $\beta \approx 1/|\alpha|$, and $\beta$ is calibrated per qubit.
+- **DRAG** adds a correction in the quadrature channel, 90 degrees from the in-phase drive.
+- The correction follows the time derivative of the in-phase envelope $I(t)$.
+- This helps suppress unwanted excitation of $|2\rangle$. Detuning or phase corrections can address the associated phase error.
+- The coefficient $\beta$ sets the correction's scale and sign. Its value depends on the qubit and waveform convention and is calibrated experimentally.
+
+<!-- Reference: Motzoi et al., Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits (2009), https://doi.org/10.1103/PhysRevLett.103.110501. The coefficient in this continuous-time equation need not use the same normalisation as a waveform API's beta parameter. -->
 
 ---
 
@@ -360,51 +374,60 @@ $$Q(t) = \beta\,\dot{I}(t)$$
 
 ![h:470](img/mixer.svg)
 
-<p class="cap">Two envelopes on two DACs, one oscillator split ninety degrees, and one tone whose amplitude and phase are set independently.</p>
+<p class="cap">Two DAC outputs supply the I and Q envelopes. The mixer combines them with local-oscillator signals 90 degrees apart to control the amplitude and phase of the microwave output.</p>
 
 ---
 
 ## Virtual Z gates
 
-- A $Z$ rotation turns the frame the instrument already keeps.
-- Apply $Z(\theta)$ by advancing the phase of every later pulse on that line.
-- No waveform and no samples, so no duration and no error.
-- A single-qubit unitary becomes two `X/2` pulses with phase advances around them.
+- A **virtual Z gate** is implemented by updating the phase reference for subsequent control pulses.
+- The phase update represents a rotation about $Z$ and requires no additional physical pulse duration.
+- Later pulses use the updated reference so that their rotation axes remain consistent.
+- Any single-qubit unitary can be composed from two $X_{\pi/2}$ pulses and virtual Z rotations, up to a global phase.
+
+<!-- Reference: McKay et al., Efficient Z Gates for Quantum Processors (2017), https://doi.org/10.1103/PhysRevA.96.022330. -->
 
 ---
 
 ## Two-qubit gates
 
-Two qubits interact through a coupling, and a gate is an interval where you let it act.
+Two-qubit gates use the coupling between qubits to make their evolution depend on their joint state.
 
-| Route | What you do | Duration |
+| Approach | Control mechanism | Example |
 |---|---|---|
-| **Flux** | Push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
-| **All-microwave** | Drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
+| **Flux tuning** | Tune a qubit near the avoided crossing between $|11\rangle$ and $|02\rangle$ to accumulate a conditional phase | Controlled-Z gate |
+| **Microwave driving** | Drive one qubit near its neighbour's frequency to produce a state-dependent rotation | Cross-resonance gate |
 
-- The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.
-- The microwave route moves neither qubit.
-- Two-qubit error runs five to ten times single-qubit error.
-- Each pair is calibrated by a two-dimensional scan, amplitude against duration.
+- Flux tuning can move a qubit away from a sweet spot and increase its sensitivity to flux noise.
+- Cross-resonance control can keep the qubit frequencies fixed.
+- Pulse amplitude, duration, and phase corrections are calibrated for each pair. Gate speed and error depend on the device and implementation.
 
 ---
 
 ## Dispersive readout
 
-- Every gate so far went out on a drive line that has no ADC.
-- The qubit is read through a **resonator** beside it, coupled at rate $g$.
-- The detuning $\Delta = f_{01} - f_r$ is far larger than $g$.
-- At that ratio the two cannot exchange energy, so they shift each other.
+- We measure the qubit by probing a **coupled resonator** with a microwave pulse.
+- The detuning $\Delta = f_{01} - f_r$ is large compared with the coupling strength $g$; the resonator must also remain far from higher qubit transitions.
+- In this **dispersive regime**, direct energy exchange is suppressed, but the qubit state shifts the resonator's response.
+- Measuring that response lets us infer the qubit state.
+
+<!-- Dispersive theory assumes sufficiently weak coupling relative to the relevant detunings and readout power below the breakdown of the approximation. Reference: Koch et al. (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
 ## The dispersive shift
 
-- The resonator sits at $f_r + \chi$ or $f_r - \chi$, and the qubit picks which.
-- Park a tone between the two, and the transmission past the resonator carries the answer.
-- The shift grows with the coupling and shrinks with the detuning.
+- The resonator frequencies associated with $|0\rangle$ and $|1\rangle$ are separated by $2|\chi|$.
+- A probe near these frequencies produces different amplitudes and phases for the two states.
+- For a transmon, the leading dispersive approximation is
 
-$$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz}, \qquad 2\chi = 3.6\ \text{MHz}$$
+$$\chi \approx \frac{g^2\alpha}{\Delta(\Delta+\alpha)},$$
+
+with $g$, $\Delta$, and $\alpha$ expressed in the same frequency units.
+
+For example, $\chi = -1.8\ \text{MHz}$ gives a separation of $2|\chi| = 3.6\ \text{MHz}$.
+
+<!-- Reference: Koch et al. (2007), Eq. (3.9), https://arxiv.org/abs/cond-mat/0703002. The numerical shift is illustrative; no numerical coupling g has been specified. -->
 
 ---
 
@@ -412,66 +435,66 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 
 ![h:470](img/dispersive.svg)
 
-<p class="cap">The resonator's two dips, the chain that carries the return up to an ADC, and the two clouds a threshold gets drawn between.</p>
+<p class="cap">The readout signal is amplified, digitised, and processed into I and Q values. Repeated measurements form two distributions, and a decision threshold assigns each result to a qubit state.</p>
 
 ---
 
 ## Integration weights
 
-- The weights $w(t)$ are their own calibration, measured like any other number.
-- Optimal is the difference between the mean $|0\rangle$ and $|1\rangle$ responses.
-- That difference is taken sample by sample across the record.
-- The window then weights the part where the two states separate.
+- Integration weights determine how each sample contributes to the final I and Q values.
+- To calibrate them, prepare $|0\rangle$ and $|1\rangle$ and measure the mean readout trace for each state.
+- A common choice uses the difference between those traces, giving more weight to times when the responses are easier to distinguish.
+- This matched-filter choice is optimal for additive white Gaussian noise with equal variance. Correlated or time-dependent noise can require different weights.
+
+<!-- Reference: Khan et al., Practical Trainable Temporal Postprocessor for Multistate Quantum Measurement (2024), https://doi.org/10.1103/PRXQuantum.5.020364. -->
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Concepts · slides only</p>
+<p class="kicker">Lecture introduction</p>
 
-# Why a language of its own
+# A language for pulse programs
 
-### Six requirements, and what a vendor dialect does to them
-
----
-
-## Six requirements
-
-- **Timed waveforms on named lines**, not gates on qubits.
-- **A clock per line**, with barriers as explicit instructions.
-- **Parameter sweeps**, nested or stepped in lockstep.
-- **Shot averaging**, collapsing repeats into one number.
-- **Acquisition with weights**, and a choice of raw, integrated, or classified output.
-- **Conditional measurement**, active reset for example, decided in real time.
+### Expressing experiments across control platforms
 
 ---
 
-## One dialect per rack
+## What a pulse program needs to express
 
-- Experimental results get published in papers. The control code behind them isn't shared.
-- Every vendor ships its own sequencer dialect.
-- They are assembly shaped, because an FPGA has to meet every clock edge.
-- Loops come out of registers, and waveform memory is addressed by hand.
-- Porting to a second rack means rewriting experiments that were already correct.
-
----
-
-## The loop decision
-
-- Each script hard codes which loops run in the sequencer.
-- Whatever is left runs on the host, one round trip per step.
-- Running on the host can cost a factor of a hundred.
-- The choice belongs to the rack, so it should not sit in the file.
+- **Waveforms and timing:** play pulses on named buses at the intended times.
+- **Synchronisation:** track each bus's timeline and align buses when required.
+- **Parameter sweeps:** vary parameters in nested loops or step several parameters together.
+- **Averaging:** repeat measurements and combine the results.
+- **Acquisition:** specify integration weights and request raw traces, integrated IQ, or classified states.
+- **Feedback:** use a measurement result to choose the next operation, as in active reset.
 
 ---
 
-## A Python DSL
+## Vendor control interfaces
 
-- The experiment goes in the file, the rack stays outside it.
-- QProgram is a Python builder that produces an AST.
-- `program.play(...)` appends a typed `Play` node and sends nothing.
-- Every other tool in the library reads that one tree.
-- Not a compiler or a scheduler, since those sit behind `PlatformProtocol`.
+- Control platforms differ in their instruction sets, timing constraints, and supported operations.
+- Low-level sequencer code may expose registers, waveform memory, and hardware-specific loop instructions.
+- When these details are embedded in an experiment script, moving to another platform requires changes to the script.
+- A common program representation lets us describe the experiment separately from the platform-specific code that executes it.
+
+---
+
+## Where loops execute
+
+- A loop can run on an instrument's sequencer when the hardware supports its operations and parameter updates.
+- Other loops may need to run on the host computer, for example when they control an external instrument.
+- Host execution can add communication and setup overhead at each step.
+- The execution plan uses the program's requirements and the platform's capabilities to determine where loops can run.
+
+---
+
+## QProgram as a Python DSL
+
+- QProgram uses Python to build a structured description of an experiment: an **abstract syntax tree**.
+- Calling `program.play(...)` adds a typed `Play` node to that tree. Building the program does not send a pulse to hardware.
+- The same structure supports inspection, validation, and serialisation.
+- A platform implementing `PlatformProtocol` handles execution, including any compilation and scheduling required by its hardware.
 
 ---
 
@@ -479,7 +502,7 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 
 ![h:480](img/stack.svg)
 
-<p class="cap">Your script builds a tree, a platform runs that tree, and files fall out as artifacts.</p>
+<p class="cap">Python code builds a QProgram. Serialisation saves its structure, and a platform executes it and returns measurement results.</p>
 
 ---
 
