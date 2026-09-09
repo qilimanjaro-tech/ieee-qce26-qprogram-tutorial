@@ -180,7 +180,7 @@ section img { display: block; margin: 0 auto; }
 ## How we work
 
 - The slides are the map, and the notebooks are the work.
-- One part per notebook: each opens on a few slides, then moves into the notebook and one 🧩 exercise.
+- One part per notebook: each opens on a few slides, then moves into the notebook and one exercise.
 - `notebooks/` holds the `# TODO` cells, `notebooks/solutions/` the answers.
 
 | Topic | Notebook | Time |
