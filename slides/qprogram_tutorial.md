@@ -126,14 +126,14 @@ section img { display: block; margin: 0 auto; }
 
 ## The presenters
 
-- **Vyron Vasileiadis**, Tech Lead at **Qilimanjaro Quantum Tech** · vyron@qilimanjaro.tech
-- **Flavie Le Bars**, Quantum Software Engineer at **Qilimanjaro Quantum Tech** · flavie.lebars@qilimanjaro.tech
+- **Vyron Vasileiadis** · Tech Lead · vyron@qilimanjaro.tech
+- **Flavie Le Bars** · Quantum Software Engineer · flavie.lebars@qilimanjaro.tech
 
 ---
 
-## Qilimanjaro
+## Qilimanjaro Quantum Tech
 
-- **Qilimanjaro Quantum Tech** builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.
+- **Qilimanjaro** builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.
 - Full-stack: hardware, control electronics, software, and cloud access, under one roof.
 - Founded in 2019, based in Barcelona.
 
@@ -184,12 +184,12 @@ section img { display: block; margin: 0 auto; }
 
 | Topic | Notebook | Time |
 |---|---|---|
-| Background: superconducting qubits, control hardware, and pulse programming | | 40 min |
-| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 25 min |
-| Variables, sweeps, and results | `02_basics` | 25 min |
+| Background: superconducting qubits, control hardware, and pulse programming | | 20 min |
+| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 35 min |
+| Variables, sweeps, and results | `02_basics` | 35 min |
 | **Break** | | |
 | Fragments, feedback, extensions, and platforms | `03_advanced` | 75 min |
-| Questions and closing discussion | | 10 min |
+| Questions and closing discussion | | 15 min |
 
 ---
 
@@ -977,21 +977,23 @@ python -m qprogram.lsp explain flux_sweep.qp
 
 ---
 
-## Exercise 3.1: a custom measurement field
+## Exercise 3.1: a custom waveform in a conditional sequence
 
-- Register `measure.fields.counts` to make `"counts"` available to `measure`.
-- Request both `"counts"` and `MeasurementField.STATE`.
-- Validate against descriptors that support the field and omit it.
-- The reference platform allocates the custom field but leaves it at zero. A supporting platform must supply the measured values.
+- Define and register `TwoStepPulse`: full amplitude for the first half, half amplitude for the second.
+- Use the waveform in a fragment that accepts an amplitude parameter.
+- Set the flux bias with `qdac.set_offset` before the readout.
+- Use `if_`/`else_` to call the fragment with different amplitudes based on the measured state.
+- Inspect the `.qp` text before and after expanding the fragment calls.
 
 
 ---
 
 ## Where to go next
 
-- **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram) · **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
+- **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram)
+- **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
 - The Reference section is normative, and `qp.lark` is the machine-readable grammar.
-- Read `qprogram-qblox` or `qprogram-qdac` before writing your own extension.
+- Read [github.com/qilimanjaro-tech/qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox)`` or [github.com/qilimanjaro-tech/qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac) before writing your own extension.
 - Write a rule your lab cares about as a predicate.
 - Issues and pull requests are welcome.
 
@@ -999,9 +1001,9 @@ python -m qprogram.lsp explain flux_sweep.qp
 
 ## Other events at QCE 2026
 
-- **Paper: QProgram**: *A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming* (Q-SET 2026), Vyron Vasileiadis, Flavie Le Bars, David Arcos. Wed Sep 16, 10:00–11:30 AM EDT, Room 714B.
-- **Poster: QiliSim**: *A C++ Quantum Simulator for Digital/Analog Workflows*, Luke Mortimer, Ameer Azzam, Vyron Vasileiadis, Natàlia Padilla. Board 76, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
-- **Poster: QPySequence**: *Pythonic Sequence Programming for Qblox Hardware*, Flavie Le Bars, Vyron Vasileiadis, Joel Pérez Díaz. Board 86, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+- **Paper** - *QProgram: A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming*. Room 714B. Wed Sep 16, 10:00–11:30.
+- **Poster** - *QiliSim: A C++ Quantum Simulator for Digital/Analog Workflows*. Board 76, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+- **Poster** - *QPySequence: Pythonic Sequence Programming for Qblox Hardware*. Board 86, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
 
 ---
 <!-- _class: lead center -->

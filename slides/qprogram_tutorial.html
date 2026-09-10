@@ -17,15 +17,15 @@
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="2" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="2" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
 <h2 id="the-presenters">The presenters</h2>
 <ul>
-<li><strong>Vyron Vasileiadis</strong>, Tech Lead at <strong>Qilimanjaro Quantum Tech</strong> · vyron@qilimanjaro.tech</li>
-<li><strong>Flavie Le Bars</strong>, Quantum Software Engineer at <strong>Qilimanjaro Quantum Tech</strong> · flavie.lebars@qilimanjaro.tech</li>
+<li><strong>Vyron Vasileiadis</strong> · Tech Lead · vyron@qilimanjaro.tech</li>
+<li><strong>Flavie Le Bars</strong> · Quantum Software Engineer · flavie.lebars@qilimanjaro.tech</li>
 </ul>
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="3" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="3" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
-<h2 id="qilimanjaro">Qilimanjaro</h2>
+<h2 id="qilimanjaro-quantum-tech">Qilimanjaro Quantum Tech</h2>
 <ul>
-<li><strong>Qilimanjaro Quantum Tech</strong> builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.</li>
+<li><strong>Qilimanjaro</strong> builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.</li>
 <li>Full-stack: hardware, control electronics, software, and cloud access, under one roof.</li>
 <li>Founded in 2019, based in Barcelona.</li>
 </ul>
@@ -88,17 +88,17 @@
 <tr>
 <td>Background: superconducting qubits, control hardware, and pulse programming</td>
 <td></td>
-<td>40 min</td>
+<td>20 min</td>
 </tr>
 <tr>
 <td>Operations, schemas, waveforms, and <code>.qp</code> files</td>
 <td><code>01_introduction</code></td>
-<td>25 min</td>
+<td>35 min</td>
 </tr>
 <tr>
 <td>Variables, sweeps, and results</td>
 <td><code>02_basics</code></td>
-<td>25 min</td>
+<td>35 min</td>
 </tr>
 <tr>
 <td><strong>Break</strong></td>
@@ -113,7 +113,7 @@
 <tr>
 <td>Questions and closing discussion</td>
 <td></td>
-<td>10 min</td>
+<td>15 min</td>
 </tr>
 </tbody>
 </table>
@@ -1162,21 +1162,23 @@ python -m qprogram.lsp explain flux_sweep.qp
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="76" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="76" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
-<h2 id="exercise-31-a-custom-measurement-field">Exercise 3.1: a custom measurement field</h2>
+<h2 id="exercise-31-a-custom-waveform-in-a-conditional-sequence">Exercise 3.1: a custom waveform in a conditional sequence</h2>
 <ul>
-<li>Register <code>measure.fields.counts</code> to make <code>&quot;counts&quot;</code> available to <code>measure</code>.</li>
-<li>Request both <code>&quot;counts&quot;</code> and <code>MeasurementField.STATE</code>.</li>
-<li>Validate against descriptors that support the field and omit it.</li>
-<li>The reference platform allocates the custom field but leaves it at zero. A supporting platform must supply the measured values.</li>
+<li>Define and register <code>TwoStepPulse</code>: full amplitude for the first half, half amplitude for the second.</li>
+<li>Use the waveform in a fragment that accepts an amplitude parameter.</li>
+<li>Set the flux bias with <code>qdac.set_offset</code> before the readout.</li>
+<li>Use <code>if_</code>/<code>else_</code> to call the fragment with different amplitudes based on the measured state.</li>
+<li>Inspect the <code>.qp</code> text before and after expanding the fragment calls.</li>
 </ul>
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="77" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="77" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>
-<li><strong>Docs</strong>: <a href="https://qilimanjaro-tech.github.io/qprogram">qilimanjaro-tech.github.io/qprogram</a> · <strong>Source</strong>: <a href="https://github.com/qilimanjaro-tech/qprogram">github.com/qilimanjaro-tech/qprogram</a></li>
+<li><strong>Docs</strong>: <a href="https://qilimanjaro-tech.github.io/qprogram">qilimanjaro-tech.github.io/qprogram</a></li>
+<li><strong>Source</strong>: <a href="https://github.com/qilimanjaro-tech/qprogram">github.com/qilimanjaro-tech/qprogram</a></li>
 <li>The Reference section is normative, and <code>qp.lark</code> is the machine-readable grammar.</li>
-<li>Read <code>qprogram-qblox</code> or <code>qprogram-qdac</code> before writing your own extension.</li>
+<li>Read <a href="https://github.com/qilimanjaro-tech/qprogram-qblox">github.com/qilimanjaro-tech/qprogram-qblox</a>`` or <a href="https://github.com/qilimanjaro-tech/qprogram-qdac">github.com/qilimanjaro-tech/qprogram-qdac</a> before writing your own extension.</li>
 <li>Write a rule your lab cares about as a predicate.</li>
 <li>Issues and pull requests are welcome.</li>
 </ul>
@@ -1185,9 +1187,9 @@ python -m qprogram.lsp explain flux_sweep.qp
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="78" data-paginate="true" data-footer="Pulse-level Programming with QProgram · QCE 2026" lang="en-US" data-marpit-pagination="78" style="--paginate:true;--footer:Pulse-level Programming with QProgram · QCE 2026;" data-marpit-pagination-total="79" data-size="16:9">
 <h2 id="other-events-at-qce-2026">Other events at QCE 2026</h2>
 <ul>
-<li><strong>Paper: QProgram</strong>: <em>A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming</em> (Q-SET 2026), Vyron Vasileiadis, Flavie Le Bars, David Arcos. Wed Sep 16, 10:00–11:30 AM EDT, Room 714B.</li>
-<li><strong>Poster: QiliSim</strong>: <em>A C++ Quantum Simulator for Digital/Analog Workflows</em>, Luke Mortimer, Ameer Azzam, Vyron Vasileiadis, Natàlia Padilla. Board 76, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.</li>
-<li><strong>Poster: QPySequence</strong>: <em>Pythonic Sequence Programming for Qblox Hardware</em>, Flavie Le Bars, Vyron Vasileiadis, Joel Pérez Díaz. Board 86, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.</li>
+<li><strong>Paper</strong> - <em>QProgram: A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming</em>. Room 714B. Wed Sep 16, 10:00–11:30.</li>
+<li><strong>Poster</strong> - <em>QiliSim: A C++ Quantum Simulator for Digital/Analog Workflows</em>. Board 76, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.</li>
+<li><strong>Poster</strong> - <em>QPySequence: Pythonic Sequence Programming for Qblox Hardware</em>. Board 86, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.</li>
 </ul>
 <footer>Pulse-level Programming with QProgram · QCE 2026</footer>
 </section>
