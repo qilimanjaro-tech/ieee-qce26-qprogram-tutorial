@@ -126,14 +126,14 @@ section img { display: block; margin: 0 auto; }
 
 ## The presenters
 
-- **Vyron Vasileiadis**, Tech Lead at **Qilimanjaro Quantum Tech** · vyron@qilimanjaro.tech
-- **Flavie Le Bars**, Quantum Software Engineer at **Qilimanjaro Quantum Tech** · flavie.lebars@qilimanjaro.tech
+- **Vyron Vasileiadis** · Tech Lead · vyron@qilimanjaro.tech
+- **Flavie Le Bars** · Quantum Software Engineer · flavie.lebars@qilimanjaro.tech
 
 ---
 
-## Qilimanjaro
+## Qilimanjaro Quantum Tech
 
-- **Qilimanjaro Quantum Tech** builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.
+- **Qilimanjaro** builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.
 - Full-stack: hardware, control electronics, software, and cloud access, under one roof.
 - Founded in 2019, based in Barcelona.
 
@@ -1001,9 +1001,9 @@ python -m qprogram.lsp explain flux_sweep.qp
 
 ## Other events at QCE 2026
 
-- **Paper: QProgram**: *A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming* (Q-SET 2026), Vyron Vasileiadis, Flavie Le Bars, David Arcos. Wed Sep 16, 10:00–11:30 AM EDT, Room 714B.
-- **Poster: QiliSim**: *A C++ Quantum Simulator for Digital/Analog Workflows*, Luke Mortimer, Ameer Azzam, Vyron Vasileiadis, Natàlia Padilla. Board 76, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
-- **Poster: QPySequence**: *Pythonic Sequence Programming for Qblox Hardware*, Flavie Le Bars, Vyron Vasileiadis, Joel Pérez Díaz. Board 86, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+- **Paper** - *QProgram: A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming*. Room 714B. Wed Sep 16, 10:00–11:30.
+- **Poster** - *QiliSim: A C++ Quantum Simulator for Digital/Analog Workflows*. Board 76, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+- **Poster** - *QPySequence: Pythonic Sequence Programming for Qblox Hardware*. Board 86, Hall E. Mon Sep 14, 18:30–20:00; Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
 
 ---
 <!-- _class: lead center -->
