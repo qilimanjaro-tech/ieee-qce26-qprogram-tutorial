@@ -171,42 +171,41 @@ section img { display: block; margin: 0 auto; }
 
 ## Follow along
 
-- **Full setup**: see the README, QR code above. Install, troubleshooting, the `uv` option.
-- No hardware and no cloud account, since the reference platform ships in the wheel.
-- Open `notebooks/01_introduction.ipynb` now. Its first two cells are the environment check.
+- Follow the **README** linked by the QR code above for installation instructions, troubleshooting, and the `uv` setup option.
+- The examples run locally using the reference platform included in the package. You do not need hardware or a cloud account.
+- Open `notebooks/01_introduction.ipynb` and run the first two cells to check your environment.
 
 ---
 
 ## How we work
 
-- The slides are the map, and the notebooks are the work.
-- One part per notebook: each opens on a few slides, then moves into the notebook and one exercise.
-- `notebooks/` holds the `# TODO` cells, `notebooks/solutions/` the answers.
+- Each section starts with slides that introduce the main ideas, followed by notebook examples and an exercise.
+- Complete the `# TODO` cells in `notebooks/`. Solutions are available in `notebooks/solutions/`.
 
 | Topic | Notebook | Time |
 |---|---|---|
-| Background: the chip, the rack, and why a language of its own | | 40 min |
-| Operations, schemas, waveforms, and the `.qp` file | `01_introduction` | 25 min |
+| Background: superconducting qubits, control hardware, and pulse programming | | 40 min |
+| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 25 min |
 | Variables, sweeps, and results | `02_basics` | 25 min |
 | **Break** | | |
-| Fragments, feedback, extending, and the machine | `03_advanced` | 75 min |
-| Questions and close | | 10 min |
+| Fragments, feedback, extensions, and platforms | `03_advanced` | 75 min |
+| Questions and closing discussion | | 10 min |
 
 ---
 
 ## What you will build
 
-- A **pulse program** you can read, save, load and diff (`01_introduction`)
-- A **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** (`02_basics`)
-- **Active reset**, one measurement deciding the next pulse (`03_advanced`)
-- Your **own waveform, sweep source, and vendor operation** (`03_advanced`)
-- A **platform** of your own, and a rack's **execution plan** (`03_advanced`)
+- A **pulse program** you can inspect, save, reload, and compare across versions (`01_introduction`).
+- A **resonator frequency scan**, a **two-dimensional parameter map**, and a **sweep that changes two parameters together** (`02_basics`).
+- An **active reset sequence** that uses a measurement result to decide whether to apply a correction pulse (`03_advanced`).
+- A custom **waveform**, **sweep source**, and **vendor operation** (`03_advanced`).
+- A simple **platform implementation**, with an **execution plan** that describes how the program would run (`03_advanced`).
 
 ---
 
 ## Acronyms
 
-| Acronym | Stands for |
+| Acronym | Meaning |
 |---|---|
 | **ADC** | Analog-to-digital converter |
 | **AST** | Abstract syntax tree |
@@ -214,48 +213,54 @@ section img { display: block; margin: 0 auto; }
 | **DRAG** | Derivative removal by adiabatic gate |
 | **DSL** | Domain-specific language |
 | **FPGA** | Field-programmable gate array |
-| **IQ** | In-phase / quadrature |
-| **LC** | Inductor-capacitor (circuit) |
+| **IQ** | In-phase and quadrature |
+| **LC** | Inductor-capacitor circuit |
+| **LO** | Local oscillator |
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Concepts · slides only</p>
+<p class="kicker">Lecture introduction</p>
 
-# The chip and the rack
+# The chip and the control hardware
 
-### What a gate has to become before an instrument can emit it
+### How electrical signals control and measure a superconducting qubit
 
 ---
 
-## The harmonic problem
+## The LC oscillator
 
-- What you calibrate is an LC circuit on a chip at 10 mK.
-- Its energy levels are evenly spaced.
-- A tone driving $|0\rangle \to |1\rangle$ drives $|1\rangle \to |2\rangle$ as hard.
-- So no two levels can be addressed alone, and there is no qubit yet.
+- An LC circuit contains a capacitor and an inductor. Energy oscillates between the capacitor's electric field and the inductor's magnetic field.
+- In the quantum description, an ideal LC oscillator has **equally spaced energy levels**.
+- The transitions $|0\rangle \to |1\rangle$ and $|1\rangle \to |2\rangle$ therefore have the same frequency.
+- To address the lowest two levels selectively, we need a circuit with **unequal level spacings**.
+
+<!-- Reference: Krantz et al., A quantum engineer's guide to superconducting qubits (2019), https://arxiv.org/abs/1904.06560. -->
 
 ---
 
 ## The Josephson junction
 
-- A Josephson junction replaces the inductor.
-- Two aluminium films with a nanometre of oxide between them.
-- Its current goes as $I_c\sin\varphi$, so it is nonlinear.
-- Its inductance therefore depends on the current already flowing.
-- It is the only nonlinear element in the circuit.
+- A Josephson junction consists of two superconductors separated by a thin insulating barrier.
+- It acts as a **nonlinear inductor**, replacing the linear inductor in our oscillator.
+- The supercurrent follows $I = I_c\sin\varphi$, where $I_c$ is the critical current and $\varphi$ is the superconducting phase difference across the junction.
+- This nonlinearity makes the energy levels unequally spaced, allowing us to distinguish the qubit transition from higher transitions.
 
 ---
 
 ## Anharmonicity
 
-$$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
+Ignoring offset charge, the circuit Hamiltonian is
 
-- A parabola gives evenly spaced rungs.
-- A cosine well gets shallower as you climb, so the rungs crowd.
-- $f_{01}$ and $f_{12}$ then differ by the anharmonicity $\alpha$, here $-300$ MHz.
-- A pulse narrower in spectrum than $|\alpha|$ addresses the bottom two levels.
+$$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi.$$
+
+- $E_C$ is the charging energy and $E_J$ the Josephson energy; $\hat n$ and $\hat\varphi$ describe the Cooper-pair number and phase difference.
+- The cosine potential gives smaller level spacings at higher energies.
+- The **anharmonicity** is $\alpha = f_{12} - f_{01}$. For example, $\alpha = -300\ \text{MHz}$ places the second transition 300 MHz below the qubit transition.
+- Keeping the pulse bandwidth well below $|\alpha|$ helps avoid exciting $|2\rangle$.
+
+<!-- Reference: Koch et al., Charge-insensitive qubit design derived from the Cooper pair box (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
@@ -263,18 +268,22 @@ $$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi$$
 
 ![h:440](img/transmon.svg)
 
-<p class="cap">A capacitor across a Josephson junction, and the crowded ladder the cosine well gives it.</p>
+<p class="cap">A transmon combines a Josephson junction with a large shunt capacitor. The capacitor reduces sensitivity to charge noise, while the junction provides the unequal level spacings needed to address the qubit transition.</p>
 
 ---
 
 ## Tuning with flux
 
-- Split the junction into a loop of two and the effective $E_J$ becomes tunable.
-- A DC bias threads flux through that loop and moves $f_{01}$.
-- The curve is a square root of a cosine, and its flat top is the **sweet spot**.
-- There the slope against bias vanishes, so flux noise stops moving the frequency.
+- Replacing the single junction with two junctions in a superconducting loop makes the effective Josephson energy tunable.
+- Current in a nearby flux line changes the magnetic flux through the loop, shifting $f_{01}$.
+- For a symmetric junction pair, an approximate tuning curve is
 
-$$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
+$$f_{01}(V) \approx f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}.$$
+
+- $V_0$ is a bias at the maximum frequency; $V_\Phi$ is the voltage period.
+- At a **sweet spot**, the slope is zero, reducing sensitivity to small flux fluctuations. Higher-order sensitivity remains.
+
+<!-- This approximation neglects the charging-energy correction and breaks down near the frequency minima. Reference: Koch et al. (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
@@ -282,47 +291,51 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 ![h:470](img/rack.svg)
 
-<p class="cap">Three lines down to the chip and one line back, with attenuation going in and gain coming out.</p>
+<p class="cap">The control electronics generate microwave and flux signals for the chip. The readout electronics digitise the returning signal after amplification.</p>
 
 ---
 
-## The fridge
+## The dilution refrigerator
 
 ![h:480](img/fridge.svg)
 
-<p class="cap">Attenuation stage by stage going down, and the coldest amplifier sets the noise figure for the rest.</p>
+<p class="cap">The refrigerator cools the chip to millikelvin temperatures. Attenuators and filters reduce incoming noise; low-noise amplifiers strengthen the weak readout signal on its way out.</p>
 
 ---
 
-## Three lines
+## Control and readout lines
 
-| Line | What runs on it | What it does |
+| Line | Example signal | Purpose |
 |---|---|---|
-| **Drive** | A microwave tone near $f_{01}$ = 4.85 GHz | Rotates the state |
-| **Readout** | A microwave tone near $f_r$ = 7.20 GHz | Interrogates a resonator coupled to the qubit |
-| **Flux** | A slow, near-DC voltage through a coil | Moves $f_{01}$ |
+| **Drive** | A microwave pulse near $f_{01} = 4.85\ \text{GHz}$ | Rotate the qubit state |
+| **Readout** | A microwave pulse near $f_r = 7.20\ \text{GHz}$ | Probe a resonator coupled to the qubit |
+| **Flux** | A DC bias or a timed flux pulse | Adjust the qubit frequency |
 
-- The drive line has no ADC, so nothing sent down it comes back.
-- Every operation today writes a voltage onto one of these three lines.
+- These frequencies are illustrative; actual values come from device calibration.
+- In the notebooks, **buses** identify the signal paths used for control and acquisition.
 
 ---
 
 ## The rotating frame
 
-- The Bloch vector precesses about $z$ at the qubit frequency.
-- Move to a frame spinning about $z$ at the drive frequency.
-- On resonance the precession stops and the state holds still.
-- The instrument keeps that frame as a running phase on each output.
+- In the laboratory frame, the qubit's relative phase evolves at its transition frequency.
+- We describe the state in a frame rotating at the drive frequency, so the remaining free precession depends on the **detuning**.
+- On resonance, this free precession vanishes. An applied drive still rotates the state.
+- The control electronics track a phase reference so that successive pulses have the intended relative phases.
 
 ---
 
-## Area and phase
+## Pulse area and phase
 
-$$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
+For an ideal resonant pulse with a fixed phase,
 
-- The Rabi rate $\Omega(t)$ is proportional to the envelope, so only the area matters.
-- Half the amplitude is half the area, so `X/2` is the same shape halved.
-- The carrier phase $\phi$ is the azimuth, so `Y` is `X` advanced 90 degrees.
+$$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t,$$
+
+where $\Omega(t)$ is the angular Rabi frequency, in radians per second.
+
+- The **pulse area** determines the rotation angle. In the linear response regime, halving the amplitude halves the angle.
+- The **drive phase** determines the rotation axis in the equatorial plane. A 90-degree phase shift changes an $X$ rotation into a $Y$ rotation under the chosen phase convention.
+- On hardware, pulse amplitudes and phases are calibrated to implement the desired gates.
 
 ---
 
@@ -330,72 +343,91 @@ $$\theta = \int_0^{\tau}\Omega(t)\,\mathrm{d}t$$
 
 ![h:480](img/rotation.svg)
 
-<p class="cap">The carrier phase picks the axis in the equatorial plane, the envelope area picks the angle.</p>
+<p class="cap">For an ideal resonant pulse with fixed phase, the drive phase sets the rotation axis in the equatorial plane, and the envelope area sets the rotation angle.</p>
 
 ---
 
 ## Leakage
 
-- A transmon is a ladder, not a two-level system.
-- The $|1\rangle \to |2\rangle$ transition sits $|\alpha|$ below the one you drive.
-- Population reaches it at order $(\Omega/\alpha)^2$, so a faster gate leaks more.
-- Most comes back, and what stays is leakage no later gate recovers.
-- A square edge is broadband and feeds the transition you are avoiding.
+- A transmon has more than two energy levels. We use $|0\rangle$ and $|1\rangle$ as the computational states.
+- Its $|1\rangle \to |2\rangle$ transition lies $|\alpha|$ below the qubit transition.
+- Short or abruptly switched pulses have broad spectra and can excite this unwanted transition.
+- Population left outside the computational states at the end of a gate is called **leakage**.
+- Smooth envelopes and pulse corrections help reduce leakage while keeping gates short.
 
 ---
 
 ## DRAG
 
-$$Q(t) = \beta\,\dot{I}(t)$$
+$$Q(t) = \beta\,\frac{\mathrm{d}I(t)}{\mathrm{d}t}$$
 
-- DRAG adds a second envelope on the quadrature 90 degrees from the one you play.
-- Its shape is the derivative of the in-phase envelope.
-- It cancels the leading transfer into $|2\rangle$ and the phase error left behind.
-- First order gives $\beta \approx 1/|\alpha|$, and $\beta$ is calibrated per qubit.
+- **DRAG** adds a correction in the quadrature channel, 90 degrees from the in-phase drive.
+- The correction follows the time derivative of the in-phase envelope $I(t)$.
+- This helps suppress unwanted excitation of $|2\rangle$. Detuning or phase corrections can address the associated phase error.
+- The coefficient $\beta$ sets the correction's scale and sign. Its value depends on the qubit and waveform convention and is calibrated experimentally.
+
+<!-- Reference: Motzoi et al., Simple Pulses for Elimination of Leakage in Weakly Nonlinear Qubits (2009), https://doi.org/10.1103/PhysRevLett.103.110501. The coefficient in this continuous-time equation need not use the same normalisation as a waveform API's beta parameter. -->
+
+---
+
+## The IQ mixer
+
+![h:470](img/mixer.svg)
+
+<p class="cap">Two DAC outputs supply the I and Q envelopes. The mixer combines them with local-oscillator signals 90 degrees apart to control the amplitude and phase of the microwave output.</p>
 
 ---
 
 ## Virtual Z gates
 
-- A $Z$ rotation turns the frame the instrument already keeps.
-- Apply $Z(\theta)$ by advancing the phase of every later pulse on that line.
-- No waveform and no samples, so no duration and no error.
-- A single-qubit unitary becomes two `X/2` pulses with phase advances around them.
+- A **virtual Z gate** is implemented by updating the phase reference for subsequent control pulses.
+- The phase update represents a rotation about $Z$ and requires no additional physical pulse duration.
+- Later pulses use the updated reference so that their rotation axes remain consistent.
+- Any single-qubit unitary can be composed from two $X_{\pi/2}$ pulses and virtual Z rotations, up to a global phase.
+
+<!-- Reference: McKay et al., Efficient Z Gates for Quantum Processors (2017), https://doi.org/10.1103/PhysRevA.96.022330. -->
 
 ---
 
 ## Two-qubit gates
 
-Two qubits interact through a coupling, and a gate is an interval where you let it act.
+Two-qubit gates use the coupling between qubits to make their evolution depend on their joint state.
 
-| Route | What you do | Duration |
+| Approach | Control mechanism | Example |
 |---|---|---|
-| **Flux** | Push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
-| **All-microwave** | Drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
+| **Flux tuning** | Tune a qubit near the avoided crossing between $\|11\rangle$ and $\|02\rangle$ to accumulate a conditional phase | Controlled-Z gate |
+| **Microwave driving** | Drive one qubit near its neighbour's frequency to produce a state-dependent rotation | Cross-resonance gate |
 
-- The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.
-- The microwave route moves neither qubit.
-- Two-qubit error runs five to ten times single-qubit error.
-- Each pair is calibrated by a two-dimensional scan, amplitude against duration.
+- Flux tuning can move a qubit away from a sweet spot and increase its sensitivity to flux noise.
+- Cross-resonance control can keep the qubit frequencies fixed.
+- Pulse amplitude, duration, and phase corrections are calibrated for each pair. Gate speed and error depend on the device and implementation.
 
 ---
 
 ## Dispersive readout
 
-- Every gate so far went out on a drive line that has no ADC.
-- The qubit is read through a **resonator** beside it, coupled at rate $g$.
-- The detuning $\Delta = f_{01} - f_r$ is far larger than $g$.
-- At that ratio the two cannot exchange energy, so they shift each other.
+- We measure the qubit by probing a **coupled resonator** with a microwave pulse.
+- The detuning $\Delta = f_{01} - f_r$ is large compared with the coupling strength $g$; the resonator must also remain far from higher qubit transitions.
+- In this **dispersive regime**, direct energy exchange is suppressed, but the qubit state shifts the resonator's response.
+- Measuring that response lets us infer the qubit state.
+
+<!-- Dispersive theory assumes sufficiently weak coupling relative to the relevant detunings and readout power below the breakdown of the approximation. Reference: Koch et al. (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
 ## The dispersive shift
 
-- The resonator sits at $f_r + \chi$ or $f_r - \chi$, and the qubit picks which.
-- Park a tone between the two, and the transmission past the resonator carries the answer.
-- The shift grows with the coupling and shrinks with the detuning.
+- The resonator frequencies associated with $|0\rangle$ and $|1\rangle$ are separated by $2|\chi|$.
+- A probe near these frequencies produces different amplitudes and phases for the two states.
+- For a transmon, the leading dispersive approximation is
 
-$$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz}, \qquad 2\chi = 3.6\ \text{MHz}$$
+$$\chi \approx \frac{g^2\alpha}{\Delta(\Delta+\alpha)},$$
+
+with $g$, $\Delta$, and $\alpha$ expressed in the same frequency units.
+
+For example, $\chi = -1.8\ \text{MHz}$ gives a separation of $2|\chi| = 3.6\ \text{MHz}$.
+
+<!-- Reference: Koch et al. (2007), Eq. (3.9), https://arxiv.org/abs/cond-mat/0703002. The numerical shift is illustrative; no numerical coupling g has been specified. -->
 
 ---
 
@@ -403,131 +435,66 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 
 ![h:470](img/dispersive.svg)
 
-<p class="cap">The resonator's two dips, the chain that carries the return up to an ADC, and the two clouds a threshold gets drawn between.</p>
+<p class="cap">The readout signal is amplified, digitised, and processed into I and Q values. Repeated measurements form two distributions, and a decision threshold assigns each result to a qubit state.</p>
 
 ---
 
 ## Integration weights
 
-- The weights $w(t)$ are their own calibration, measured like any other number.
-- Optimal is the difference between the mean $|0\rangle$ and $|1\rangle$ responses.
-- That difference is taken sample by sample across the record.
-- The window then weights the part where the two states separate.
+- Integration weights determine how each sample contributes to the final I and Q values.
+- To calibrate them, prepare $|0\rangle$ and $|1\rangle$ and measure the mean readout trace for each state.
+- A common choice uses the difference between those traces, giving more weight to times when the responses are easier to distinguish.
+- This matched-filter choice is optimal for additive white Gaussian noise with equal variance. Correlated or time-dependent noise can require different weights.
 
----
-
-## Coherence times
-
-| | This chip | What it measures |
-|---|---|---|
-| $T_1$ | 18 us | Energy leaving the qubit and not coming back |
-| $T_2^{*}$ | 9 us | Plus every source of frequency wander, unfiltered |
-| $T_2$ echo | 16 us | Plus a $\pi$ pulse in the middle, refocusing slow noise |
-
-$$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
-
-- Relaxation feeds half its rate into dephasing, so $T_2 \le 2T_1$ always.
-- Pure dephasing $T_\varphi$ is the rest, and the gap between the last two rows is its slow part.
-
----
-
-## Three coherence experiments
-
-| Experiment | The sequence | What it isolates |
-|---|---|---|
-| Inversion recovery | $\pi$, wait, read | $T_1$, energy leaving and not coming back |
-| Ramsey | $\pi/2$, wait, $\pi/2$, read | $T_2^{*}$, and the drive frequency error as a fringe |
-| Hahn echo | $\pi/2$, wait, $\pi$, wait, $\pi/2$, read | $T_2$, with slow noise refocused |
-
-- Only the middle of the sequence changes, and that is why a **fragment** earns its place.
-- Ramsey runs deliberately off resonance, so the fringe rate reads out the frequency error.
-- Sweep out to about three time constants, since later points measure only noise.
-
----
-
-## Noise sources
-
-- **Two-level defects** in the junction oxide and every metal interface.
-- **Quasiparticles**, broken Cooper pairs raised by stray infrared and cosmic rays.
-- **$1/f$ flux noise**, the reason a tunable qubit has a sweet spot.
-- **Purcell decay** down the readout line, at rate $\kappa(g/\Delta)^2$.
-- All four drift, so one coherence number is a snapshot.
-
----
-
-## The device
-
-| | | |
-|---|---|---|
-| $f_{01}$ = 4.85 GHz | $f_r$ = 7.20 GHz | $\Delta$ = $-2.35$ GHz |
-| $\kappa$ = 1.5 MHz ($Q_L$ = 4800) | $\chi$ = $-1.8$ MHz | $2\chi/\kappa$ = 2.4 |
-| $T_1$ = 18 us | $T_2^{*}$ = 9 us | $T_2$ = 16 us |
-
-Every fit you run has to land on these, and a circuit carries none of them.
-
----
-
-## Six measured numbers
-
-A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply this.
-
-```text
-40 ns DRAG envelope,  IQ pair,  carrier 4.8500 GHz,  amplitude 0.6200,  sigma 10 ns,  beta 0.15
-```
-
-- Nothing in `X(q0)` names a line, a carrier, or an envelope.
-- The carrier and the amplitude came out of their own scans, and the rest are choices.
-- They drift, so the scans are run again.
+<!-- Reference: Khan et al., Practical Trainable Temporal Postprocessor for Multistate Quantum Measurement (2024), https://doi.org/10.1103/PRXQuantum.5.020364. -->
 
 ---
 
 <!-- _class: divider -->
 
-<p class="kicker">Concepts · slides only</p>
+<p class="kicker">Lecture introduction</p>
 
-# Why a language of its own
+# A language for pulse programs
 
-### Six requirements, and what a vendor dialect does to them
-
----
-
-## Six requirements
-
-- **Timed waveforms on named lines**, not gates on qubits.
-- **A clock per line**, with barriers as explicit instructions.
-- **Parameter sweeps**, nested or stepped in lockstep.
-- **Shot averaging**, collapsing repeats into one number.
-- **Acquisition with weights**, and a choice of raw, integrated, or classified output.
-- **Conditional measurement**, active reset for example, decided in real time.
+### Expressing experiments across control platforms
 
 ---
 
-## One dialect per rack
+## What a pulse program needs to express
 
-- Experimental results get published in papers. The control code behind them isn't shared.
-- Every vendor ships its own sequencer dialect.
-- They are assembly shaped, because an FPGA has to meet every clock edge.
-- Loops come out of registers, and waveform memory is addressed by hand.
-- Porting to a second rack means rewriting experiments that were already correct.
-
----
-
-## The loop decision
-
-- Each script hard codes which loops run in the sequencer.
-- Whatever is left runs on the host, one round trip per step.
-- Running on the host can cost a factor of a hundred.
-- The choice belongs to the rack, so it should not sit in the file.
+- **Waveforms and timing:** play pulses on named buses at the intended times.
+- **Synchronisation:** track each bus's timeline and align buses when required.
+- **Parameter sweeps:** vary parameters in nested loops or step several parameters together.
+- **Averaging:** repeat measurements and combine the results.
+- **Acquisition:** specify integration weights and request raw traces, integrated IQ, or classified states.
+- **Feedback:** use a measurement result to choose the next operation, as in active reset.
 
 ---
 
-## A Python DSL
+## Vendor control interfaces
 
-- The experiment goes in the file, the rack stays outside it.
-- QProgram is a Python builder that produces an AST.
-- `program.play(...)` appends a typed `Play` node and sends nothing.
-- Every other tool in the library reads that one tree.
-- Not a compiler or a scheduler, since those sit behind `PlatformProtocol`.
+- Control platforms differ in their instruction sets, timing constraints, and supported operations.
+- Low-level sequencer code may expose registers, waveform memory, and hardware-specific loop instructions.
+- When these details are embedded in an experiment script, moving to another platform requires changes to the script.
+- A common program representation lets us describe the experiment separately from the platform-specific code that executes it.
+
+---
+
+## Where loops execute
+
+- A loop can run on an instrument's sequencer when the hardware supports its operations and parameter updates.
+- Other loops may need to run on the host computer, for example when they control an external instrument.
+- Host execution can add communication and setup overhead at each step.
+- The execution plan uses the program's requirements and the platform's capabilities to determine where loops can run.
+
+---
+
+## QProgram as a Python DSL
+
+- QProgram uses Python to build a structured description of an experiment: an **abstract syntax tree**.
+- Calling `program.play(...)` adds a typed `Play` node to that tree. Building the program does not send a pulse to hardware.
+- The same structure supports inspection, validation, and serialisation.
+- A platform implementing `PlatformProtocol` handles execution, including any compilation and scheduling required by its hardware.
 
 ---
 
@@ -535,7 +502,7 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 ![h:480](img/stack.svg)
 
-<p class="cap">Your script builds a tree, a platform runs that tree, and files fall out as artifacts.</p>
+<p class="cap">Python code builds a QProgram. Serialisation saves its structure, and a platform executes it and returns measurement results.</p>
 
 ---
 
@@ -543,239 +510,245 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 <p class="kicker">Part 1 · notebooks/01_introduction.ipynb</p>
 
-# Operations, schemas, waveforms, and the `.qp` file
+# QProgram fundamentals
 
-### The operations, the lines they run on, the shapes they play, and the file they save to
-
----
-
-## A program is a value
-
-- Every operation you call appends one typed node to a tree and sends nothing anywhere.
-- So what you hold afterwards is data your own code can print, compare, rewrite and save.
-- Containers nest, and the nesting in the file is the nesting in the result.
-- A program can therefore be checked and refused before an instrument exists.
+### Operations, buses, waveforms, and saved programs
 
 ---
 
-## One signal path
+## Building a program
+
+- Each operation adds a node to the program structure.
+- Building a program does not execute it.
+- You can inspect the operations, modify the program, and save it before running it.
+- Validation checks the program against a platform's declared capabilities.
+
+---
+
+## Buses and signal paths
 
 ![h:300](img/buses.svg)
 
-- A bus is one signal path, from an instrument port to the chip.
-- One qubit owns three lines that have nothing in common with each other.
-- One feedline carries every readout at once, each on its own frequency.
-- So an operation names the line, never the qubit.
+- A bus identifies the signal path targeted by an operation.
+- The transmon schemas provide drive and readout buses. A flux-tunable transmon also has a flux bus.
+- Bus names separate the program's operations from their physical instrument connections.
 
 ---
 
-## Every call names a property
+## Core operations
 
-| What a call does | The calls |
+| Purpose | Methods |
 |---|---|
-| Book time on a line | `play`, `measure`, `wait` |
-| Bring lines to a common time | `sync` |
-| Set or read one property of a line | `set_frequency`, `set_phase`, `reset_phase`, `set_gain`, `set_offset`, `set_parameter`, `get_parameter` |
-| Run a named sub-program | `call` |
+| Play, measure, or wait | `play`, `measure`, `wait` |
+| Synchronise buses | `sync` |
+| Set signal properties | `set_frequency`, `set_phase`, `reset_phase`, `set_gain`, `set_offset` |
+| Access platform configuration | `set_parameter`, `get_parameter` |
+| Call a reusable sequence | `call` |
 
-- Instrument verbs rather than gates, and each call appends exactly one node.
-- Durations are nanoseconds, frequencies hertz, phases radians, gain and offset dimensionless.
-- Which properties a machine can change, and when, is the machine's to declare. Part 3 reads that declaration.
-- `measure` and `get_parameter` hand something back, and the other ten return `None`.
+- Units: nanoseconds for duration, hertz for frequency, and radians for phase. Gain and offset are dimensionless.
+- `measure` returns a handle and `get_parameter` returns a variable. The other operations return `None`.
 
 ---
 
-## One clock per bus
+## Timing and synchronisation
 
 ![h:350](img/timing.svg)
 
-- Every bus keeps its own cursor, advanced only by what you write to that bus.
-- A barrier holds every named bus until the furthest ahead has finished.
-- A bare `sync()` covers every bus in the program; give it a list to sync only certain buses.
+- Each bus has its own timeline.
+- `sync(buses)` aligns the selected buses at the latest of their current times.
+- `sync()` includes every bus. Pass an explicit list when only some buses need to wait.
 
 ---
 
-## What a measurement returns
+## Measurement outputs
 
-- `measure` plays the readout tone and integrates what comes back, in one call.
-- The second waveform is the integration window, and a flat window of ones is the default here.
-- The reduction is a choice you make in the program: the ADC trace, the integrated point, the classified bit, or all three.
-- Ask for a field you never requested and it is a `KeyError`.
-- A handle is a name, so a result is indexed by what you called the measurement.
+| Field | Output |
+|---|---|
+| `MeasurementField.IQ` | Integrated I and Q values |
+| `MeasurementField.STATE` | Classified state |
+| `MeasurementField.RAW` | Raw acquisition trace |
+
+- `measure` plays the readout waveform and acquires the response. Its `weights` argument supplies the integration weights.
+- Keep the returned handle to retrieve the measurement with `result.get(handle, field=...)`.
+- Requesting a field that the measurement did not include raises `KeyError`.
 
 ---
 
-## A schema, not a string
+## Bus schemas and validation
 
 ```python
 program.measure(q[0].drive, "readout", "weights")
--> Bus 'q0/drive' does not support acquisition (acquires=False).
+# ValidationError: this drive bus does not support acquisition.
 ```
 
-- A raw string bus name builds, prints and saves, and nothing checks it until the run.
-- A `BusSchema` hands back a reference that is still a string and carries two facts about copper.
-- Which shape the line takes, real-valued or two-path, and whether an ADC listens to it.
-- Both become an error on the line that made the mistake, and raw strings skip both on purpose.
+- `BusSchema` provides structured references such as `q[0].drive`.
+- A `BusRef` carries the channel type and acquisition capability.
+- QProgram checks waveform compatibility and acquisition support when you add operations.
+- Plain string names do not provide this metadata.
 
 ---
 
-## Waveforms are data
+## Waveforms and aliases
 
-- A waveform describes one envelope and knows nothing about hardware.
-- Equality is structural, so two `Gaussian(0.5, 40, 8)` built in different cells are one waveform.
-- A program can then report how many distinct envelopes it plays.
-- Nothing in a shape names a line, so the bus decides whether a `Square` is a readout tone or a flux excursion.
+- Waveforms describe pulse envelopes independently of programs and hardware.
+- `envelope()` returns samples and `get_duration()` returns the duration. IQ waveforms expose I and Q components.
+- Matching waveform types and parameters compare equal. `plot()` displays their shapes.
+- String aliases let you supply waveform definitions later with `with_waveforms`.
 
 ---
 
-## A file you can diff
+## Saving and loading programs
 
 ```diff
--    play "q0/drive" IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
-+    play "q0/drive" IQDrag(amplitude=0.31, duration=40, sigma=10, beta=0.15)
+- play "q0/drive" IQDrag(amplitude=0.62, duration=40, sigma=10, beta=0.15)
++ play "q0/drive" IQDrag(amplitude=0.31, duration=40, sigma=10, beta=0.15)
 ```
 
-- One statement per line, so a retune shows up as one changed line under version control.
-- Nothing truncated, nothing implied, and no dependency on a numpy version or a database.
-- The amplitudes that go stale live in a waveform library beside the program, resolved per bus.
-- `rebind` re-spells every bus through another schema, so a second rack needs no find and replace.
+- `qp.save` and `qp.load` write and read `.qp` files.
+- `qp.dumps` and `qp.loads` work with text directly.
+- Compare `loaded.body == original.body` to check the restored structure.
+- The text format makes changes to operations and waveform parameters easy to review.
 
 ---
 
-## The simulator
+## Reference simulation
 
-- `qp.simulate(program, model=...)` walks the tree in pure Python.
-- It models the shape of the experiment: the nesting, the repetition, one record per `measure`.
-- It models no timing and no waveform physics, so `wait` changes no number.
-- The program you write and the analysis you run on the results are the same ones a rack would run, and that is where the work lives.
+- `qp.simulate(program, model=...)` executes the program on the Python reference platform.
+- It follows the program's blocks and repetitions and collects measurement records.
+- The measurement model supplies the values returned at each shot.
+- It does not simulate pulse dynamics or hardware timing. Use it to explore program structure and result analysis.
+
+---
+
+## Exercise 1.1: a complete sequence
+
+- Set a flux offset, play a drive pulse, and synchronise the drive and readout buses.
+- Measure both I/Q and the classified state.
+- Save and load the program, then compare its body with the original.
+- Attempt a measurement on the flux bus and inspect the schema validation error.
 
 ---
 
-## Exercise 1.1
-
-> 🧩 Bias the flux line, prepare the qubit, read it out, and round-trip the program through a file.
-
-- Then measure the flux bus and watch the schema refuse it.
-- The flux line has no ADC, and the schema knows that before any hardware does.
-
----
 <!-- _class: divider -->
 
 <p class="kicker">Part 2 · notebooks/02_basics.ipynb</p>
 
 # Variables, sweeps, and results
 
-### The first three scans of the calibration order, written as programs that come back labeled
+### Parameter sweeps, averaging, and labelled measurement data
 
 ---
 
-## A program with holes
+## Variables and expressions
 
-- A program with no holes can only be run once, and the fab does not deliver the frequency you asked for.
-- A variable is the hole, and a sweep fills it once per iteration.
-- Arithmetic on one builds an expression and computes nothing, so a hole can sit inside a pulse envelope.
-- The label and units you declare name the axes of every figure drawn from the result.
+- A variable represents a value that can change between iterations.
+- A sweep assigns successive values to the variable.
+- Arithmetic creates symbolic expressions that use the variable's current value when evaluated.
+- Variables can parameterise operations or waveform constructors. Their labels and units provide plot metadata.
 
 ---
 
-## Anatomy of a program
+## Result dimensions
 
 ![h:470](img/anatomy.svg)
 
-<p class="cap"><code>sweep</code> creates an axis, <code>average</code> creates none, <code>measure</code> creates a record, and <code>play</code> carries the variable down.</p>
+<p class="cap">Nested sweeps define result dimensions. Averaging combines shots without adding a dimension. Each measurement creates a record, and a waveform can use the current value of a swept variable.</p>
 
 ---
 
-## A source, not a list
+## Sweep sources
 
-| `KIND` | What it promises |
-|---|---|
-| `linear` | Point $i$ is exactly `start + step * i` |
-| `arbitrary` | Every other source, and its points have to be shipped |
+| Kind | Examples | Meaning |
+|---|---|---|
+| `linear` | `Range`, `Linspace` | Values follow `start + step * i` |
+| `arbitrary` | `Values`, `Logspace`, `File` | The source supplies the individual values |
 
-- A bare list is refused, because a source declares its kind before the run starts and a list declares none.
-- A source also reports its length without running, which is how a lockstep pair is checked and how the result arrays are sized.
-- `qp.Values` is arbitrary even when the numbers are evenly spaced, because a list proves nothing about itself.
-- Eight ship, and three of them take a source and hand back one, so they compose.
+- Pass a source object or use a `from_*` builder method. Wrap a plain list in `qp.Values`.
+- `Values` remains arbitrary even when its values are evenly spaced.
+- Sources report their length and required capabilities. `Repeat`, `Rotate`, and `Concat` combine existing sources.
 
 ---
 
 ## Averaging over shots
 
-- `average(shots)` repeats the body and hands back the mean, and the shot count is nowhere in the shape.
-- Amplifier noise and projection noise both fall as $1/\sqrt{N}$, so halving the noise costs four times the time.
-- The same array position holds a bit at one shot and a population at five hundred.
-- A readout frequency placed on the resonance costs nothing per shot.
+- `average(shots)` repeats a block and averages its measurements.
+- Averaging adds no shot dimension to the result.
+- I/Q values and raw traces become means. Classified states become estimates of the probability of state 1.
+- For independent noise, the standard deviation of the mean decreases approximately as $1/\sqrt{N}$.
 
 ---
 
-## The measurement model
+## Mock measurement models
 
-- The interpreter asks a measurement model for one sample per shot, and every measured number in a run comes from it.
-- Every figure in the notebook therefore comes out of five constants and three short formulas you can read.
-- `env` holds every variable a loop currently binds, keyed by the id you declared.
-- Any object with a `sample(bus, env)` method does the job, so a model may carry state.
-
----
-
-## The grid bounds the answer
-
-- A 20 MHz window in 200 kHz steps puts about seven samples across a 1.5 MHz resonance.
-- An argmin can never beat the step size, so that grid locates the resonator to 200 kHz.
-- A finer answer costs either a finer grid or a fit to the shape of the curve.
+- The reference platform requests a sample for each measurement, shot, and sweep point.
+- `env` contains currently assigned variables and platform parameters.
+- Model constants describe the assumed device response. Define them beside the model that uses them.
+- Use `MockMeasurementModel` for configurable responses or implement `sample(bus, env)` for a custom model.
 
 ---
 
-## The saturation ceiling
-
-$$P_1(f, a) = \frac{1}{2}\,\frac{\Omega^2}{\Omega^2 + (f - f_{01})^2}, \qquad \Omega \propto a$$
-
-- The qubit answers only through the resonator, so finding it takes a second tone swept past $f_{01}$.
-- A strong continuous drive balances excitation against decay, so the population saturates at one half.
-- A two-tone peak above that ceiling means the classifier is wrong.
-- The same formula sets the width, so a stronger drive broadens the line while the peak stays at one half.
-
----
-
-## A rectangle or a diagonal
+## Resonator spectroscopy
 
 ```python
-with program.sweep(amp, ...):                          # a rectangle
-    with program.sweep(freq, ...):
-        ...
-with program.sweep(amp, ...) | program.sweep(freq, ...):   # a diagonal
-    ...
+F_READOUT = 7.20e9  # Hz: assumed true resonance frequency
+KAPPA = 1.5e6       # Hz: model linewidth parameter
 ```
 
-- Nested `with` statements are nested loops, so a two-deep nest is a rectangle of points.
-- `|` advances both on the same tick instead, and one dimension comes back carrying two coordinates.
-- The map cost 861 points at 200 shots, and most of them sat off resonance.
-- Walking the ridge is 21 points over the same body, once the map has found it.
+- Sweep `ro_freq` from 7.19 to 7.21 GHz in 200 kHz steps.
+- Combine I and Q to calculate the response magnitude, then locate its sampled minimum.
+- Compare the estimated frequency with `F_READOUT`.
+- The grid and measurement noise affect the estimate. A finer scan or a fit can improve it.
 
 ---
 
-## Exercise 2.1
+## Nested amplitude and frequency sweeps
 
-> 🧩 Park the drive on resonance, step its amplitude, and calibrate a full rotation from the curve.
-
-$$P(a) = \sin^2\!\left(\frac{\pi a}{2 a_\pi}\right)$$
-
-- The top of that curve is flat, so shot noise moves an argmax a step or two off the true peak.
-- The half-way crossing sits on the steepest part of the same curve, where the same noise usually leaves the answer where the noiseless curve puts it.
-- Read the half rotation off the rising branch, then double it.
+- The amplitude variable enters the waveform constructor. The frequency variable enters `set_frequency`.
+- Two nested sweeps measure every combination and produce a result with dimensions `(drive_amp, drive_freq)`.
+- The mock model uses `F_01` for the resonance frequency and `RABI_RATE` to relate amplitude to response width.
+- In this illustrative model, the peak population is 0.5 and the response broadens with amplitude. `result.plot` displays the map as a heatmap.
 
 ---
+
+## Nested and paired sweeps
+
+```python
+with program.sweep(amp, ...):       # Every combination
+    with program.sweep(freq, ...):
+        ...
+
+with program.sweep(amp, ...) | program.sweep(freq, ...):
+    ...                            # Corresponding pairs
+```
+
+- Nested sweeps produce separate dimensions. Paired sweeps share one dimension with multiple coordinates.
+- Paired sources must have equal lengths.
+- The notebook's full map has 861 points. Pairing each amplitude with its selected peak frequency uses 21 points.
+
+---
+
+## Exercise 2.1: estimating a pi-pulse amplitude
+
+$$P_1(a) = \sin^2\left(\frac{\pi a}{2A_\pi}\right)$$
+
+- Sweep the drive amplitude at a fixed frequency and average classified states.
+- `A_PI = 0.62` sets the first maximum of the mock response.
+- On the rising branch, find the amplitude whose population is closest to 0.5. Double it to estimate the pi-pulse amplitude.
+- Compare with `A_PI` and mark the estimate on the plot. Noise and sweep spacing affect the result.
+
+---
+
 <!-- _class: divider -->
 
 <p class="kicker">Session 2 · Part 3 · notebooks/03_advanced.ipynb</p>
 
-# Fragments, feedback, and the machine
+# Reusable sequences and platform support
 
-### Two seams for writing less, two for vocabulary the core must never ship, and two for the machine that runs it
+### Fragments, feedback, language extensions, and execution plans
 
 ---
 
-## One definition, many call sites
+## Fragments
 
 ```text
 fragment x_pulse(drive, amp):
@@ -786,236 +759,231 @@ body:
   x_pulse("q0/drive", 0.25)
 ```
 
-- $T_1$, Ramsey and echo are prepare, wait, read out, and only the middle changes.
-- Three copies of the pulse definition drift apart at the next recalibration, and the three curves stop being comparable.
-- A `@fragment` is one named, parameterized definition, and each call site stays one line in the file.
-- `expand()` inlines every call, so keep `measure` in the program where the handle stays yours.
+- `@qp.fragment` defines a reusable sequence with parameters.
+- The Python function runs once to build the definition. Each call supplies its own arguments.
+- `expand()` substitutes calls with their operations. Expand before binding aliases inside fragments.
+- Measurements declared in the calling program keep their handles directly accessible.
 
 ---
 
-## A branch inside the shot
+## Conditionals and active reset
 
-```
-excited before: 0.305
-excited after:  0.029
+```python
+with program.if_(measurement.state == 1):
+    program.play("q0/drive", "pi")
 ```
 
-- A branch inside the shot cannot be faked by a host round trip, because the decision has to land before the qubit relaxes.
-- The condition is one comparison of one classified state against an integer, and nothing wider.
-- Passive reset idles several $T_1$ before every shot. Active reset measures first and flips only the shots that came back excited.
-- One extra measurement and one conditional pulse take 30 percent hot down to 3.
+- Request `MeasurementField.STATE` before using a measurement in a condition.
+- Conditions support one equality or inequality comparison with an integer or another classified state.
+- Active reset applies a correction when the first measurement reports state 1.
+- In the mock example, 30% initial excitation and 90% reset success give an expected population of 3% after reset.
 
 ---
 
-## Three extension seams
+## Extending QProgram
 
-| You want | You write | You get for free |
+| Extension | Implementation | Registration |
 |---|---|---|
-| A pulse shape the DSL lacks | A `Waveform` subclass | Serialization, structural equality, validation, plotting |
-| A sweep axis the DSL lacks | A `SweepSource` subclass | Serialization, a capability token, length checks, coordinates |
-| An operation the DSL will never have | An `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a capability token |
+| Waveform | `envelope()` and `get_duration()` | Waveform class and capability token |
+| Sweep source | `KIND`, `TOKEN`, `length()`, `values()` | Sweep-source class |
+| Vendor operation | `Operation` and `VendorNamespace` subclasses | Namespace, syntax, tokens, and version |
 
-- A language that cannot be extended gets forked, and a fork stops being portable.
-- A capability token is a dotted name a rack can refuse the node by.
-- The extension travels inside the file, so a colleague loads it without knowing what to import.
-- A swept parameter arrives as a `qp.Expression`, so a shape that does not resolve it fails inside numpy naming neither the waveform nor the variable.
+- Resolve `qp.Expression` parameters when the implementation needs numeric values.
+- Registration connects custom types to serialisation and capability checks.
+- Capability tokens let a platform declare support for each extension.
 
 ---
 
-## One portable file
+## Vendor requirements in a program file
 
 ```text
 #!QProgram 0.2
 
-require twpa 0.1
+require qblox 0.2
 
 body:
-  var flux_amp label="Flux amplitude" units="DAC units"
-
-  twpa.set_pump "q0/readout" 7900000000.0
-  average 200:
-    for flux_amp in Chebyshev(start=0.0, stop=0.5, num=21):
-      play "q0/flux" HalfSine(amplitude=flux_amp, duration=40)
-      sync "q0/flux" "q0/readout"
-      measure "q0/readout" "readout" "weights" name="m0" fields=["state"]
+  qblox.set_markers "q0/drive" "0001"
 ```
 
-- The `require` header names each vendor, and the loader imports what it names.
-- Only the `qprogram.vendors` entry-point group is scanned.
-- A vendor nobody claims fails by name, naming the package to install.
-- So an archived file still loads years later, in an interpreter that imported nothing.
+- A `require` line identifies a vendor extension and its format version.
+- The loader discovers installed extensions through `qprogram.vendors` entry points.
+- Missing extensions and unsupported versions produce load errors.
+- Custom waveform and source classes also need their Python implementations and registration.
 
 ---
 
-## Two vendors, one name
+## Vendor-specific offset operations
 
-```text
-op.set_offset            qblox True  qdac False
-vendor.qdac.set_offset   qblox False qdac True
-```
-
-- Every operation sets or reads a property of a bus, and a profile is where a machine says which properties it has.
-- A Qblox bus changes its offset between one pulse and the next, so `qblox-default-v1` claims the core `op.set_offset`.
-- A QDAC channel takes every change through the host at millisecond latency, so `qdac-default-v1` refuses that name and offers its own.
-- Borrowing a core name whose meaning does not fit would make the two look interchangeable.
-
----
-
-## What a platform supplies
-
-- Six questions: the chip it is wired to, the buses it exposes, the knobs per bus and platform wide, what it can run, and `execute`.
-- Only the last one is work. `validate`, `plan` and `explain` arrive already written off the descriptor.
-- Between `execute` and the arrays the protocol says nothing at all. Compile, upload, run, assemble.
-- That work is where a vendor's expertise lives, and it is deliberately outside the interface.
-
----
-
-## Two racks
-
-| | Rack A, yours | Rack B, next door |
+| Capability | Qblox profile | QDAC profile |
 |---|---|---|
-| Drive and readout | One box, one shared clock | One box, one shared clock |
-| Flux line | A DC-coupled output on that box | A 20-bit DC source over Ethernet |
-| Bus names | `q0/drive` | `drive_q0` |
+| `op.set_offset` | Supported | Not supported |
+| `vendor.qdac.set_offset` | Not supported | Supported |
 
-- The flux row is the one that changes how the program runs.
-- Heavy filtering keeps a flux line quiet and gives it millisecond time constants, so nothing behind it steps a loop.
-- Your program named neither rack, neither wiring choice, and neither calibration.
-- The same file is the deliverable in both labs, and `rebind` settles the naming.
+- The Qblox profile supports core offset changes within a sequence.
+- The QDAC profile provides a separate operation for updates through the host.
+- Distinct tokens describe the different execution requirements.
 
 ---
 
-## Two loops, one file
+## The platform interface
 
-```text
-  average 200:
-    for bias in Linspace(start=-0.05, stop=0.15, num=41):
-      set_offset q[0].flux bias
-      set_frequency q[0].drive 4850000000.0
-      play q[0].drive "pi"
-      sync q[0].drive q[0].readout
-      measure q[0].readout "probe" "weights" name="m0" fields=["state"]
-```
-
-- The outer loop steps a DC level onto a slow, filtered line, milliseconds per step.
-- Everything inside it retunes a source, fires a pulse and reads out, microseconds per step.
-- The file never recorded which of the two is which, and it should not have.
-- The rest of this part is how a rack settles it, and what that costs when it settles it badly.
-
----
-
-## The cost of a loop
-
-| Where the loop runs | One execution | 41 points, 200 shots |
-|---|---|---|
-| Real time, passive reset | 2 us readout plus $5T_1$ | **0.75 s** |
-| Real time, active reset | About 10 us | **0.08 s** |
-| Host, one round trip per execution | About 1 ms | **8.2 s** |
-
-- $T_1$ is 18 us on this chip, so passive reset spends 90 of those 92 microseconds waiting.
-- A host round trip costs three orders of magnitude more than a real-time one.
-- Which one you get is a property of the rack, and the rest of this part makes it visible.
-
----
-
-## rt and host
-
-- Every capability slot splits into an `rt` half and a `host` half, the two **domains** a node can run in.
-- `rt` runs inside the instrument, and `host` is dispatched from the control PC.
-- Either half may be `None`, and a `None` is a statement about the wiring.
-- A slot is keyed by kind of bus, so `("q", "flux")` is separate from `("q", "drive")` and describes a class of rack rather than one wiring list.
-
----
-
-## Tokens, limits, predicates
-
-| Mechanism | The question it answers | Examples |
-|---|---|---|
-| **Token** | Is this in the set? | `op.play`, `waveform.iq_drag`, `sweep.logspace` |
-| **Limit** | Is this number small enough? | `max_loop_nesting`, `max_measurements` |
-| **Predicate** | Given the rest of the program, is this legal? | No arbitrary sweep at `Wait.duration` |
-
-- Every node answers `required_capabilities()` with a set of dotted strings computed from its own data.
-- Supply is a set the rack publishes, so checking one is a hash lookup and no instrument is attached.
-- The validator reads four numeric limits and passes over every other key a profile publishes.
-- A token set is small enough for a vendor to ship as a named, versioned profile.
-
----
-
-## Reading the plan
-
-| Label | What it means |
+| Member | Purpose |
 |---|---|
-| `[rt]` | Real time, inside the instrument |
-| `[host]` | Dispatched from the control PC, one round trip per iteration |
-| `[rt\|host]` | Either one, and the platform picks |
-| `[--]` | Nothing can run it, and an error above says why |
+| `get_bus_schema()` | Return the bus schema |
+| `get_buses()` | List available buses |
+| `get_parameters(bus)` | List parameters for a bus |
+| `get_global_parameters()` | List parameters without a bus |
+| `capabilities` | Describe supported features |
+| `execute(program)` | Run the program and return results |
 
-- The plan is the second half of what `qp.validate` returns.
-- Read it from the leaves up, because an operation that can run nowhere empties the loop holding it.
-- So the loop's own line carries no reason, and an empty child propagates exactly one level.
-- `qp.explain` draws the same plan as a tree, marking each diagnostic inline, `!!` error, `~` warning, `i` info.
+- The base class provides `validate`, `plan`, and `explain`.
+- Hardware implementations handle compilation, instrument communication, and result construction.
 
 ---
 
-## Two domains
+## Two platform configurations
+
+| Feature | Configuration A | Configuration B |
+|---|---|---|
+| Drive and readout | Real-time execution | Real-time execution |
+| Flux updates | Real-time execution | Host execution |
+| Example bus name | `q0/drive` | `drive_q0` |
+
+- Bus naming and execution support are separate concerns.
+- `rebind` resolves structural bus references using another schema's naming pattern.
+- The capability descriptor determines whether the program can run and in which domains.
+
+---
+
+## Averaging around a bias sweep
+
+```text
+average 200:
+  for bias in Linspace(start=-0.05, stop=0.15, num=41):
+    set_offset q[0].flux bias
+    set_frequency q[0].drive 4850000000.0
+    play q[0].drive "pi"
+    sync q[0].drive q[0].readout
+    measure q[0].readout "probe" "weights" name="m0" fields=["state"]
+```
+
+- The outer averaging block makes 200 passes over the 41-point sweep.
+- Each point updates the bias and performs the measurement sequence.
+- The platform descriptor determines where these operations execute.
+
+---
+
+## Host updates and measurement order
+
+| Operation count | Original loop order | Averaging inside the sweep |
+|---|---|---|
+| Flux offset updates | 8,200 | 41 |
+| Measurement shots | 8,200 | 8,200 |
+
+- The original program updates the offset at every point in every pass.
+- The transformed program sets the offset once per bias, then collects all 200 shots.
+- Reducing host updates can reduce overhead. The actual runtime depends on the platform.
+
+---
+
+## Execution domains
+
+| Domain | Execution |
+|---|---|
+| `rt` | A real-time component, such as an instrument sequencer |
+| `host` | The control computer |
+
+- Each `BusCapabilities` object contains an `rt` and a `host` component. Either can be `None`.
+- Profiles can differ by bus kind, such as `("q", "flux")` and `("q", "drive")`.
+- Platform-level profiles cover features such as blocks and expressions.
+
+---
+
+## Tokens, limits, and predicates
+
+| Mechanism | Purpose | Example |
+|---|---|---|
+| Token | Declare support for a feature | `op.play`, `waveform.iq_drag` |
+| Limit | Constrain a numeric property | `max_loop_nesting` |
+| Predicate | Check a rule using program context | Restrict a swept flux offset |
+
+- Nodes report requirements through `required_capabilities()`.
+- Profiles supply tokens, limits, and predicates without requiring an instrument connection.
+- The core validator checks four limit keys. Additional published limits need their own enforcement.
+
+---
+
+## Reading an execution plan
+
+| Label | Meaning |
+|---|---|
+| `[rt]` | Real-time execution is supported |
+| `[host]` | Host execution is supported |
+| `[rt\|host]` | Both domains are supported |
+| `[--]` | No supported execution domain |
+
+- `qp.validate` returns diagnostics and a plan. `qp.explain` displays them beside the program.
+- An unsupported operation can remove the enclosing loop's available domains.
+- Inspect the child diagnostics as well as the block labels to understand an error.
+
+---
+
+## Host execution in the plan
 
 ![h:460](img/plan.svg)
 
-<p class="cap">Drive and readout run in real time, flux on a slow DAC, so the bias loop runs host side and drags the averaging with it.</p>
+<p class="cap">The flux operation supports only host execution. That restriction moves its enclosing bias sweep and averaging block to the host, even though drive and readout operations support real-time execution.</p>
 
 ---
 
-## The rewrite is opt-in
+## Reordering averaging
 
-- A block runs where its worst child runs, so the averaging fell to the host and pays the round trip 200 times per point.
-- `qp.optimize(program, caps)` swaps the two loops and hoists the bias write between them.
-- It is not unconditionally equivalent. It takes all 200 shots of one point before moving on, where the program as written interleaved passes over the whole sweep.
-- The same experiment for a stationary device, a different one under drift, so the call stays yours.
-
----
-
-## One bare sync
-
-- A bare `sync()` pulls every bus into one domain intersection.
-- The flux bus has no real-time half, so that sync lands host side in the middle of a run of real-time operations.
-- Nothing can be hoisted across it, and the rewrite is lost with no error message.
-- Naming the two buses you mean keeps the sync real time and the rewrite alive.
+- `qp.optimize(program, capabilities)` returns a new program for a supported transformation.
+- It moves the bias sweep outside averaging and places the offset update before the shots at each point.
+- This changes the measurement order from repeated full scans to all shots at one point.
+- Consider device drift and operation side effects before applying it. The `reorderable-averaging` hint identifies when the transformation is available.
 
 ---
 
-## A rule about your own wiring
+## Synchronisation and optimisation
 
-- A predicate is code, and it is where a lab writes down a fact about its own wiring that no vendor profile carries.
-- This rack's flux DAC will not go past a tenth of a volt, and that number lives in a predicate.
-- The validation context is what makes the rule expressible, because the values live in the loop that binds the variable.
-- It yields a `Diagnostic` to refuse, or a `DomainConstraint` that moves a loop host side rather than failing the program.
+- `sync()` includes every bus in the program.
+- If the flux bus supports only host execution, including it can restrict the synchronisation to the host.
+- A synchronisation in the middle of the sequence can prevent the averaging transformation.
+- Use an explicit bus list to express which timelines must align, then inspect the plan.
 
 ---
 
-## Diagnostics as data
+## Custom validation rules
 
-```
-$ python -m qprogram.lsp check flux_sweep.qp   (exit 1)
-[{"line": 18, "end_line": 18, "severity": "error", "code": "parse-error",
-  "message": "Line 19: bus path 'q[0].drve' does not resolve against the
-  program schema: 'q' has no bus 'drve'. Available: drive, readout, flux"}]
+- The example uses `BIAS_LIMIT = 0.1` V as the maximum absolute flux offset.
+- `ctx.binding_loop_of(variable)` finds the sweep whose values the predicate must check.
+- A predicate can yield a `Diagnostic` to report a violation.
+- A `DomainConstraint` restricts a block's execution domains while allowing a supported alternative, such as host execution.
+
+---
+
+## Diagnostics and command-line tools
+
+```sh
+python -m qprogram.lsp check flux_sweep.qp
+python -m qprogram.lsp explain flux_sweep.qp
 ```
 
-- `qp.validate` returns diagnostics and raises nothing, so one call serves three callers with different needs.
-- An editor that wants every problem, a build that wants a non-zero exit, a notebook that wants to keep going.
-- `execute` is the caller that turns an error into an exception, so nothing broken reaches a rack.
-- The editor and the parser cannot drift apart, because both are this one module.
+- Diagnostics provide a severity, code, message, and location in the program.
+- `qp.validate` returns validation failures as data for notebooks, editors, or automated checks.
+- A platform's `execute` implementation should reject error diagnostics before execution.
+- `check` returns JSON diagnostics and `explain` displays the execution plan. `lsp serve` provides editor integration.
 
 ---
 
-## Exercise 3.1
+## Exercise 3.1: a custom measurement field
 
-> 🧩 Add a vendor measurement field, then prove it is legal on one rack and refused on another.
+- Register `measure.fields.counts` to make `"counts"` available to `measure`.
+- Request both `"counts"` and `MeasurementField.STATE`.
+- Validate against descriptors that support the field and omit it.
+- The reference platform allocates the custom field but leaves it at zero. A supporting platform must supply the measured values.
 
-- One token registration widens `measure` itself, because the `fields=` vocabulary is read off the capability registry.
-- The token makes the field legal and the executor allocates the array for it.
-- Nothing in the reference platform knows how to produce a photon count, so the counts come back zero.
 
 ---
 
