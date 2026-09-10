@@ -184,12 +184,12 @@ section img { display: block; margin: 0 auto; }
 
 | Topic | Notebook | Time |
 |---|---|---|
-| Background: superconducting qubits, control hardware, and pulse programming | | 40 min |
-| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 25 min |
-| Variables, sweeps, and results | `02_basics` | 25 min |
+| Background: superconducting qubits, control hardware, and pulse programming | | 20 min |
+| Operations, schemas, waveforms, and `.qp` files | `01_introduction` | 35 min |
+| Variables, sweeps, and results | `02_basics` | 35 min |
 | **Break** | | |
 | Fragments, feedback, extensions, and platforms | `03_advanced` | 75 min |
-| Questions and closing discussion | | 10 min |
+| Questions and closing discussion | | 15 min |
 
 ---
 
