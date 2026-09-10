@@ -9,13 +9,31 @@ footer: 'Pulse-level Programming with QProgram · QCE 2026'
 ---
 
 <style>
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("fonts/PlusJakartaSans-Regular.ttf") format("truetype");
+  font-weight: 400; font-style: normal;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("fonts/PlusJakartaSans-SemiBold.ttf") format("truetype");
+  font-weight: 600; font-style: normal;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("fonts/PlusJakartaSans-Bold.ttf") format("truetype");
+  font-weight: 700; font-style: normal;
+}
+
 :root {
-  --accent: #0f766e;
-  --accent-soft: #e6f4f1;
+  --accent: #3d1a94;
+  --accent-soft: #ece7fa;
+  --accent2: #c6093f;
+  --accent2-soft: #fbe7ec;
   --ink: #1c1c2e;
 }
 section {
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 26px;
   color: var(--ink);
   padding: 56px 72px;
@@ -29,35 +47,58 @@ strong { color: var(--accent); }
 a { color: var(--accent); text-decoration: none; }
 ul, ol { line-height: 1.45; }
 code {
-  background: var(--accent-soft); color: #0b5f58;
+  background: var(--accent-soft); color: var(--accent);
   padding: 2px 7px; border-radius: 5px; font-size: 0.86em;
 }
 pre { font-size: 0.72em; line-height: 1.35; }
 pre code { background: none; padding: 0; }
-table { font-size: 0.76em; }
-th { background: var(--accent-soft); color: var(--accent); }
-blockquote { font-size: 0.86em; color: #4a4a62; border-left: 4px solid var(--accent); padding-left: 16px; }
+table { font-size: 0.76em; margin-left: 40px; }
+th { background: var(--accent-soft); color: var(--accent); border-bottom: 2px solid var(--accent2); }
+blockquote { font-size: 0.86em; color: #4a4a62; border-left: 4px solid var(--accent2); padding-left: 16px; }
 footer { color: #9a9ab0; font-size: 0.5em; }
 section::after { color: #b6b6c8; font-weight: 600; }
 
-section.lead { text-align: center; justify-content: center; }
-section.lead h1 { font-size: 2.4em; margin-bottom: 0.1em; }
-section.lead .sub { font-size: 1.15em; color: #55556e; }
-section.lead .meta { font-size: 0.8em; color: #8a8aa0; margin-top: 1.4em; }
+section.lead {
+  display: flex; flex-direction: column;
+  background: #05040c url("img/dark-gradient-bg.png") no-repeat center / cover;
+  color: #fff; text-align: left;
+  justify-content: center; align-items: flex-start;
+}
+section.lead h1 { font-size: 2.1em; margin: 0 0 0.2em; color: #fff; font-weight: 400; }
+section.lead .sub { font-size: 1.15em; color: rgba(255,255,255,.85); }
+section.lead .meta { font-size: 0.8em; color: rgba(255,255,255,.6); margin-top: 1.2em; }
+section.lead .logo { width: 260px; margin: 0; }
+section.lead .lead-text { width: 100%; margin-top: 50px; }
+
+section.lead.center { justify-content: center; align-items: center; text-align: center; }
+section.lead.center h1 { font-size: 2.3em; margin: 0 0 0.15em; }
+section.lead.center .sub { margin: 0.2em 0; }
+section.lead.center .logo { width: 460px; margin: 0 0 32px; }
 
 section.divider {
-  background: linear-gradient(135deg, #0f766e 0%, #08403c 100%);
+  display: flex; flex-direction: column;
+  background: linear-gradient(135deg, #c6093f 0%, #7f1997 45%, #2f2eff 100%);
   color: #fff; justify-content: center;
 }
 section.divider h1, section.divider h2, section.divider h3 { color: #fff; }
 section.divider strong { color: #ffd866; }
-section.divider .kicker { font-size: 0.8em; letter-spacing: .18em; text-transform: uppercase; opacity: .8; }
+section.divider .kicker { font-size: 0.8em; letter-spacing: .18em; text-transform: uppercase; color: #fff; opacity: .85; }
 section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
+section img { display: block; margin: 0 auto; }
 .cap { font-size: 0.72em; color: #6a6a82; text-align: center; margin-top: 6px; }
 .center { text-align: center; }
 .small { font-size: 0.82em; }
-.big { font-size: 1.5em; color: var(--accent); font-weight: 700; text-align: center; margin: 0.3em 0; }
+.big {
+  font-size: 1.5em; color: var(--accent); font-weight: 700; text-align: center;
+  margin: 0.5em auto; padding: 0.4em 0.9em; max-width: fit-content;
+  background: var(--accent-soft); border-radius: 12px;
+}
+.hl { color: var(--accent2); font-weight: 700; }
+.callout {
+  border-left: 4px solid var(--accent2); background: var(--accent2-soft);
+  padding: 10px 18px; border-radius: 0 8px 8px 0; margin: 0.6em 0;
+}
 
 .qrgrid { display: flex; gap: 40px; justify-content: center; align-items: flex-start; margin-top: 28px; }
 .qrgrid > div { text-align: center; width: 300px; }
@@ -71,9 +112,15 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 <!-- _paginate: false -->
 <!-- _footer: '' -->
 
+<img class="logo" src="img/qilimanjaro-logo-white.png" alt="Qilimanjaro Quantum Tech" />
+
+<div class="lead-text">
+
 # Pulse-level Programming with QProgram
 
 <p class="meta">IEEE Quantum Week · QCE 2026</p>
+
+</div>
 
 ---
 
@@ -81,8 +128,22 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 - **Vyron Vasileiadis**, Tech Lead at **Qilimanjaro Quantum Tech** · vyron@qilimanjaro.tech
 - **Flavie Le Bars**, Quantum Software Engineer at **Qilimanjaro Quantum Tech** · flavie.lebars@qilimanjaro.tech
-- **Qilimanjaro** builds quantum computers and the software stack that drives them.
+
+---
+
+## Qilimanjaro
+
+- **Qilimanjaro Quantum Tech** builds analog quantum processors on superconducting fluxonium qubits, plus the software stack that drives them.
+- Full-stack: hardware, control electronics, software, and cloud access, under one roof.
+- Founded in 2019, based in Barcelona.
+
+---
+
+## QProgram
+
 - **QProgram** is the pulse-level layer of that stack, an open-source Python DSL.
+- Hardware-agnostic: the same program targets a Qblox cluster, a QDevil QDAC, or the reference simulator.
+- Modality- and paradigm-agnostic too, since a transmon and a fluxonium, or a gate model and an annealer, all come down to pulse-level programming.
 
 ---
 
@@ -110,9 +171,7 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 
 ## Follow along
 
-- **Local**: `pip install "qprogram[viz]==0.2.0"`, Python 3.11 to 3.14.
-- **Colab**: the first cell of each notebook installs what is missing.
-- The Advanced notebook adds two vendor packages, and its own first cell installs them.
+- **Full setup**: see the README, QR code above. Install, troubleshooting, the `uv` option.
 - No hardware and no cloud account, since the reference platform ships in the wheel.
 - Open `notebooks/01_introduction.ipynb` now. Its first two cells are the environment check.
 
@@ -121,34 +180,42 @@ section.divider code { background: rgba(255,255,255,.18); color: #fff; }
 ## How we work
 
 - The slides are the map, and the notebooks are the work.
-- Two movements of concepts first, covered by no notebook.
-- Then one part per notebook. Each opens on a few slides, then moves into the notebook and one 🧩 exercise.
+- One part per notebook: each opens on a few slides, then moves into the notebook and one exercise.
 - `notebooks/` holds the `# TODO` cells, `notebooks/solutions/` the answers.
-- Interrupt me, above all with a lab story that contradicts the slide.
 
----
-
-## Schedule
-
-| Part | Notebook | Topic | Time |
-|---|---|---|---|
-| | | the chip, the rack, and why a language of its own | 40 min |
-| 1 | `01_introduction` | The program is data | 25 min |
-| 2 | `02_basics` | Variables, sweeps, and results | 25 min |
-| 3 | `03_advanced` | Fragments, feedback, extending, and the machine | 75 min |
-| | | questions and close | 10 min |
-
-Three notebooks, three parts, one 🧩 exercise each. The break between the two sessions lands after Part 2, so the whole of the second session is Part 3, whose six sections stand on their own and can be taken in any order.
+| Topic | Notebook | Time |
+|---|---|---|
+| Background: the chip, the rack, and why a language of its own | | 40 min |
+| Operations, schemas, waveforms, and the `.qp` file | `01_introduction` | 25 min |
+| Variables, sweeps, and results | `02_basics` | 25 min |
+| **Break** | | |
+| Fragments, feedback, extending, and the machine | `03_advanced` | 75 min |
+| Questions and close | | 10 min |
 
 ---
 
 ## What you will build
 
-- a **pulse program** you can read, save, load and diff (Part 1)
-- a **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** (Part 2)
-- **active reset**, one measurement deciding the next pulse
-- your **own waveform, sweep source, and vendor operation**
-- a **platform** of your own, and a rack's **execution plan** (all three in Part 3)
+- A **pulse program** you can read, save, load and diff (`01_introduction`)
+- A **resonator scan**, a **two-dimensional map**, and a **lockstep sweep** (`02_basics`)
+- **Active reset**, one measurement deciding the next pulse (`03_advanced`)
+- Your **own waveform, sweep source, and vendor operation** (`03_advanced`)
+- A **platform** of your own, and a rack's **execution plan** (`03_advanced`)
+
+---
+
+## Acronyms
+
+| Acronym | Stands for |
+|---|---|
+| **ADC** | Analog-to-digital converter |
+| **AST** | Abstract syntax tree |
+| **DAC** | Digital-to-analog converter |
+| **DRAG** | Derivative removal by adiabatic gate |
+| **DSL** | Domain-specific language |
+| **FPGA** | Field-programmable gate array |
+| **IQ** | In-phase / quadrature |
+| **LC** | Inductor-capacitor (circuit) |
 
 ---
 
@@ -229,11 +296,11 @@ $$f_{01}(V) = f_{\max}\sqrt{\left|\cos\frac{\pi(V - V_0)}{V_\Phi}\right|}$$
 
 ## Three lines
 
-| line | what runs on it | what it does |
+| Line | What runs on it | What it does |
 |---|---|---|
-| **drive** | a microwave tone near $f_{01}$ = 4.85 GHz | rotates the state |
-| **readout** | a microwave tone near $f_r$ = 7.20 GHz | interrogates a resonator coupled to the qubit |
-| **flux** | a slow, near-DC voltage through a coil | moves $f_{01}$ |
+| **Drive** | A microwave tone near $f_{01}$ = 4.85 GHz | Rotates the state |
+| **Readout** | A microwave tone near $f_r$ = 7.20 GHz | Interrogates a resonator coupled to the qubit |
+| **Flux** | A slow, near-DC voltage through a coil | Moves $f_{01}$ |
 
 - The drive line has no ADC, so nothing sent down it comes back.
 - Every operation today writes a voltage onto one of these three lines.
@@ -301,10 +368,10 @@ $$Q(t) = \beta\,\dot{I}(t)$$
 
 Two qubits interact through a coupling, and a gate is an interval where you let it act.
 
-| route | what you do | duration |
+| Route | What you do | Duration |
 |---|---|---|
-| **flux** | push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
-| **all-microwave** | drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
+| **Flux** | Push one qubit until $\lvert 11\rangle$ and $\lvert 02\rangle$ meet, hold, come back | 40 to 100 ns |
+| **All-microwave** | Drive A at B's frequency and let the coupling condition B on A | 200 to 500 ns |
 
 - The flux route drags a qubit off its sweet spot, the bias where flux noise stops moving its frequency.
 - The microwave route moves neither qubit.
@@ -351,11 +418,11 @@ $$\chi = \frac{g^2}{\Delta}\cdot\frac{\alpha}{\Delta+\alpha} = -1.8\ \text{MHz},
 
 ## Coherence times
 
-| | this chip | what it measures |
+| | This chip | What it measures |
 |---|---|---|
-| $T_1$ | 18 us | energy leaving the qubit and not coming back |
-| $T_2^{*}$ | 9 us | plus every source of frequency wander, unfiltered |
-| $T_2$ echo | 16 us | plus a $\pi$ pulse in the middle, refocusing slow noise |
+| $T_1$ | 18 us | Energy leaving the qubit and not coming back |
+| $T_2^{*}$ | 9 us | Plus every source of frequency wander, unfiltered |
+| $T_2$ echo | 16 us | Plus a $\pi$ pulse in the middle, refocusing slow noise |
 
 $$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
 
@@ -366,9 +433,9 @@ $$\frac{1}{T_2} = \frac{1}{2T_1} + \frac{1}{T_\varphi}$$
 
 ## Three coherence experiments
 
-| experiment | the sequence | what it isolates |
+| Experiment | The sequence | What it isolates |
 |---|---|---|
-| inversion recovery | $\pi$, wait, read | $T_1$, energy leaving and not coming back |
+| Inversion recovery | $\pi$, wait, read | $T_1$, energy leaving and not coming back |
 | Ramsey | $\pi/2$, wait, $\pi/2$, read | $T_2^{*}$, and the drive frequency error as a fringe |
 | Hahn echo | $\pi/2$, wait, $\pi$, wait, $\pi/2$, read | $T_2$, with slow noise refocused |
 
@@ -414,16 +481,6 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 ---
 
-## Calibration order
-
-<p class="big">resonator → qubit → π pulse → coherence → readout → reset</p>
-
-- Each scan consumes the answer from the one before it.
-- You cannot find the qubit before you can read it out.
-- You cannot fit a $\pi$ amplitude before you know where the qubit is.
-
----
-
 <!-- _class: divider -->
 
 <p class="kicker">Concepts · slides only</p>
@@ -440,14 +497,14 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 - **A clock per line**, with barriers as explicit instructions.
 - **Parameter sweeps**, nested or stepped in lockstep.
 - **Shot averaging**, collapsing repeats into one number.
-- **Acquisition with weights**, and a choice of what to keep.
-- **A branch on a measurement**, inside the shot.
+- **Acquisition with weights**, and a choice of raw, integrated, or classified output.
+- **Conditional measurement**, active reset for example, decided in real time.
 
 ---
 
 ## One dialect per rack
 
-- A paper travels between labs, and the control code behind it stays in the lab that wrote it.
+- Experimental results get published in papers. The control code behind them isn't shared.
 - Every vendor ships its own sequencer dialect.
 - They are assembly shaped, because an FPGA has to meet every clock edge.
 - Loops come out of registers, and waveform memory is addressed by hand.
@@ -486,7 +543,7 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 <p class="kicker">Part 1 · notebooks/01_introduction.ipynb</p>
 
-# The program is data
+# Operations, schemas, waveforms, and the `.qp` file
 
 ### The operations, the lines they run on, the shapes they play, and the file they save to
 
@@ -514,12 +571,12 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 ## Every call names a property
 
-| what a call does | the calls |
+| What a call does | The calls |
 |---|---|
-| book time on a line | `play`, `measure`, `wait` |
-| bring lines to a common time | `sync` |
-| set or read one property of a line | `set_frequency`, `set_phase`, `reset_phase`, `set_gain`, `set_offset`, `set_parameter`, `get_parameter` |
-| run a named sub-program | `call` |
+| Book time on a line | `play`, `measure`, `wait` |
+| Bring lines to a common time | `sync` |
+| Set or read one property of a line | `set_frequency`, `set_phase`, `reset_phase`, `set_gain`, `set_offset`, `set_parameter`, `get_parameter` |
+| Run a named sub-program | `call` |
 
 - Instrument verbs rather than gates, and each call appends exactly one node.
 - Durations are nanoseconds, frequencies hertz, phases radians, gain and offset dimensionless.
@@ -534,8 +591,7 @@ A circuit says `X(q0)`. Before an instrument can emit it, somebody has to supply
 
 - Every bus keeps its own cursor, advanced only by what you write to that bus.
 - A barrier holds every named bus until the furthest ahead has finished.
-- A bare `sync()` covers every bus in the program rather than the two you had in mind.
-- An empty list raises rather than guessing what you meant.
+- A bare `sync()` covers every bus in the program; give it a list to sync only certain buses.
 
 ---
 
@@ -632,10 +688,10 @@ program.measure(q[0].drive, "readout", "weights")
 
 ## A source, not a list
 
-| `KIND` | what it promises |
+| `KIND` | What it promises |
 |---|---|
-| `linear` | point $i$ is exactly `start + step * i` |
-| `arbitrary` | every other source, and its points have to be shipped |
+| `linear` | Point $i$ is exactly `start + step * i` |
+| `arbitrary` | Every other source, and its points have to be shipped |
 
 - A bare list is refused, because a source declares its kind before the run starts and a list declares none.
 - A source also reports its length without running, which is how a lockstep pair is checked and how the result arrays are sized.
@@ -753,11 +809,11 @@ excited after:  0.029
 
 ## Three extension seams
 
-| you want | you write | you get for free |
+| You want | You write | You get for free |
 |---|---|---|
-| a pulse shape the DSL lacks | a `Waveform` subclass | serialization, structural equality, validation, plotting |
-| a sweep axis the DSL lacks | a `SweepSource` subclass | serialization, a capability token, length checks, coordinates |
-| an operation the DSL will never have | an `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a capability token |
+| A pulse shape the DSL lacks | A `Waveform` subclass | Serialization, structural equality, validation, plotting |
+| A sweep axis the DSL lacks | A `SweepSource` subclass | Serialization, a capability token, length checks, coordinates |
+| An operation the DSL will never have | An `Operation` plus a `VendorNamespace` | `program.<vendor>.<op>()`, a `require` line, a capability token |
 
 - A language that cannot be extended gets forked, and a fork stops being portable.
 - A capability token is a dotted name a rack can refuse the node by.
@@ -816,11 +872,11 @@ vendor.qdac.set_offset   qblox False qdac True
 
 ## Two racks
 
-| | rack A, yours | rack B, next door |
+| | Rack A, yours | Rack B, next door |
 |---|---|---|
-| drive and readout | one box, one shared clock | one box, one shared clock |
-| flux line | a DC-coupled output on that box | a 20-bit DC source over Ethernet |
-| bus names | `q0/drive` | `drive_q0` |
+| Drive and readout | One box, one shared clock | One box, one shared clock |
+| Flux line | A DC-coupled output on that box | A 20-bit DC source over Ethernet |
+| Bus names | `q0/drive` | `drive_q0` |
 
 - The flux row is the one that changes how the program runs.
 - Heavy filtering keeps a flux line quiet and gives it millisecond time constants, so nothing behind it steps a loop.
@@ -850,11 +906,11 @@ vendor.qdac.set_offset   qblox False qdac True
 
 ## The cost of a loop
 
-| where the loop runs | one execution | 41 points, 200 shots |
+| Where the loop runs | One execution | 41 points, 200 shots |
 |---|---|---|
-| real time, passive reset | 2 us readout plus $5T_1$ | **0.75 s** |
-| real time, active reset | about 10 us | **0.08 s** |
-| host, one round trip per execution | about 1 ms | **8.2 s** |
+| Real time, passive reset | 2 us readout plus $5T_1$ | **0.75 s** |
+| Real time, active reset | About 10 us | **0.08 s** |
+| Host, one round trip per execution | About 1 ms | **8.2 s** |
 
 - $T_1$ is 18 us on this chip, so passive reset spends 90 of those 92 microseconds waiting.
 - A host round trip costs three orders of magnitude more than a real-time one.
@@ -873,11 +929,11 @@ vendor.qdac.set_offset   qblox False qdac True
 
 ## Tokens, limits, predicates
 
-| mechanism | the question it answers | examples |
+| Mechanism | The question it answers | Examples |
 |---|---|---|
-| **token** | is this in the set? | `op.play`, `waveform.iq_drag`, `sweep.logspace` |
-| **limit** | is this number small enough? | `max_loop_nesting`, `max_measurements` |
-| **predicate** | given the rest of the program, is this legal? | no arbitrary sweep at `Wait.duration` |
+| **Token** | Is this in the set? | `op.play`, `waveform.iq_drag`, `sweep.logspace` |
+| **Limit** | Is this number small enough? | `max_loop_nesting`, `max_measurements` |
+| **Predicate** | Given the rest of the program, is this legal? | No arbitrary sweep at `Wait.duration` |
 
 - Every node answers `required_capabilities()` with a set of dotted strings computed from its own data.
 - Supply is a set the rack publishes, so checking one is a hash lookup and no instrument is attached.
@@ -888,12 +944,12 @@ vendor.qdac.set_offset   qblox False qdac True
 
 ## Reading the plan
 
-| label | what it means |
+| Label | What it means |
 |---|---|
-| `[rt]` | real time, inside the instrument |
-| `[host]` | dispatched from the control PC, one round trip per iteration |
-| `[rt\|host]` | either one, and the platform picks |
-| `[--]` | nothing can run it, and an error above says why |
+| `[rt]` | Real time, inside the instrument |
+| `[host]` | Dispatched from the control PC, one round trip per iteration |
+| `[rt\|host]` | Either one, and the platform picks |
+| `[--]` | Nothing can run it, and an error above says why |
 
 - The plan is the second half of what `qp.validate` returns.
 - Read it from the leaves up, because an operation that can run nowhere empties the loop holding it.
@@ -972,11 +1028,22 @@ $ python -m qprogram.lsp check flux_sweep.qp   (exit 1)
 - Issues and pull requests are welcome.
 
 ---
-<!-- _class: lead -->
+
+## Other events at QCE 2026
+
+- **Paper: QProgram**: *A Hardware-Agnostic DSL for Portable Pulse-Level Quantum Programming* (Q-SET 2026), Vyron Vasileiadis, Flavie Le Bars, David Arcos. Wed Sep 16, 10:00–11:30 AM EDT, Room 714B.
+- **Poster: QiliSim**: *A C++ Quantum Simulator for Digital/Analog Workflows*, Luke Mortimer, Ameer Azzam, Vyron Vasileiadis, Natàlia Padilla. Board 76, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+- **Poster: QPySequence**: *Pythonic Sequence Programming for Qblox Hardware*, Flavie Le Bars, Vyron Vasileiadis, Joel Pérez Díaz. Board 86, Hall E. Mon Sep 14, 18:30–20:00 (reception); Tue Sep 15, 11:30–12:30; Wed Sep 16, 14:30–15:00.
+
+---
+<!-- _class: lead center -->
 <!-- _footer: '' -->
+
+<img class="logo" src="img/qilimanjaro-logo-white.png" alt="Qilimanjaro Quantum Tech" />
 
 # Thank you
 
-<p class="sub">Questions, and the notebooks are yours to keep</p>
+<p class="sub">Questions welcome.</p>
+<p class="sub">The notebooks are yours to keep.</p>
 
 <p class="meta">vyron@qilimanjaro.tech · flavie.lebars@qilimanjaro.tech · QCE 2026</p>
