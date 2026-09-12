@@ -592,8 +592,8 @@ Each extension registers a namespace on `QProgram` through which you call its op
 """
 
 # %%
-import qprogram_qblox  # noqa: F401  Register the Qblox namespace.
-import qprogram_qdac  # noqa: F401  Register the QDAC namespace.
+import qprogram_qblox  # Register the Qblox namespace.
+import qprogram_qdac  # Register the QDAC namespace.
 
 # The imports make both namespaces available on a regular QProgram.
 qprogram = qp.QProgram(label="vendor_operations")
@@ -788,8 +788,8 @@ The vendor extensions from section 3.4 also publish named profiles. The two prof
 """
 
 # %%
-import qprogram_qblox  # noqa: F401  Register the Qblox profile.
-import qprogram_qdac  # noqa: F401  Register the QDAC profile.
+import qprogram_qblox  # Register the Qblox profile.
+import qprogram_qdac  # Register the QDAC profile.
 
 qblox_half = qp.CompilerCapabilities.from_profile("qblox-default-v1")
 qdac_half = qp.CompilerCapabilities.from_profile("qdac-default-v1")

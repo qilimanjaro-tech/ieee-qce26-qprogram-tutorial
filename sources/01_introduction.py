@@ -122,7 +122,7 @@ The example below plays a drive pulse, waits for 400 ns, and then performs a rea
 
 `set_gain` controls the gain applied to the bus output, while a waveform's `amplitude` controls the amplitude of that waveform. `reset_phase` resets the oscillator phase to zero, providing a consistent phase reference.
 
-`play`, `measure`, and `wait` advance the time on their target bus. A platform may require durations to be multiples of a particular interval, such as 4 ns. QProgram preserves the values you provide; the platform determines whether those durations are supported.
+`play`, `measure`, and `wait` advance the time on their target bus.
 """
 
 # %%
@@ -207,7 +207,7 @@ except qp.ValidationError as exc:
 r"""
 ### Setting bus properties
 
-Methods such as `set_frequency` and `set_gain` describe settings that a platform can change within a pulse sequence. Use `set_parameter(bus, name, value)` for platform configuration, such as an external attenuator setting or a local oscillator frequency. Changing these settings may require host communication between runs, so sweeping them can involve additional work for each point.
+Methods such as `set_frequency` and `set_gain` describe settings that a platform can change within a pulse sequence. Use `set_parameter(bus, name, value)` for platform configuration, such as an external attenuator setting. Changing these settings may require host communication between runs, so sweeping them can involve additional work for each point.
 
 Parameter names are defined by the platform and are not validated by QProgram's core. Use the platform's `get_parameters(bus)` method to find the available parameters.
 
@@ -387,13 +387,6 @@ The five IQ waveform types combine or transform single-channel waveforms:
 - `IQRotation` rotates an existing IQ pair in the IQ plane.
 - `Modulated` modulates a real envelope onto a carrier.
 
-When choosing parameters, keep the following sampling and duration details in mind:
-
-- `sigma` and `smooth_duration` are widths in nanoseconds, not fractions of the total duration.
-- `duration` defines the sampling window. For a centred shape, the samples may not include its exact centre, so the sampled peak can be slightly lower than the requested amplitude.
-- `area()` uses trapezoidal integration. At the default resolution, `Square(0.5, 100).area()` returns 49.5.
-- `FlatTop` adds its `buffer` outside the specified `duration`, increasing the total waveform duration.
-
 Waveforms compare and hash by their structure and parameter values. Two separately created `Gaussian(0.5, 40, 8)` objects therefore compare equal. You can concatenate compatible shapes with `a + b`, which creates a `Chained` waveform.
 
 A waveform is not tied to a particular bus. For example, you can play a `Square` directly on a flux bus or wrap it in `IQZero` to use it on an IQ bus.
@@ -439,11 +432,12 @@ print(qp.dumps(qprogram))  # The play and measure operations refer to those alia
 
 # %%
 # Supply a waveform for each alias to create a new, resolved program.
-print(qp.dumps(qprogram.with_waveforms({
+qprogram_with_resolved_waveforms = qprogram.with_waveforms({
     "pi": pi_pulse,
     "readout": readout_pulse,
     "weights": weights,
-})))  # The output now contains the waveform definitions.
+})
+print(qp.dumps(qprogram_with_resolved_waveforms))  # The output now contains the waveform definitions.
 print(qprogram.body.waveforms())  # The original program still contains the aliases.
 
 # %%
@@ -473,7 +467,7 @@ Call `plot()` explicitly when you want to customise the figure. Assign the retur
 # %%
 ax = drive_envelope.plot()
 ax.set_title("Gaussian envelope", loc="left")
-ax.axhline(drive_envelope.peak_amplitude(), color="grey", linestyle=":", linewidth=0.8)
+ax.axhline(drive_envelope.peak_amplitude(), color="red", linestyle=":", linewidth=0.8)
 plt.show()
 
 # %% [markdown]

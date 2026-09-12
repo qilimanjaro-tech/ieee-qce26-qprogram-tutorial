@@ -14,13 +14,13 @@ As in **Introduction**, the examples use the waveform aliases `"readout"` and `"
 # %%
 # Install QProgram if it is not already available in this Python environment.
 try:
-    import qprogram  # noqa: F401
+    import qprogram
 except ImportError:
     import subprocess
     import sys
 
     subprocess.run([sys.executable, "-m", "pip", "install", "qprogram[viz]==0.2.0"], check=True)
-    import qprogram  # noqa: F401
+    import qprogram
 
 from importlib.metadata import version
 
