@@ -685,214 +685,10 @@ print("registered migrations:", qp.serialization.known_migrations("qp"))
 qprogram = qp.loads(FROM_LAST_YEAR)
 print(qp.dumps(qprogram))  # The format header and vendor requirement now use version 0.2.
 
-# %% [markdown]
-r"""
-## 3.5 Implementing a platform
-
-A platform implements the interface used to inspect resources, validate programs, and execute them. `qp.PlatformProtocol` requires six members:
-
-| Member | Purpose |
-|---|---|
-| `get_bus_schema()` | Return the bus schema. |
-| `get_buses()` | List the available buses. |
-| `get_parameters(bus)` | List configuration parameters for one bus. |
-| `get_global_parameters()` | List parameters that are not associated with a bus. |
-| `capabilities` | Return the platform's capability descriptor. |
-| `execute(qprogram)` | Execute a program and return a `QProgramResult`. |
-
-The base class implements `validate`, `plan`, and `explain` using the capability descriptor. Streaming is optional; the default `stream` implementation raises an error.
-
-An `execute` implementation should validate the program first, raise `qp.UnsupportedOperationError` for error diagnostics, and report warnings without treating them as errors. This is an implementation convention, so the platform must include that logic explicitly.
-"""
 
 # %% [markdown]
 r"""
-### A minimal platform implementation
-
-`BenchtopRack` implements all six required members. This example exposes one flux-tunable qubit and a `dac_range` parameter on its flux bus. It stores the schema, capabilities, and parameter values, and checks diagnostics before running a program.
-
-For this example, execution delegates to `ReferencePlatform`. A hardware platform would instead compile the program, send it to the instruments, run it, and assemble the results. The protocol leaves those steps to the implementation.
-"""
-
-# %%
-schema = BusSchema.flux_tunable_transmon()
-q = schema.q
-
-
-class BenchtopRack(qp.PlatformProtocol):
-    """Demonstrate the platform interface with a configurable capability descriptor."""
-
-    def __init__(self, schema, capabilities, parameters=None):
-        self._schema = schema
-        self._capabilities = capabilities
-        self.parameters = dict(parameters or {})
-
-    def get_bus_schema(self):
-        return self._schema
-
-    def get_buses(self):
-        q = self._schema.q
-        return [q[0].drive, q[0].readout, q[0].flux]
-
-    def get_parameters(self, bus):
-        if bus == self._schema.q[0].flux:
-            return ["dac_range"]
-        return []
-
-    def get_global_parameters(self):
-        return ["fridge_temperature"]
-
-    @property
-    def capabilities(self):
-        return self._capabilities
-
-    def execute(self, qprogram):
-        diagnostics = self.validate(qprogram)
-        for diagnostic in diagnostics:
-            if diagnostic.severity == "error":
-                raise qp.UnsupportedOperationError(str(diagnostic))
-            if diagnostic.severity == "warning":
-                warnings.warn(str(diagnostic), qp.ExecutionWarning, stacklevel=2)
-        # Delegate execution to the reference platform for this tutorial.
-        platform = qp.ReferencePlatform(self._schema, parameters=self.parameters)
-        return platform.execute(qprogram)
-
-# %% [markdown]
-r"""
-The next program sweeps a flux bias and measures at each point. We describe a platform where flux operations can execute only through the host.
-
-Each bus profile contains an `rt` component for real-time execution and a `host` component for host execution. Setting `rt=None` on the flux profile removes real-time support for that bus. Section 3.6 explains how these components affect the execution plan.
-
-The capability descriptors are immutable, so `dataclasses.replace` creates modified copies. Here, we start from the reference descriptor and change only the flux profile.
-"""
-
-# %%
-qprogram = qp.QProgram(label="flux_sweep", schema=schema)
-bias = qprogram.variable("bias", label="Flux bias", units="V")
-bias_source = qp.Linspace(-0.05, 0.15, 41)
-
-with qprogram.average(shots=200):
-    with qprogram.sweep(bias, bias_source):
-        qprogram.set_offset(q[0].flux, bias)
-        qprogram.set_frequency(q[0].drive, 4.85e9)
-        qprogram.play(q[0].drive, "pi")
-        qprogram.sync([q[0].drive, q[0].readout])
-        qprogram.measure(
-            q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,)
-        )
-
-# %%
-reference = qp.reference_capabilities()
-slow_dac = replace(reference.default_bus_profile, rt=None)  # Support flux operations in the host domain only.
-rack_caps = replace(reference, bus={("q", "flux"): slow_dac})
-
-rack = BenchtopRack(schema, rack_caps, parameters={"q0/flux.dac_range": 0.5})
-
-print("buses:", rack.get_buses())
-print("parameters on q0/flux:", rack.get_parameters(q[0].flux))
-print("global parameters:", rack.get_global_parameters())
-
-# Execution emits a warning because the flux sweep must run through the host.
-run = rack.execute(qprogram)
-
-print("result:", run)
-population = run.get("m0", field=MeasurementField.STATE)
-print("array:", population.dims, population.shape)
-
-# %% [markdown]
-r"""
-The platform returns a result containing a population array and reports an `ExecutionWarning` about host execution. The warning appears in the notebook output.
-
-The next example removes support for `op.set_offset` from the flux bus entirely. Validation then produces an error, and `execute` rejects the program before execution.
-"""
-
-# %%
-host_half = reference.default_bus_profile.host
-dc_source = replace(
-    host_half,
-    profile="dc-source-v1",
-    capabilities=host_half.capabilities - {"op.set_offset"},
-)
-fixed_flux = qp.BusCapabilities(rt=None, host=dc_source)
-fixed_caps = replace(reference, bus={("q", "flux"): fixed_flux})
-
-unsupported_rack = BenchtopRack(schema, fixed_caps)
-try:
-    unsupported_rack.execute(qprogram)
-except qp.UnsupportedOperationError as exc:
-    print(exc)
-
-# %% [markdown]
-r"""
-### Inherited methods and result construction
-
-`BenchtopRack` inherits `validate`, `plan`, and `explain` from `PlatformProtocol`. The next cell calls the first two without any additional implementation in the subclass.
-"""
-
-# %%
-diagnostics = rack.validate(qprogram)
-for diagnostic in diagnostics:
-    print(diagnostic)
-
-plan = rack.plan(qprogram)
-print("plan entries:", len(plan))
-
-# %% [markdown]
-r"""
-A platform can construct results directly by creating a `qp.QProgramResult` and calling `append_measurement(bus=..., name=..., data=...)`. The `data` argument is an `xarray.DataArray` assembled by the platform. Without an explicit `fields` mapping, the array is recorded as the integrated I/Q field returned by default from `result.get`.
-
-The next cell constructs a state result using the same bias coordinates as the program above. Zeros stand in for acquired values so we can focus on the array dimensions, coordinates, and measurement name.
-
-In a hardware platform, this construction belongs in `execute` after acquisition. Each measurement's data and coordinates must match its requested fields and enclosing sweeps.
-"""
-
-# %%
-# One value per bias point, with the variable identifier naming the dimension.
-bias_values = bias_source.values()
-data = xr.DataArray(
-    np.zeros(len(bias_values)),
-    dims=[bias.id],
-    coords={bias.id: bias_values},
-)
-
-own = qp.QProgramResult()
-own.append_measurement(
-    bus=q[0].readout,
-    name="m0",  # Match the name used by measure() in the program.
-    data=data,
-    fields={"state": data},  # Store the array as the classified-state output.
-)
-state = own.get("m0", field=MeasurementField.STATE)
-
-print("result:", own)
-print(state)  # Shows the values, dimension, and bias coordinates.
-
-# %% [markdown]
-r"""
-`qp.ReferencePlatform` exposes four configuration arguments:
-
-- `schema` supplies the schema returned by `get_bus_schema`.
-- `model` supplies simulated measurement values. The default mock model reports state 0 for every shot.
-- `parameters` initialises a dictionary keyed as `"bus.parameter"`. `get_parameter` reads it and `set_parameter` updates it. Updates persist across executions on the same platform instance.
-- `vendor_op_handlers` maps vendor operation classes to callbacks that implement their effects during execution.
-
-`qp.simulate` is a convenience wrapper that creates a reference platform and executes one program. Use a platform instance directly when you want to retain state between executions.
-"""
-
-# %%
-bench = qp.ReferencePlatform(schema=schema, parameters={"q0/drive.attenuation": 20.0})
-
-qprogram = qp.QProgram(label="parameter_store", schema=schema)
-qprogram.set_parameter(q[0].flux, "bias", 0.05)
-q0_drive_attenuation = qprogram.get_parameter(q[0].drive, "attenuation")
-bench.execute(qprogram)
-
-print("parameter store after execution:", bench.parameters)
-print("value read into the variable:", q0_drive_attenuation.id, "=", q0_drive_attenuation.value)
-
-# %% [markdown]
-r"""
-## 3.6 Capabilities, plans, and transformations
+## 3.5 Capabilities, plans, and transformations
 
 A capability descriptor declares which parts of a program a platform can execute. The validator uses it to report unsupported features and determine the available execution domains.
 
@@ -1304,51 +1100,211 @@ A `DomainConstraint` on the loop also does not produce the hint. In that case, t
 # %%
 print(qp.explain(qprogram, rack_caps))
 
+
 # %% [markdown]
 r"""
-### Defining a vendor namespace
+## 3.6 Implementing a platform
 
-To add a vendor operation, define an `Operation` subclass for the program node and a `qp.VendorNamespace` subclass for the builder methods.
+A platform implements the interface used to inspect resources, validate programs, and execute them. `qp.PlatformProtocol` requires six members:
 
-The operation implements `required_capabilities()`. The base class provides methods for finding variables, buses, and waveforms, along with traversal and structural equality. A namespace method calls `self._append(...)` to add an operation to the program.
+| Member | Purpose |
+|---|---|
+| `get_bus_schema()` | Return the bus schema. |
+| `get_buses()` | List the available buses. |
+| `get_parameters(bus)` | List configuration parameters for one bus. |
+| `get_global_parameters()` | List parameters that are not associated with a bus. |
+| `capabilities` | Return the platform's capability descriptor. |
+| `execute(qprogram)` | Execute a program and return a `QProgramResult`. |
 
-The example adds `twpa.set_pump`, an illustrative operation for setting an amplifier's pump frequency. Four registration calls make the namespace, operation syntax, capability token, and vendor version available to QProgram.
+The base class implements `validate`, `plan`, and `explain` using the capability descriptor. Streaming is optional; the default `stream` implementation raises an error.
 
-`register_vendor_version` is called last because it marks the vendor as active. The `qp.try_activate_vendor` guard then allows the cell to reuse an existing registration. Keeping the class definitions inside the guard avoids creating new class objects while the registry still refers to the earlier definitions.
+An `execute` implementation should validate the program first, raise `qp.UnsupportedOperationError` for error diagnostics, and report warnings without treating them as errors. This is an implementation convention, so the platform must include that logic explicitly.
+"""
+
+# %% [markdown]
+r"""
+### A minimal platform implementation
+
+`BenchtopRack` implements all six required members. This example exposes one flux-tunable qubit and a `dac_range` parameter on its flux bus. It stores the schema, capabilities, and parameter values, and checks diagnostics before running a program.
+
+For this example, execution delegates to `ReferencePlatform`. A hardware platform would instead compile the program, send it to the instruments, run it, and assemble the results. The protocol leaves those steps to the implementation.
 """
 
 # %%
-# Register once per kernel. Rerunning the cell reuses the existing classes and registrations.
-if not qp.try_activate_vendor("twpa"):
+schema = BusSchema.flux_tunable_transmon()
+q = schema.q
 
-    class SetPump(qp.operations.Operation):
-        """Represent an amplifier pump-frequency setting associated with a readout bus."""
 
-        def __init__(self, bus: str, frequency: float | qp.Expression) -> None:
-            self.bus = bus
-            self.frequency = frequency
+class BenchtopRack(qp.PlatformProtocol):
+    """Demonstrate the platform interface with a configurable capability descriptor."""
 
-        def required_capabilities(self) -> set[str]:
-            return {"vendor.twpa.set_pump"} | qp.protocol.expression_tokens(self.frequency)
+    def __init__(self, schema, capabilities, parameters=None):
+        self._schema = schema
+        self._capabilities = capabilities
+        self.parameters = dict(parameters or {})
 
-    class TwpaNamespace(qp.VendorNamespace):
-        """Provide builder methods in the qprogram.twpa namespace."""
+    def get_bus_schema(self):
+        return self._schema
 
-        def set_pump(self, bus: str, frequency: float | qp.Expression) -> None:
-            self._append(SetPump(bus=bus, frequency=frequency))
+    def get_buses(self):
+        q = self._schema.q
+        return [q[0].drive, q[0].readout, q[0].flux]
 
-    qp.QProgram.register_vendor("twpa", TwpaNamespace)  # Register the namespace on QProgram itself.
-    qp.register_vendor_operation("twpa", "set_pump", SetPump)
-    qp.register_capability_tokens("vendor.twpa.set_pump")
-    qp.register_vendor_version("twpa", "0.1.0")  # Mark the vendor active after completing registration.
+    def get_parameters(self, bus):
+        if bus == self._schema.q[0].flux:
+            return ["dac_range"]
+        return []
 
-qprogram = qp.QProgram(label="pump_then_read")
-qprogram.twpa.set_pump("q0/readout", 7.9e9)
-pump_text = qp.dumps(qprogram)
+    def get_global_parameters(self):
+        return ["fridge_temperature"]
 
-print(pump_text)
-qprogram = qp.loads(pump_text)
-print("serialised text preserved after loading:", qp.dumps(qprogram) == pump_text)
+    @property
+    def capabilities(self):
+        return self._capabilities
+
+    def execute(self, qprogram):
+        diagnostics = self.validate(qprogram)
+        for diagnostic in diagnostics:
+            if diagnostic.severity == "error":
+                raise qp.UnsupportedOperationError(str(diagnostic))
+            if diagnostic.severity == "warning":
+                warnings.warn(str(diagnostic), qp.ExecutionWarning, stacklevel=2)
+        # Delegate execution to the reference platform for this tutorial.
+        platform = qp.ReferencePlatform(self._schema, parameters=self.parameters)
+        return platform.execute(qprogram)
+
+# %% [markdown]
+r"""
+The next program sweeps a flux bias and measures at each point. We describe a platform where flux operations can execute only through the host.
+
+Each bus profile contains an `rt` component for real-time execution and a `host` component for host execution. Setting `rt=None` on the flux profile removes real-time support for that bus. Section 3.6 explains how these components affect the execution plan.
+
+The capability descriptors are immutable, so `dataclasses.replace` creates modified copies. Here, we start from the reference descriptor and change only the flux profile.
+"""
+
+# %%
+qprogram = qp.QProgram(label="flux_sweep", schema=schema)
+bias = qprogram.variable("bias", label="Flux bias", units="V")
+bias_source = qp.Linspace(-0.05, 0.15, 41)
+
+with qprogram.average(shots=200):
+    with qprogram.sweep(bias, bias_source):
+        qprogram.set_offset(q[0].flux, bias)
+        qprogram.set_frequency(q[0].drive, 4.85e9)
+        qprogram.play(q[0].drive, "pi")
+        qprogram.sync([q[0].drive, q[0].readout])
+        qprogram.measure(
+            q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,)
+        )
+
+# %%
+reference = qp.reference_capabilities()
+slow_dac = replace(reference.default_bus_profile, rt=None)  # Support flux operations in the host domain only.
+rack_caps = replace(reference, bus={("q", "flux"): slow_dac})
+
+rack = BenchtopRack(schema, rack_caps, parameters={"q0/flux.dac_range": 0.5})
+
+print("buses:", rack.get_buses())
+print("parameters on q0/flux:", rack.get_parameters(q[0].flux))
+print("global parameters:", rack.get_global_parameters())
+
+# Execution emits a warning because the flux sweep must run through the host.
+run = rack.execute(qprogram)
+
+print("result:", run)
+population = run.get("m0", field=MeasurementField.STATE)
+print("array:", population.dims, population.shape)
+
+# %% [markdown]
+r"""
+The platform returns a result containing a population array and reports an `ExecutionWarning` about host execution. The warning appears in the notebook output.
+
+The next example removes support for `op.set_offset` from the flux bus entirely. Validation then produces an error, and `execute` rejects the program before execution.
+"""
+
+# %%
+host_half = reference.default_bus_profile.host
+dc_source = replace(
+    host_half,
+    profile="dc-source-v1",
+    capabilities=host_half.capabilities - {"op.set_offset"},
+)
+fixed_flux = qp.BusCapabilities(rt=None, host=dc_source)
+fixed_caps = replace(reference, bus={("q", "flux"): fixed_flux})
+
+unsupported_rack = BenchtopRack(schema, fixed_caps)
+try:
+    unsupported_rack.execute(qprogram)
+except qp.UnsupportedOperationError as exc:
+    print(exc)
+
+# %% [markdown]
+r"""
+### Inherited methods and result construction
+
+`BenchtopRack` inherits `validate`, `plan`, and `explain` from `PlatformProtocol`. The next cell calls the first two without any additional implementation in the subclass.
+"""
+
+# %%
+diagnostics = rack.validate(qprogram)
+for diagnostic in diagnostics:
+    print(diagnostic)
+
+plan = rack.plan(qprogram)
+print("plan entries:", len(plan))
+
+# %% [markdown]
+r"""
+A platform can construct results directly by creating a `qp.QProgramResult` and calling `append_measurement(bus=..., name=..., data=...)`. The `data` argument is an `xarray.DataArray` assembled by the platform. Without an explicit `fields` mapping, the array is recorded as the integrated I/Q field returned by default from `result.get`.
+
+The next cell constructs a state result using the same bias coordinates as the program above. Zeros stand in for acquired values so we can focus on the array dimensions, coordinates, and measurement name.
+
+In a hardware platform, this construction belongs in `execute` after acquisition. Each measurement's data and coordinates must match its requested fields and enclosing sweeps.
+"""
+
+# %%
+# One value per bias point, with the variable identifier naming the dimension.
+bias_values = bias_source.values()
+data = xr.DataArray(
+    np.zeros(len(bias_values)),
+    dims=[bias.id],
+    coords={bias.id: bias_values},
+)
+
+own = qp.QProgramResult()
+own.append_measurement(
+    bus=q[0].readout,
+    name="m0",  # Match the name used by measure() in the program.
+    data=data,
+    fields={"state": data},  # Store the array as the classified-state output.
+)
+state = own.get("m0", field=MeasurementField.STATE)
+
+print("result:", own)
+print(state)  # Shows the values, dimension, and bias coordinates.
+
+# %% [markdown]
+r"""
+`qp.ReferencePlatform` exposes four configuration arguments:
+
+- `schema` supplies the schema returned by `get_bus_schema`.
+- `model` supplies simulated measurement values. The default mock model reports state 0 for every shot.
+- `parameters` initialises a dictionary keyed as `"bus.parameter"`. `get_parameter` reads it and `set_parameter` updates it. Updates persist across executions on the same platform instance.
+- `vendor_op_handlers` maps vendor operation classes to callbacks that implement their effects during execution.
+
+`qp.simulate` is a convenience wrapper that creates a reference platform and executes one program. Use a platform instance directly when you want to retain state between executions.
+"""
+
+# %%
+bench = qp.ReferencePlatform(schema=schema, parameters={"q0/drive.attenuation": 20.0})
+
+qprogram = qp.QProgram(label="parameter_store", schema=schema)
+qprogram.set_parameter(q[0].flux, "bias", 0.05)
+q0_drive_attenuation = qprogram.get_parameter(q[0].drive, "attenuation")
+bench.execute(qprogram)
+
+print("parameter store after execution:", bench.parameters)
+print("value read into the variable:", q0_drive_attenuation.id, "=", q0_drive_attenuation.value)
 
 # %% [markdown]
 r"""
