@@ -550,16 +550,9 @@ Saving the `.qp` file alongside your results preserves the program structure and
 r"""
 ## 1.7 Running a program
 
-`qp.simulate(qprogram, model=...)` executes a program on QProgram's Python reference platform. The platform interprets the program's structure, including loops and measurements. It does not simulate pulse dynamics or hardware timing, so adding a `wait` does not change the generated measurement values.
+`qp.simulate(qprogram)` executes a program on QProgram's Python reference platform. The platform interprets the program's structure, including loops and measurements. It does not simulate pulse dynamics or hardware timing, so adding a `wait` does not change the generated measurement values.
 
-A measurement model supplies a sample for each shot. `qp.MockMeasurementModel` provides a configurable model with the following arguments:
-
-- `response`: a function returning the noiseless complex measurement value.
-- `noise`: the standard deviation of the Gaussian noise added to each quadrature.
-- `raw_samples`: the number of samples in the simulated ADC trace.
-- `seed`: a random seed for reproducible results.
-
-The example below contains one measurement without loops or averaging, so it produces one measurement record. `MEAN_IQ` sets the assumed noiseless response to I = 0.62 and Q = 0.18. The response is fixed and does not depend on the pulse sequence. **Basics** shows how the response can depend on a swept variable.
+Start by calling `qp.simulate(qprogram)` without any extra arguments. By default, measurements have zero I/Q values, classified state 0, and a zero-filled raw trace of 16 samples. The example below contains one measurement without loops or averaging, so it produces one measurement record.
 
 Use `result.get(handle, field=...)` to retrieve an output as an `xarray.DataArray`. This array has named dimensions and coordinates. The integrated result has an `IQ` dimension of length two, with coordinates `"I"` and `"Q"`. Select a quadrature by name with `.sel(IQ="I")` or `.sel(IQ="Q")`.
 """
@@ -574,6 +567,28 @@ m_single = qprogram.measure(
     fields=(MeasurementField.IQ, MeasurementField.STATE, MeasurementField.RAW),
 )
 
+result = qp.simulate(qprogram)
+print("default I/Q:", result.get(m_single, field=MeasurementField.IQ).values)  # [0. 0.]
+print("default state:", result.get(m_single, field=MeasurementField.STATE).item())  # 0.0
+
+# %% [markdown]
+r"""
+### Measurement models
+
+To supply different measurement values, pass a **measurement model** with `qp.simulate(qprogram, model=...)`. The reference platform calls the model for each measurement at each shot and sweep point. The model receives the bus and an `env` mapping. This mapping contains currently assigned variable values, keyed by identifier, and platform parameter values, keyed as `"bus.parameter"`. Unassigned variables are absent from `env`.
+
+`qp.MockMeasurementModel(response=None, p_excited=None, noise=0.0, raw_samples=16, seed=0)` provides a configurable model:
+
+- `response` returns the noiseless complex I/Q value. The default is `0j`.
+- `p_excited` returns the probability of state 1. By default, every shot is in state 0.
+- `noise` sets the standard deviation of Gaussian noise added to each quadrature per shot.
+- `raw_samples` sets the length of the simulated raw trace.
+- `seed` initialises the model's random number generator. Creating a new model with the same seed reproduces the sequence; reusing an existing model continues its random sequence.
+
+The next cell runs the same program with a fixed response and added noise. `MEAN_IQ` sets the assumed noiseless response to I = 0.62 and Q = 0.18. The response is fixed and does not depend on the pulse sequence. **Basics** shows how the response can depend on a swept variable.
+"""
+
+# %%
 MEAN_IQ = 0.62 + 0.18j  # Assumed noiseless readout response: I=0.62, Q=0.18.
 
 model = qp.MockMeasurementModel(

@@ -6,7 +6,7 @@ The **Introduction** notebook covered individual pulse sequences. This notebook 
 
 You will also retrieve, inspect, and plot measurement results. `qp.simulate` returns labelled arrays with dimensions and coordinates derived from the variables you sweep.
 
-The worked examples demonstrate a single sweep, two nested sweeps, and two sweeps that advance together. They use simple measurement models on the reference platform.
+The worked examples demonstrate a single sweep, two nested sweeps, and two sweeps that advance together. They use the reference platform and measurement models introduced in **Introduction**.
 
 As in **Introduction**, the examples use the waveform aliases `"readout"` and `"weights"`. They remain unresolved here because the reference platform generates data from the measurement model without evaluating the readout waveforms.
 """
@@ -137,7 +137,7 @@ Expressions can replace numeric arguments in operations such as `set_frequency`,
 
 They can also be used in numeric constructor arguments of parameterised waveforms. Exceptions include the sample array passed to `Arbitrary`, the waveform object passed to a wrapper, and the integer `buffer` of `FlatTop`.
 
-To vary a pulse, pass the expression through its waveform constructor. The waveform evaluates the expression when `envelope()` is called. Section 2.8 uses this approach to sweep a pulse's amplitude.
+To vary a pulse, pass the expression through its waveform constructor. The waveform evaluates the expression when `envelope()` is called. Section 2.7 uses this approach to sweep a pulse's amplitude.
 
 Use `evaluate()` to inspect an expression's current value. It returns `qp.UNASSIGNED` if any required variable has no value. Use `evaluate_or_raise()` when evaluation must produce a number. The interpreter uses this stricter method during execution, so an unassigned variable raises an error.
 """
@@ -270,24 +270,16 @@ print("Concat:", qp.Concat([base, qp.Values([2.0, 3.0])]).values())  # Append an
 
 # %% [markdown]
 r"""
-## 2.4 Measurement models
+### Sweep values in `env`
 
-The reference platform calls a **measurement model** for each measurement at each shot and sweep point. The model receives the bus and an `env` mapping. This mapping contains currently assigned variable values, keyed by identifier, and platform parameter values, keyed as `"bus.parameter"`. Unassigned variables are absent from `env`.
+During simulation, a sweep assigns its next source value to the swept variable before executing its body. When a measurement in that body calls the model, `env` includes the current value under the variable's identifier. A model can therefore use `env["ro_freq"]` to calculate a response for the current frequency.
 
-`qp.MockMeasurementModel(response=None, p_excited=None, noise=0.0, raw_samples=16, seed=0)` provides a configurable model:
-
-- `response` returns the noiseless complex I/Q value. The default is `0j`.
-- `p_excited` returns the probability of state 1. By default, every shot is in state 0.
-- `noise` sets the standard deviation of Gaussian noise added to each quadrature per shot.
-- `raw_samples` sets the length of the simulated raw trace.
-- `seed` initialises the model's random number generator. Creating a new model with the same seed reproduces the sequence; reusing an existing model continues its random sequence.
-
-The example below prints the arguments received by a response function at two frequency points. Each call receives the current value of `ro_freq` in `env`.
+The response function below prints its inputs at each measurement. The first iteration supplies `{"ro_freq": 7.19e9}` and the second supplies `{"ro_freq": 7.21e9}`. Both calls return the same I/Q response.
 """
 
 # %%
 def show_environment(bus, env):
-    """Show the model's inputs and return a constant I/Q response."""
+    """Show the current sweep value supplied to the measurement model."""
     print("bus:", bus)
     print("env:", env)
     return 1 + 0j
@@ -300,57 +292,12 @@ with qprogram.sweep(ro_freq, qp.Values([7.19e9, 7.21e9])):
     qprogram.set_frequency(q[0].readout, ro_freq)
     qprogram.measure(q[0].readout, "readout", "weights")
 
-# One measurement at each frequency produces two calls to show_environment.
+# Each measurement sees the ro_freq value assigned by its sweep iteration.
 probe_result = qp.simulate(qprogram, model=qp.MockMeasurementModel(response=show_environment))
 
 # %% [markdown]
 r"""
-### Defining a custom model
-
-To define your own measurement model, implement `sample(bus, env)` and return a `qp.MeasurementSample`. The sample contains `i`, `q`, `state`, and an optional `raw` trace. If your model returns raw traces, provide a `raw_samples` attribute so the executor can determine their length at the start of the run.
-
-A custom model is useful when measurements depend on earlier samples, share state across buses, or require a relationship between the classified state and I/Q values. The example below chooses the state first, then samples I/Q values from the distribution associated with that state. Its `p_excited` argument is a fixed probability between 0 and 1.
-"""
-
-# %%
-class TwoStateReadout:
-    """Sample I/Q values from a distribution selected by the sampled qubit state."""
-
-    def __init__(self, p_excited, seed=0):
-        self.p_excited = p_excited
-        self.rng = np.random.default_rng(seed)
-
-    def sample(self, bus, env):
-        # Choose state 1 with probability p_excited; otherwise choose state 0.
-        state = int(self.rng.random() < self.p_excited)
-
-        # Each state has its own mean I/Q response.
-        if state == 1:
-            centre_i, centre_q = 0.9, 0.1
-        else:
-            centre_i, centre_q = 0.2, -0.3
-
-        noise_i, noise_q = self.rng.normal(0.0, 0.08, size=2)
-        return qp.MeasurementSample(
-            i=centre_i + noise_i,
-            q=centre_q + noise_q,
-            state=state,
-        )
-
-
-qprogram = qp.QProgram(label="own_model", schema=schema)
-m_own = qprogram.measure(
-    q[0].readout, "readout", "weights", fields=(MeasurementField.IQ, MeasurementField.STATE)
-)
-own_model = TwoStateReadout(p_excited=1.0, seed=1)  # Always choose state 1 in this example.
-own = qp.simulate(qprogram, model=own_model)
-
-print("I/Q sample for state 1:", own.get(m_own).values)
-print("classified state:", own.get(m_own, field=MeasurementField.STATE).item())
-
-# %% [markdown]
-r"""
-## 2.5 Averaging measurements
+## 2.4 Averaging measurements
 
 Use `with qprogram.average(shots=N):` to repeat a block `N` times and average its measurement outputs. Integrated I/Q values and raw traces are averaged over the shots. Classified states are averaged to estimate the probability of state 1.
 
@@ -422,7 +369,7 @@ print("model probability:", P_EXCITED)
 
 # %% [markdown]
 r"""
-## 2.6 One swept variable
+## 2.5 Example: Resonator Spectroscopy
 
 This example combines a variable, a sweep, averaging, and a measurement model. It sweeps the readout frequency from 7.19 to 7.21 GHz in 200 kHz steps and averages 200 shots at each point.
 
@@ -539,7 +486,7 @@ print("model centre:", F_READOUT / 1e9, "GHz")
 
 # %% [markdown]
 r"""
-## 2.7 Plotting results
+## 2.6 Plotting results
 
 `result.plot(handle)` retrieves a measurement and chooses a plot from its dimensions. One sweep dimension produces a line plot; two produce a heatmap. Axis labels and units come from the variable metadata stored in the result.
 
@@ -600,9 +547,20 @@ except qp.ValidationError as exc:
 
 # %% [markdown]
 r"""
-## 2.8 Two nested sweeps
+## 2.7 Two nested sweeps
 
-Nest two `with qprogram.sweep(...)` blocks to measure every combination of their values. The outer sweep becomes the first result dimension, and the inner sweep becomes the second.
+QProgram supports nesting one `with qprogram.sweep(...)` block inside another. For each value of the outer variable, the inner sweep runs through its entire source. The body therefore executes for every combination of values: an outer sweep with `M` points and an inner sweep with `N` points visit `M * N` combinations.
+
+You can nest as many sweeps as your experiment needs; QProgram has no fixed language limit on the number of levels. Each additional sweep adds a result dimension and multiplies the number of combinations by its source length. A platform may restrict execution through its `max_loop_nesting` capability, discussed in **Advanced**.
+
+A measurement inside both sweeps has one result dimension per swept variable, ordered from outermost to innermost. Each dimension's coordinates contain that variable's sweep values. A classified-state result has shape `(M, N)`. An integrated I/Q result has shape `(M, N, 2)`, with the final `IQ` dimension holding the two quadratures.
+
+Enclosing both sweeps in `average(shots=S)` repeats the full grid `S` times and averages the measurements at each point. The result keeps its sweep dimensions without adding a shot dimension. A two-dimensional state result can then be displayed as a heatmap or sliced along either coordinate.
+"""
+
+# %% [markdown]
+r"""
+### Example: Qubit Spectroscopy vs Drive Amplitude
 
 This example sweeps 21 drive amplitudes and 41 frequencies, producing 861 points. With 200 shots at each point, the model is sampled 172,200 times.
 
@@ -656,8 +614,6 @@ print("shape:", population.shape)  # 21 amplitudes × 41 frequencies; shots are 
 # %% [markdown]
 r"""
 With two sweep dimensions, `result.plot` produces a heatmap. By default, the inner sweep is shown on the horizontal axis and the outer sweep on the vertical axis. Here, these are frequency and amplitude. The colour represents the excited-state population.
-
-Use `x=` or `y=` to select an axis explicitly; the other dimension is assigned to the remaining axis.
 """
 
 # %%
@@ -675,6 +631,31 @@ ax_map = map_result.plot(
     title="Qubit spectroscopy at different drive amplitudes",
 )
 ax_map.axvline(0.0, color="white", linestyle=":")  # Zero detuning is the model resonance.
+plt.show()
+
+# %% [markdown]
+r"""
+Use `x=` or `y=` to select an axis explicitly; the other dimension is assigned to the remaining axis.
+
+The same heatmap below uses `x="drive_amp"` to put amplitude on the horizontal axis and frequency on the vertical axis. The frequency conversion and colour scale stay the same. The zero-detuning reference line is now horizontal.
+"""
+
+# %%
+ax_map = map_result.plot(
+    m_two_tone,
+    field=MeasurementField.STATE,
+    x="drive_amp",
+    coords={
+        "drive_freq": Quantity(
+            label="Drive frequency",
+            units="MHz from $f_{01}$",
+            transform=lambda v: (v - F_01) / 1e6,
+        ),
+    },
+    value=Quantity("Excited-state population"),
+    title="Qubit spectroscopy at different drive amplitudes",
+)
+ax_map.axhline(0.0, color="white", linestyle=":")  # Zero detuning is the model resonance.
 plt.show()
 
 # %% [markdown]
@@ -706,7 +687,7 @@ The estimated widths are affected by both the 1 MHz frequency spacing and the no
 
 # %% [markdown]
 r"""
-## 2.9 Sweeping two variables together
+## 2.8 Sweeping two variables together
 
 Nested sweeps visit every combination of values. To use pairs of values instead, combine sweeps with `|`:
 
@@ -798,18 +779,6 @@ ax_ridge.axhline(0.5, color="grey", linestyle=":", label="model population at re
 ax_ridge.legend()
 plt.show()
 
-# %%
-# x="drive_amp" omits the frequency axis, so coords cannot customise that axis.
-try:
-    ridge_result.plot(
-        m_ridge,
-        field=MeasurementField.STATE,
-        x="drive_amp",
-        coords={"drive_freq": Quantity(units="Hz")},
-    )
-except qp.ValidationError as exc:
-    print(exc)
-
 # %% [markdown]
 r"""
 ### 🧩 Exercise 2.1
@@ -821,7 +790,7 @@ The supplied `p_rabi` model produces a sine-squared response. Its constant `A_PI
 1. Create a new transmon schema using `BusSchema.transmon()`. Assign it to `schema` and use `q = schema.q` to access its qubit buses.
 2. Create a program labelled `exercise-2.1` using your new schema. Declare an amplitude variable with the identifier `amp`, a readable label, and `units="DAC units"`. The model accesses this variable as `env["amp"]`.
 3. Use `average(shots=200)` around a linear sweep of 41 amplitudes from 0.0 to 1.0.
-4. Inside the sweep, set the drive frequency to `F_01`, the qubit frequency defined in section 2.8. Play an `IQDrag` waveform with the variable as its amplitude, `duration=40`, `sigma=10`, and `beta=0.15`.
+4. Inside the sweep, set the drive frequency to `F_01`, the qubit frequency defined in section 2.7. Play an `IQDrag` waveform with the variable as its amplitude, `duration=40`, `sigma=10`, and `beta=0.15`.
 5. Synchronise the drive and readout buses. Measure the readout bus using the aliases `"readout"` and `"weights"`, requesting only `MeasurementField.STATE`. Store the measurement handle.
 6. Simulate the program with `qp.MockMeasurementModel(p_excited=p_rabi, seed=17)`. Retrieve the state result and print its dimensions and shape.
 7. Select amplitudes from 0.0 to 0.5 using this result's `amp` coordinate. Calculate the absolute difference from population 0.5, then use `idxmin("amp")` to find the amplitude with the smallest difference. Double that amplitude to estimate the pi-pulse amplitude and compare it with `A_PI`.
