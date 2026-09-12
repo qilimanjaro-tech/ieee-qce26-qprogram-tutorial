@@ -726,6 +726,8 @@ The reference descriptor supports parameter reads and writes in the host domain.
 The validator selects profiles from the node's context. Blocks use the platform profile. An operation targeting a bus uses that bus's profile; operations involving several buses must be supported by all relevant profiles. Expression tokens beginning with `expr.` are checked against the platform profile, including when an expression appears in a bus operation.
 
 Use `node.required_capabilities()` to inspect requirements and `CompilerCapabilities.supports(token)` to check whether a profile supplies a capability. The next cells demonstrate both sides of this check.
+
+The `qprogram` below is the shared program for this section. It sweeps the flux bias from -0.05 V to 0.15 V inside 200 averaging passes. The examples reuse this program and change only the capability descriptor. Examples that need a different sequence define a separately named program, leaving `qprogram` unchanged.
 """
 
 # %%
@@ -812,41 +814,61 @@ r"""
 The plan maps nodes to their supported execution domains. Each diagnostic includes a severity, code, message, and information about the affected node. Inspect `severity` to distinguish errors from warnings and use `code` for programmatic handling.
 
 For readable output, print a diagnostic directly or select its fields. Printing an entire list can include node representations that are less useful than the formatted messages.
+
+The following examples use the shared `qprogram` defined at the start of this section. Each defines its own capability descriptor, starting with the reference descriptor.
 """
 
 # %%
-clean, plan = qp.validate(qprogram, reference)
-print("diagnostics:", clean)  # An empty list means no issues were reported.
+reference = qp.reference_capabilities()
+diagnostics, plan = qp.validate(qprogram, reference)
+print("diagnostics:", diagnostics)  # An empty list means no issues were reported.
 print("plan entries:", len(plan))
 
-reference_bus = reference.default_bus_profile
-slow_dac = replace(reference_bus, rt=None)  # Support flux operations in the host domain only.
-rack_caps = replace(reference, bus={("q", "flux"): slow_dac})
+# %% [markdown]
+r"""
+Now model a flux DAC that receives updates through the host computer. Setting its bus profile's `rt` component to `None` removes real-time support while preserving host support. The `("q", "flux")` entry applies this profile to qubit flux buses; other buses keep the reference defaults.
 
-diagnostics, host_plan = qp.validate(qprogram, rack_caps)
+Capability descriptors are immutable, so `dataclasses.replace` creates modified copies. This example produces warnings about host execution, but the program remains valid.
+"""
+
+# %%
+reference = qp.reference_capabilities()
+# Model a flux DAC controlled by the host: its bus has no real-time component.
+flux_profile = reference.for_bus(q[0].flux)
+host_flux_profile = replace(flux_profile, rt=None)
+capabilities = replace(reference, bus={("q", "flux"): host_flux_profile})
+
+diagnostics, plan = qp.validate(qprogram, capabilities)
 for diagnostic in diagnostics:
     print(diagnostic)
 
-# %%
-host_half = reference_bus.host
-dc_source = replace(
-    host_half,
-    profile="dc-source-v1",
-    capabilities=host_half.capabilities - {"op.set_offset"},
-)
-fixed_flux = qp.BusCapabilities(rt=None, host=dc_source)
-fixed_caps = replace(reference, bus={("q", "flux"): fixed_flux})
+# %% [markdown]
+r"""
+A fixed DC source cannot change its offset. In this example, the flux bus has no real-time component and its host component lacks `op.set_offset`, so the operation is unsupported in both domains. Inspect the resulting error diagnostic's fields.
+"""
 
-diagnostics, fixed_plan = qp.validate(qprogram, fixed_caps)
-refusal = diagnostics[0]  # Inspect the diagnostic for the unsupported offset operation.
-print("severity:", refusal.severity)
-print("code:", refusal.code)
-print("message:", refusal.message)
-print("node type:", type(refusal.node).__name__)
-print("path:", refusal.path)
-print("formatted path:", qp.format_path(refusal.path))
-print("capability:", refusal.capability)
-print("domain:    ", refusal.domain)
+# %%
+reference = qp.reference_capabilities()
+# Model a fixed DC source: the host profile cannot change the flux offset.
+flux_host = reference.for_bus(q[0].flux).host
+fixed_dc_host = replace(
+    flux_host,
+    profile="dc-source-v1",
+    capabilities=flux_host.capabilities - {"op.set_offset"},
+)
+fixed_flux_profile = qp.BusCapabilities(rt=None, host=fixed_dc_host)
+capabilities = replace(reference, bus={("q", "flux"): fixed_flux_profile})
+
+diagnostics, plan = qp.validate(qprogram, capabilities)
+diagnostic = diagnostics[0]  # Inspect the diagnostic for the unsupported offset operation.
+print("severity:", diagnostic.severity)
+print("code:", diagnostic.code)
+print("message:", diagnostic.message)
+print("node type:", type(diagnostic.node).__name__)
+print("path:", diagnostic.path)
+print("formatted path:", qp.format_path(diagnostic.path))
+print("capability:", diagnostic.capability)
+print("domain:    ", diagnostic.domain)
 
 # %% [markdown]
 r"""
@@ -860,15 +882,22 @@ Use `qp.format_path` to format a path, `qp.node_path` to find a node's path, and
 """
 
 # %%
+reference = qp.reference_capabilities()
 print(qp.explain(qprogram, reference))
 
 # %% [markdown]
 r"""
-For this program, the reference descriptor allows every operation in both domains. The next cell uses the same program with the descriptor whose flux bus supports only host execution, so the plan changes without changing the program.
+For this program, the reference descriptor allows every operation in both domains. The next example uses a descriptor for a host-controlled flux DAC with the same `qprogram`. Removing the flux profile's `rt` component changes the plan without changing the sequence.
 """
 
 # %%
-print(qp.explain(qprogram, rack_caps))
+reference = qp.reference_capabilities()
+# Model a flux DAC controlled by the host: its bus has no real-time component.
+flux_profile = reference.for_bus(q[0].flux)
+host_flux_profile = replace(flux_profile, rt=None)
+capabilities = replace(reference, bus={("q", "flux"): host_flux_profile})
+
+print(qp.explain(qprogram, capabilities))
 
 # %% [markdown]
 r"""
@@ -880,7 +909,18 @@ If the flux profile does not support `set_offset` in either domain, the operatio
 """
 
 # %%
-print(qp.explain(qprogram, fixed_caps))
+reference = qp.reference_capabilities()
+# Model a fixed DC source: the host profile cannot change the flux offset.
+flux_host = reference.for_bus(q[0].flux).host
+fixed_dc_host = replace(
+    flux_host,
+    profile="dc-source-v1",
+    capabilities=flux_host.capabilities - {"op.set_offset"},
+)
+fixed_flux_profile = qp.BusCapabilities(rt=None, host=fixed_dc_host)
+capabilities = replace(reference, bus={("q", "flux"): fixed_flux_profile})
+
+print(qp.explain(qprogram, capabilities))
 
 # %% [markdown]
 r"""
@@ -903,30 +943,33 @@ For each profile, these limits are read from the `rt` component when it exists, 
 """
 
 # %%
+reference = qp.reference_capabilities()
 # Change the rt component, then place it in copies of the enclosing descriptors.
 limited_rt = replace(reference.platform.rt, limits={"max_loop_nesting": 1})
 limited_platform = replace(reference.platform, rt=limited_rt)
-limited_caps = replace(reference, platform=limited_platform)
+capabilities = replace(reference, platform=limited_platform)
 
-diagnostics, plan = qp.validate(qprogram, limited_caps)
+diagnostics, plan = qp.validate(qprogram, capabilities)
 print(diagnostics[0])  # average() plus sweep() requires two nesting levels.
 
 # %%
+reference = qp.reference_capabilities()
 # This platform permits no measurements, so the readout is rejected.
 no_measurements_rt = replace(reference.platform.rt, limits={"max_measurements": 0})
 no_measurements_platform = replace(reference.platform, rt=no_measurements_rt)
-no_measurements_caps = replace(reference, platform=no_measurements_platform)
+capabilities = replace(reference, platform=no_measurements_platform)
 
-diagnostics, plan = qp.validate(qprogram, no_measurements_caps)
+diagnostics, plan = qp.validate(qprogram, capabilities)
 print(diagnostics[0])
 
 # %%
+reference = qp.reference_capabilities()
 # A limit set only on host is not read while an rt component is present.
 limited_host = replace(reference.platform.host, limits={"max_loop_nesting": 1})
 host_limited_platform = replace(reference.platform, host=limited_host)
-on_the_wrong_half = replace(reference, platform=host_limited_platform)
+capabilities = replace(reference, platform=host_limited_platform)
 
-diagnostics, plan = qp.validate(qprogram, on_the_wrong_half)
+diagnostics, plan = qp.validate(qprogram, capabilities)
 print("diagnostics:", diagnostics)  # Empty: the validator read the unchanged rt limits.
 
 # %% [markdown]
@@ -958,33 +1001,33 @@ def flux_within_range(node, ctx):
         return
 
     values = loop.source.values()
-    reach = max(abs(values))  # Largest absolute offset in the sweep.
-    if reach > BIAS_LIMIT:
+    max_offset = max(abs(values))  # Largest absolute offset in the sweep.
+    if max_offset > BIAS_LIMIT:
         yield qp.Diagnostic(
             severity="error",
             code="benchtop.flux-out-of-range",
-            message=f"Flux sweep reaches {reach:.2f} V, exceeding the DAC limit of {BIAS_LIMIT} V.",
+            message=f"Flux sweep reaches {max_offset:.2f} V, exceeding the DAC limit of {BIAS_LIMIT} V.",
             node=node,
         )
 
 
-# Apply the rule in both domains, preserving any predicates already present.
-guarded_rt = replace(reference_bus.rt, predicates=reference_bus.rt.predicates + (flux_within_range,))
-guarded_host = replace(reference_bus.host, predicates=reference_bus.host.predicates + (flux_within_range,))
-guarded_bus = qp.BusCapabilities(rt=guarded_rt, host=guarded_host)
-guarded = replace(reference, bus={("q", "flux"): guarded_bus})
+reference = qp.reference_capabilities()
+# Apply the rule to the flux profile in both domains, preserving existing predicates.
+flux_profile = reference.for_bus(q[0].flux)
+flux_rt = replace(flux_profile.rt, predicates=flux_profile.rt.predicates + (flux_within_range,))
+flux_host = replace(flux_profile.host, predicates=flux_profile.host.predicates + (flux_within_range,))
+guarded_flux_profile = qp.BusCapabilities(rt=flux_rt, host=flux_host)
+capabilities = replace(reference, bus={("q", "flux"): guarded_flux_profile})
 
-diagnostics, plan = qp.validate(qprogram, guarded)
+diagnostics, plan = qp.validate(qprogram, capabilities)
 print(diagnostics[0])  # The sweep reaches 0.15 V, above BIAS_LIMIT.
-flux_sweep_text = qp.dumps(qprogram)
-flux_sweep_body = qprogram.body
 
-# %%
-qprogram = qp.QProgram(label="narrow_scan", schema=schema)
-bias = qprogram.variable("bias", label="Flux bias", units="V")
-with qprogram.sweep(bias, qp.Linspace(-0.05, 0.05, 11)):
-    qprogram.set_offset(q[0].flux, bias)
-diagnostics, plan = qp.validate(qprogram, guarded)
+# Validate a separate, narrower program against the same range rule.
+narrow_program = qp.QProgram(label="narrow_scan", schema=schema)
+bias = narrow_program.variable("bias", label="Flux bias", units="V")
+with narrow_program.sweep(bias, qp.Linspace(-0.05, 0.05, 11)):
+    narrow_program.set_offset(q[0].flux, bias)
+diagnostics, plan = qp.validate(narrow_program, capabilities)
 print("diagnostics:", diagnostics)  # Empty: all offsets are within the supported range.
 
 # %% [markdown]
@@ -997,7 +1040,7 @@ This differs from removing real-time support from a bus profile. A domain constr
 """
 
 # %%
-def dac_on_the_network(node, ctx):
+def restrict_flux_sweep_to_host(node, ctx):
     """Restrict the DAC sweep to host execution without rejecting the program."""
     if not isinstance(node, qp.operations.SetOffset):
         return
@@ -1013,25 +1056,35 @@ def dac_on_the_network(node, ctx):
         )
 
 
-networked_rt = replace(reference_bus.rt, predicates=reference_bus.rt.predicates + (dac_on_the_network,))
-networked_host = replace(reference_bus.host, predicates=reference_bus.host.predicates + (dac_on_the_network,))
-networked_bus = qp.BusCapabilities(rt=networked_rt, host=networked_host)
-networked = replace(reference, bus={("q", "flux"): networked_bus})
-qprogram = qp.loads(flux_sweep_text)
-print(qp.explain(qprogram, networked))
+reference = qp.reference_capabilities()
+# Keep both domains on the flux operation; the predicate restricts its sweep block.
+flux_profile = reference.for_bus(q[0].flux)
+flux_rt = replace(flux_profile.rt, predicates=flux_profile.rt.predicates + (restrict_flux_sweep_to_host,))
+flux_host = replace(flux_profile.host, predicates=flux_profile.host.predicates + (restrict_flux_sweep_to_host,))
+constrained_flux_profile = qp.BusCapabilities(rt=flux_rt, host=flux_host)
+capabilities = replace(reference, bus={("q", "flux"): constrained_flux_profile})
+
+print(qp.explain(qprogram, capabilities))
 
 # %% [markdown]
 r"""
 ### Optimising the loop arrangement
 
-In the platform with a host-only flux bus, the averaging block executes through the host because it contains the flux sweep. `qp.optimize(qprogram, capabilities)` can transform this supported pattern by moving the sweep outside the averaging block and moving the flux update before averaging.
+When the flux bus supports only host execution, the averaging block executes through the host because it contains the flux sweep. The example below applies this capability descriptor to the shared `qprogram`. `qp.optimize(qprogram, capabilities)` can transform this supported pattern by moving the sweep outside the averaging block and moving the flux update before averaging.
 
-The function returns a new program. Use `qp.explain` on that program to inspect the resulting plan.
+The function returns a new program. Keep it as `optimized_program` so you can compare its body with the original `qprogram`, then use `qp.explain` to inspect the resulting plan.
 """
 
 # %%
-qprogram = qp.optimize(qprogram, rack_caps)
-print(qp.explain(qprogram, rack_caps))
+reference = qp.reference_capabilities()
+# Model a flux DAC controlled by the host: its bus has no real-time component.
+flux_profile = reference.for_bus(q[0].flux)
+host_flux_profile = replace(flux_profile, rt=None)
+capabilities = replace(reference, bus={("q", "flux"): host_flux_profile})
+
+optimized_program = qp.optimize(qprogram, capabilities)
+print(qp.explain(optimized_program, capabilities))
+print("host-only flux changes the body:", optimized_program.body != qprogram.body)
 
 # %% [markdown]
 r"""
@@ -1041,64 +1094,98 @@ This changes the measurement order. The original program makes 200 passes over t
 
 Moving an operation outside the averaging block also changes how often it executes. This is appropriate for a persistent DC setting, but an operation with other side effects may require a different arrangement. The transformation only moves supported leading host-only operations and does not move them past other operations.
 
-The `reorderable-averaging` hint uses the same applicability check as the transformation. If the hint is absent, this rewrite is not applied.
+The `reorderable-averaging` hint uses the same applicability check as the transformation. If the hint is absent, this rewrite is not applied. With reference capabilities, all operations in this sequence support real-time execution, so the next example remains unchanged.
 """
 
 # %%
-# The earlier host-only flux example is rewritten.
-print("host-only flux changes the body:", qprogram.body != flux_sweep_body)
-
+reference = qp.reference_capabilities()
 # With reference capabilities, no operation needs to move to the host.
-qprogram = qp.loads(flux_sweep_text)
-qprogram = qp.optimize(qprogram, reference)
-print("reference capabilities change the body:", qprogram.body != flux_sweep_body)
-
-# %%
-# An additional nested sweep falls outside this transformation's supported pattern.
-qprogram = qp.QProgram(label="two_sweeps", schema=schema)
-bias = qprogram.variable("bias", label="Flux bias", units="V")
-freq = qprogram.variable("freq", label="Drive frequency", units="Hz")
-with qprogram.average(shots=200):
-    with qprogram.sweep(bias, qp.Linspace(-0.05, 0.15, 11)):
-        qprogram.set_offset(q[0].flux, bias)
-        with qprogram.sweep(freq, qp.Linspace(4.85e9 - 50e6, 4.85e9 + 50e6, 11)):
-            qprogram.set_frequency(q[0].drive, freq)
-            qprogram.play(q[0].drive, "pi")
-            qprogram.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
-
-original_body = qprogram.body
-qprogram = qp.optimize(qprogram, rack_caps)
-print("additional nested sweep changes the body:", qprogram.body != original_body)
-
-# %%
-# A broadcast sync includes the host-only flux bus in the middle of the sequence.
-qprogram = qp.QProgram(label="bare_sync", schema=schema)
-bias = qprogram.variable("bias", label="Flux bias", units="V")
-with qprogram.average(shots=200):
-    with qprogram.sweep(bias, qp.Linspace(-0.05, 0.15, 41)):
-        qprogram.set_offset(q[0].flux, bias)
-        qprogram.play(q[0].drive, "pi")
-        qprogram.sync()  # Include every bus, including the host-only flux bus.
-        qprogram.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
-
-original_body = qprogram.body
-qprogram = qp.optimize(qprogram, rack_caps)
-print("broadcast sync changes the body:", qprogram.body != original_body)
-
-# %%
-# A loop constraint leaves the operations' own real-time support unchanged.
-network_optimized_body = qp.optimize(qp.loads(flux_sweep_text), networked).body
-print("loop constraint changes the body:", network_optimized_body != flux_sweep_body)
+optimized_program = qp.optimize(qprogram, reference)
+print("reference capabilities change the body:", optimized_program.body != qprogram.body)
 
 # %% [markdown]
 r"""
-The examples compare program bodies before and after optimisation. An additional nested sweep is outside the supported pattern. Calling `sync()` without explicit buses includes the host-only flux bus, which restricts the synchronisation in the middle of the sequence and prevents the reordering.
-
-A `DomainConstraint` on the loop also does not produce the hint. In that case, the operations retain real-time support, so there is no leading group of host-only operations to move. Use the execution plan to understand why a particular program is unchanged.
+An additional nested sweep falls outside this transformation's supported pattern. `nested_sweeps_program` adds a drive-frequency sweep inside the flux sweep. Its body remains unchanged after optimisation.
 """
 
 # %%
-print(qp.explain(qprogram, rack_caps))
+nested_sweeps_program = qp.QProgram(label="two_sweeps", schema=schema)
+bias = nested_sweeps_program.variable("bias", label="Flux bias", units="V")
+frequency = nested_sweeps_program.variable("freq", label="Drive frequency", units="Hz")
+with nested_sweeps_program.average(shots=200):
+    with nested_sweeps_program.sweep(bias, qp.Linspace(-0.05, 0.15, 11)):
+        nested_sweeps_program.set_offset(q[0].flux, bias)
+        with nested_sweeps_program.sweep(frequency, qp.Linspace(4.85e9 - 50e6, 4.85e9 + 50e6, 11)):
+            nested_sweeps_program.set_frequency(q[0].drive, frequency)
+            nested_sweeps_program.play(q[0].drive, "pi")
+            nested_sweeps_program.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
+
+reference = qp.reference_capabilities()
+# Model a flux DAC controlled by the host: its bus has no real-time component.
+flux_profile = reference.for_bus(q[0].flux)
+host_flux_profile = replace(flux_profile, rt=None)
+capabilities = replace(reference, bus={("q", "flux"): host_flux_profile})
+
+optimized_program = qp.optimize(nested_sweeps_program, capabilities)
+print("additional nested sweep changes the body:", optimized_program.body != nested_sweeps_program.body)
+
+# %% [markdown]
+r"""
+Calling `sync()` without explicit buses includes the host-only flux bus. The separate `broadcast_sync_program` uses this synchronisation in the middle of the sequence, which prevents the reordering. Inspect its unchanged plan beside the body comparison.
+"""
+
+# %%
+broadcast_sync_program = qp.QProgram(label="bare_sync", schema=schema)
+bias = broadcast_sync_program.variable("bias", label="Flux bias", units="V")
+with broadcast_sync_program.average(shots=200):
+    with broadcast_sync_program.sweep(bias, qp.Linspace(-0.05, 0.15, 41)):
+        broadcast_sync_program.set_offset(q[0].flux, bias)
+        broadcast_sync_program.play(q[0].drive, "pi")
+        broadcast_sync_program.sync()  # Include every bus, including the host-only flux bus.
+        broadcast_sync_program.measure(q[0].readout, "probe", "weights", name="m0", fields=(MeasurementField.STATE,))
+
+reference = qp.reference_capabilities()
+# Model a flux DAC controlled by the host: its bus has no real-time component.
+flux_profile = reference.for_bus(q[0].flux)
+host_flux_profile = replace(flux_profile, rt=None)
+capabilities = replace(reference, bus={("q", "flux"): host_flux_profile})
+
+optimized_program = qp.optimize(broadcast_sync_program, capabilities)
+print("broadcast sync changes the body:", optimized_program.body != broadcast_sync_program.body)
+print(qp.explain(optimized_program, capabilities))
+
+# %% [markdown]
+r"""
+A `DomainConstraint` on the loop also does not produce the hint. The operations retain real-time support, so there is no leading group of host-only operations to move. The following example defines the loop constraint and applies it to the shared `qprogram` before checking the transformation.
+"""
+
+# %%
+def restrict_flux_sweep_to_host(node, ctx):
+    """Restrict the DAC sweep to host execution without rejecting the program."""
+    if not isinstance(node, qp.operations.SetOffset):
+        return
+    if not isinstance(node.offset_path0, qp.Variable):
+        return
+
+    loop = ctx.binding_loop_of(node.offset_path0)
+    if loop is not None:
+        yield qp.DomainConstraint(
+            node=loop,  # Restrict the sweep block, not the offset operation.
+            exclude=frozenset({"rt"}),
+            reason="flux DAC updates require host network communication",
+        )
+
+
+reference = qp.reference_capabilities()
+# Keep both domains on the flux operation; the predicate restricts its sweep block.
+flux_profile = reference.for_bus(q[0].flux)
+flux_rt = replace(flux_profile.rt, predicates=flux_profile.rt.predicates + (restrict_flux_sweep_to_host,))
+flux_host = replace(flux_profile.host, predicates=flux_profile.host.predicates + (restrict_flux_sweep_to_host,))
+constrained_flux_profile = qp.BusCapabilities(rt=flux_rt, host=flux_host)
+capabilities = replace(reference, bus={("q", "flux"): constrained_flux_profile})
+
+optimized_program = qp.optimize(qprogram, capabilities)
+print("loop constraint changes the body:", optimized_program.body != qprogram.body)
 
 
 # %% [markdown]
