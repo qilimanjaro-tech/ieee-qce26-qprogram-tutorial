@@ -4,7 +4,7 @@ r"""
 
 The **Introduction** notebook covered individual pulse sequences. This notebook shows how to repeat a sequence and vary its parameters. You will declare **variables**, define their values with **sweep sources**, and use **`average(shots)`** to average repeated measurements.
 
-You will also retrieve, inspect, and plot measurement results. `qp.simulate` returns labelled arrays with dimensions and coordinates derived from the variables you sweep.
+You will also retrieve, inspect, and plot measurement results. `qp.simulate` returns a result container, and `result.get(...)` retrieves an `xarray.DataArray` with dimensions and coordinates derived from the variables you sweep. You can analyse these arrays with all the familiar methods from xarray.
 
 The worked examples demonstrate a single sweep, two nested sweeps, and two sweeps that advance together. They use the reference platform and measurement models introduced in **Introduction**.
 
@@ -304,6 +304,8 @@ Use `with qprogram.average(shots=N):` to repeat a block `N` times and average it
 Averaging does not add a shot dimension to the result. It does, however, add a level of loop nesting. A platform's `max_loop_nesting` capability therefore applies to averaging blocks as well as sweeps, as explained in **Advanced**.
 
 The next two cells compare a 64-point scan with one shot per point and the same scan with 256 shots averaged per point. The model supplies a constant I/Q response with added noise and a state-1 probability of 0.3. Both programs request I/Q and classified states so we can inspect how each output is averaged.
+
+Each call to `result.get(...)` returns an `xarray.DataArray`. The comparison uses xarray's `sel(IQ="I")` to select the I quadrature and `std()` to calculate its standard deviation across the scan. Calling `item()` on the scalar result extracts its numeric value.
 """
 
 # %%
@@ -448,14 +450,9 @@ by_handle = result.get(m_spec)
 by_name = result.get("q0/readout/m0")
 by_position = result.get(0)  # The first measurement in declaration order.
 
+print("array type:", type(by_handle))  # xarray.DataArray
 print(by_handle)  # Inspect the values, dimensions, and coordinates directly.
 print("coordinate metadata:", iq.coords["ro_freq"].attrs)
-
-# %%
-# Select the I quadrature at the sampled frequency nearest the model's resonance.
-in_phase = iq.sel(IQ="I")
-on_resonance = in_phase.sel(ro_freq=F_READOUT, method="nearest")
-print("I at the resonator:", on_resonance.item())  # item() extracts the single numeric value.
 
 # %%
 # This measurement requested only MeasurementField.IQ.
@@ -466,9 +463,33 @@ except KeyError as exc:
 
 # %% [markdown]
 r"""
-### Inspecting values in the result
+### Inspecting results with xarray
 
-Use the coordinate values and measured data together to extract information from a scan. Below, we combine I and Q into a complex response and calculate its magnitude. The DataArray method `idxmin("ro_freq")` returns the frequency coordinate where that magnitude is lowest.
+The data returned by `result.get(...)` is a standard [xarray.DataArray](https://docs.xarray.dev/en/stable/generated/xarray.DataArray.html) object, so its full xarray API is available. Use familiar methods such as `sel`, `where`, `mean`, `idxmin`, and `idxmax` directly on the returned array. The examples below apply these methods to the measured data.
+
+The [sel](https://docs.xarray.dev/en/stable/generated/xarray.DataArray.sel.html) method selects data by coordinate label. Here, `sel(IQ="I")` selects the I quadrature, and `sel(ro_freq=F_READOUT, method="nearest")` selects the sampled frequency nearest the model resonance. Each selection returns another DataArray. Once only one value remains, `item()` extracts it as a number.
+"""
+
+# %%
+# Select the I quadrature at the sampled frequency nearest the model's resonance.
+in_phase = iq.sel(IQ="I")
+on_resonance = in_phase.sel(ro_freq=F_READOUT, method="nearest")
+print("I at the resonator:", on_resonance.item())  # item() extracts the single numeric value.
+
+# %% [markdown]
+r"""
+You can also select a coordinate range with `sel` and reduce a named dimension with `mean`. This example selects the frequencies within 1 MHz of `F_READOUT` and averages the I and Q values across that window. The resulting DataArray keeps the `IQ` dimension.
+"""
+
+# %%
+frequency_window = iq.sel(ro_freq=slice(F_READOUT - 1e6, F_READOUT + 1e6))
+mean_iq = frequency_window.mean(dim="ro_freq")
+print("selected window dimensions:", frequency_window.dims, "shape:", frequency_window.shape)
+print("mean I/Q in the window:", mean_iq)
+
+# %% [markdown]
+r"""
+Arithmetic on DataArrays also preserves their labelled dimensions and coordinates. Below, we combine I and Q into a complex response and calculate its magnitude. The xarray method [idxmin](https://docs.xarray.dev/en/stable/generated/xarray.DataArray.idxmin.html), called as `magnitude.idxmin("ro_freq")`, returns a scalar DataArray containing the frequency coordinate where the magnitude is lowest. Calling `item()` extracts that frequency as a number.
 
 This selects one of the sampled frequencies. A finer sweep or a fitted model can provide a more precise estimate; noise also affects which point is selected.
 """
@@ -479,7 +500,7 @@ quadrature = iq.sel(IQ="Q")
 response = in_phase + 1j * quadrature
 magnitude = abs(response)
 
-# idxmin returns the frequency itself, so no separate array indexing is needed.
+# xarray's idxmin returns the frequency coordinate at the smallest magnitude.
 f_dip = magnitude.idxmin("ro_freq").item()
 print("sampled minimum:", f_dip / 1e9, "GHz")
 print("model centre:", F_READOUT / 1e9, "GHz")
@@ -658,32 +679,6 @@ ax_map = map_result.plot(
 ax_map.axhline(0.0, color="white", linestyle=":")  # Zero detuning is the model resonance.
 plt.show()
 
-# %% [markdown]
-r"""
-You can also analyse a single row of the result array. Select an amplitude with `sel`, then use `where(..., drop=True)` to keep only frequencies whose population is at least 0.25, half the model's peak of 0.5. The difference between the highest and lowest retained frequencies estimates the response width.
-
-For this model, the full width at half maximum is `2 * RABI_RATE * amplitude` in hertz. We compare that value with the width estimated from the sampled data.
-"""
-
-# %%
-# Select the row nearest a drive amplitude of 0.175 DAC units.
-row = population.sel(drive_amp=0.175, method="nearest")
-selected_amp = row.coords["drive_amp"].item()
-
-# Keep the measured points at or above half the model's peak population.
-above_half = row.where(row >= 0.25, drop=True)
-half_max_frequencies = above_half.coords["drive_freq"]
-estimated_width = (half_max_frequencies.max() - half_max_frequencies.min()).item()
-model_width = 2 * RABI_RATE * selected_amp
-
-print("drive amplitude:", selected_amp, "DAC units")
-print("estimated width:", estimated_width / 1e6, "MHz")
-print("model width:", model_width / 1e6, "MHz")
-
-# %% [markdown]
-r"""
-The estimated widths are affected by both the 1 MHz frequency spacing and the noise from a finite number of shots. A threshold-based estimate uses the sampled frequencies without interpolation, which is particularly limiting for the narrower responses.
-"""
 
 # %% [markdown]
 r"""
@@ -716,7 +711,7 @@ except qp.ValidationError as exc:
 
 # %% [markdown]
 r"""
-The next example selects the frequency with the highest measured population at each amplitude in the previous map. It then pairs those frequencies with their amplitudes in a combined sweep.
+The next example uses xarray's `population.idxmax("drive_freq")` to select the frequency coordinate with the highest measured population at each amplitude in the previous map. The returned DataArray retains the `drive_amp` dimension. Its `values` property provides the frequency array to pair with the amplitudes in a combined sweep.
 
 This new sweep has 21 points, compared with 861 in the original map. It demonstrates how values extracted from one result can define the sources for a later program. We reuse `p_saturated` with the same `F_01` and `RABI_RATE` values, so both programs measure the same simulated response.
 """
