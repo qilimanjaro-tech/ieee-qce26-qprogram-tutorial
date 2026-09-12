@@ -161,6 +161,30 @@ except qp.UnassignedVariableError as exc:
 
 # %% [markdown]
 r"""
+### Selecting a value with `qp.where()`
+
+`qp.where(condition, then, else_)` creates a symbolic expression that selects `then` when the condition evaluates to true and `else_` when it evaluates to false. Both choices can be numbers or expressions. The condition is checked when the expression is evaluated, so the selected value can change as variables receive new values. Only the selected branch is evaluated.
+
+The example below limits the requested gain to 0.5. It passes the selected gain to `set_gain` and evaluates the same expression with two different requested values.
+"""
+
+# %%
+qprogram = qp.QProgram(label="conditional_gain", schema=schema)
+requested_gain = qprogram.variable("requested_gain")
+selected_gain = qp.where(requested_gain > 0.5, 0.5, requested_gain)
+qprogram.set_gain(q[0].readout, selected_gain)
+
+print("before assigning requested_gain:", selected_gain.evaluate())  # UNASSIGNED
+
+requested_gain.set_value(0.3)
+print("selected gain for requested_gain=0.3:", selected_gain.evaluate_or_raise())  # 0.3
+
+requested_gain.set_value(0.8)
+print("selected gain for requested_gain=0.8:", selected_gain.evaluate_or_raise())  # 0.5
+requested_gain.reset()
+
+# %% [markdown]
+r"""
 ## 2.3 Sweeps
 
 Use `qprogram.sweep(variable, source)` to execute a block once for each value supplied by a source. Before each iteration, the sweep assigns the next value to the variable. Operations inside the block then use that value.
