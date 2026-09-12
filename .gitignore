@@ -21,7 +21,6 @@ out/
 # Instructor's files
 .raw/
 setup/
-sources/
 tools/
 slides/INSTRUCTOR-NOTES.md
 slides/README.md
