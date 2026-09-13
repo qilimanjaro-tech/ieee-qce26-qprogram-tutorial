@@ -143,7 +143,7 @@ section img { display: block; margin: 0 auto; }
 
 - **QProgram** is the pulse-level layer of that stack, an open-source Python DSL.
 - Hardware-agnostic: the same program targets a Qblox cluster, a QDevil QDAC, or the reference simulator.
-- Modality- and paradigm-agnostic too, since a transmon and a fluxonium, or a gate model and an annealer, all come down to pulse-level programming.
+- Developed around superconducting experiments, with explicit extension mechanisms for supporting other quantum technologies.
 
 ---
 
@@ -180,7 +180,7 @@ section img { display: block; margin: 0 auto; }
 ## How we work
 
 - Each section starts with slides that introduce the main ideas, followed by notebook examples and an exercise.
-- Complete the `# TODO` cells in `notebooks/`. Solutions are available in `notebooks/solutions/`.
+- Complete the exercises in `notebooks/`: uncomment the hints and replace `...` with code. Solutions are in `notebooks/solutions/`.
 
 | Topic | Notebook | Time |
 |---|---|---|
@@ -246,21 +246,6 @@ section img { display: block; margin: 0 auto; }
 - It acts as a **nonlinear inductor**, replacing the linear inductor in our oscillator.
 - The supercurrent follows $I = I_c\sin\varphi$, where $I_c$ is the critical current and $\varphi$ is the superconducting phase difference across the junction.
 - This nonlinearity makes the energy levels unequally spaced, allowing us to distinguish the qubit transition from higher transitions.
-
----
-
-## Anharmonicity
-
-Ignoring offset charge, the circuit Hamiltonian is
-
-$$\hat H = 4E_C\hat n^2 - E_J\cos\hat\varphi.$$
-
-- $E_C$ is the charging energy and $E_J$ the Josephson energy; $\hat n$ and $\hat\varphi$ describe the Cooper-pair number and phase difference.
-- The cosine potential gives smaller level spacings at higher energies.
-- The **anharmonicity** is $\alpha = f_{12} - f_{01}$. For example, $\alpha = -300\ \text{MHz}$ places the second transition 300 MHz below the qubit transition.
-- Keeping the pulse bandwidth well below $|\alpha|$ helps avoid exciting $|2\rangle$.
-
-<!-- Reference: Koch et al., Charge-insensitive qubit design derived from the Cooper pair box (2007), https://arxiv.org/abs/cond-mat/0703002. -->
 
 ---
 
@@ -350,7 +335,7 @@ where $\Omega(t)$ is the angular Rabi frequency, in radians per second.
 ## Leakage
 
 - A transmon has more than two energy levels. We use $|0\rangle$ and $|1\rangle$ as the computational states.
-- Its $|1\rangle \to |2\rangle$ transition lies $|\alpha|$ below the qubit transition.
+- Its $|1\rangle \to |2\rangle$ transition occurs at a lower frequency than the $|0\rangle \to |1\rangle$ transition.
 - Short or abruptly switched pulses have broad spectra and can excite this unwanted transition.
 - Population left outside the computational states at the end of a gate is called **leakage**.
 - Smooth envelopes and pulse corrections help reduce leakage while keeping gates short.
@@ -383,7 +368,7 @@ $$Q(t) = \beta\,\frac{\mathrm{d}I(t)}{\mathrm{d}t}$$
 - A **virtual Z gate** is implemented by updating the phase reference for subsequent control pulses.
 - The phase update represents a rotation about $Z$ and requires no additional physical pulse duration.
 - Later pulses use the updated reference so that their rotation axes remain consistent.
-- Any single-qubit unitary can be composed from two $X_{\pi/2}$ pulses and virtual Z rotations, up to a global phase.
+- Any single-qubit unitary can be implemented using **at most two $X_{\pi/2}$ pulses** and virtual Z rotations with suitable angles, up to a global phase.
 
 <!-- Reference: McKay et al., Efficient Z Gates for Quantum Processors (2017), https://doi.org/10.1103/PhysRevA.96.022330. -->
 
@@ -406,28 +391,12 @@ Two-qubit gates use the coupling between qubits to make their evolution depend o
 
 ## Dispersive readout
 
-- We measure the qubit by probing a **coupled resonator** with a microwave pulse.
-- The detuning $\Delta = f_{01} - f_r$ is large compared with the coupling strength $g$; the resonator must also remain far from higher qubit transitions.
-- In this **dispersive regime**, direct energy exchange is suppressed, but the qubit state shifts the resonator's response.
-- Measuring that response lets us infer the qubit state.
+- A resonator is coupled to the qubit, with their frequencies far enough apart to suppress direct energy exchange.
+- The qubit state shifts the resonator frequency. The two resonances are separated by $2|\chi|$, where $\chi$ is the **dispersive shift**.
+- We send a microwave probe pulse and measure the returned signal's amplitude and phase.
+- The states $|0\rangle$ and $|1\rangle$ produce different responses, allowing us to infer the qubit state.
 
 <!-- Dispersive theory assumes sufficiently weak coupling relative to the relevant detunings and readout power below the breakdown of the approximation. Reference: Koch et al. (2007), https://arxiv.org/abs/cond-mat/0703002. -->
-
----
-
-## The dispersive shift
-
-- The resonator frequencies associated with $|0\rangle$ and $|1\rangle$ are separated by $2|\chi|$.
-- A probe near these frequencies produces different amplitudes and phases for the two states.
-- For a transmon, the leading dispersive approximation is
-
-$$\chi \approx \frac{g^2\alpha}{\Delta(\Delta+\alpha)},$$
-
-with $g$, $\Delta$, and $\alpha$ expressed in the same frequency units.
-
-For example, $\chi = -1.8\ \text{MHz}$ gives a separation of $2|\chi| = 3.6\ \text{MHz}$.
-
-<!-- Reference: Koch et al. (2007), Eq. (3.9), https://arxiv.org/abs/cond-mat/0703002. The numerical shift is illustrative; no numerical coupling g has been specified. -->
 
 ---
 
@@ -480,12 +449,13 @@ For example, $\chi = -1.8\ \text{MHz}$ gives a separation of $2|\chi| = 3.6\ \te
 
 ---
 
-## Where loops execute
+## Where operations execute
 
-- A loop can run on an instrument's sequencer when the hardware supports its operations and parameter updates.
-- Other loops may need to run on the host computer, for example when they control an external instrument.
-- Host execution can add communication and setup overhead at each step.
-- The execution plan uses the program's requirements and the platform's capabilities to determine where loops can run.
+- Operations can execute on an instrument's sequencer (`rt`) or on the host computer (`host`), depending on platform support.
+- For example, updating an external DC source may require communication from the host.
+- An operation's execution requirements can also constrain enclosing blocks, including sweeps and averaging.
+- Host execution can add communication and setup overhead.
+- The execution plan shows the supported domains for each operation and block, based on program requirements and platform capabilities.
 
 ---
 
@@ -620,6 +590,15 @@ program.measure(q[0].drive, "readout", "weights")
 
 ---
 
+## Mock measurement models
+
+- The reference platform requests a sample for each measurement, shot, and sweep point.
+- `env` contains currently assigned variables and platform parameters.
+- Model constants describe the assumed device response. Define them beside the model that uses them.
+- Use `MockMeasurementModel` for configurable responses or implement `sample(bus, env)` for a custom model.
+
+---
+
 ## Exercise 1.1: a complete sequence
 
 - Set a flux offset, play a drive pulse, and synchronise the drive and readout buses.
@@ -675,15 +654,6 @@ program.measure(q[0].drive, "readout", "weights")
 - Averaging adds no shot dimension to the result.
 - I/Q values and raw traces become means. Classified states become estimates of the probability of state 1.
 - For independent noise, the standard deviation of the mean decreases approximately as $1/\sqrt{N}$.
-
----
-
-## Mock measurement models
-
-- The reference platform requests a sample for each measurement, shot, and sweep point.
-- `env` contains currently assigned variables and platform parameters.
-- Model constants describe the assumed device response. Define them beside the model that uses them.
-- Use `MockMeasurementModel` for configurable responses or implement `sample(bus, env)` for a custom model.
 
 ---
 
@@ -791,6 +761,7 @@ with program.if_(measurement.state == 1):
 - Resolve `qp.Expression` parameters when the implementation needs numeric values.
 - Registration connects custom types to serialisation and capability checks.
 - Capability tokens let a platform declare support for each extension.
+- Supporting another quantum technology involves defining its control channels, adding any required operations and measurement types, and implementing hardware execution.
 
 ---
 
@@ -993,7 +964,7 @@ python -m qprogram.lsp explain flux_sweep.qp
 - **Docs**: [qilimanjaro-tech.github.io/qprogram](https://qilimanjaro-tech.github.io/qprogram)
 - **Source**: [github.com/qilimanjaro-tech/qprogram](https://github.com/qilimanjaro-tech/qprogram)
 - The Reference section is normative, and `qp.lark` is the machine-readable grammar.
-- Read [github.com/qilimanjaro-tech/qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox)`` or [github.com/qilimanjaro-tech/qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac) before writing your own extension.
+- Read [github.com/qilimanjaro-tech/qprogram-qblox](https://github.com/qilimanjaro-tech/qprogram-qblox) or [github.com/qilimanjaro-tech/qprogram-qdac](https://github.com/qilimanjaro-tech/qprogram-qdac) before writing your own extension.
 - Write a rule your lab cares about as a predicate.
 - Issues and pull requests are welcome.
 
@@ -1014,6 +985,5 @@ python -m qprogram.lsp explain flux_sweep.qp
 # Thank you
 
 <p class="sub">Questions welcome.</p>
-<p class="sub">The notebooks are yours to keep.</p>
 
 <p class="meta">vyron@qilimanjaro.tech · flavie.lebars@qilimanjaro.tech · QCE 2026</p>
