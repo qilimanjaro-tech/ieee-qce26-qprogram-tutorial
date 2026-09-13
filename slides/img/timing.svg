@@ -6,7 +6,7 @@
   both start from their own cursor at zero, so the readout tone is already running while the pi
   pulse plays, and the acquisition sees the pulse rather than the state. With a sync between them,
   the barrier holds the readout until the drive cursor has caught up, and the tone starts after the
-  pulse. The two durations are drawn to be readable rather than proportional.</desc>
+  pulse. Durations are drawn to be readable rather than proportional.</desc>
 
   <rect width="1600" height="620" fill="#ffffff"/>
 
@@ -18,13 +18,13 @@
 
   <!-- drive lane -->
   <text x="326" y="188" font-size="22" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].drive</text>
-  <line x1="340" y1="180" x2="600" y2="180" stroke="#d8d8e4" stroke-width="2"/>
+  <line x1="340" y1="180" x2="640" y2="180" stroke="#d8d8e4" stroke-width="2"/>
   <rect x="340" y="156" width="200" height="48" rx="7" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
   <text x="440" y="187" font-size="22" fill="#1c1c2e" text-anchor="middle">play pi &#183; 40 ns</text>
-  <rect x="540" y="156" width="60" height="48" rx="7" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="570" y="187" font-size="21" fill="#6a6a82" text-anchor="middle">4 ns</text>
-  <line x1="600" y1="146" x2="600" y2="214" stroke="#0f766e" stroke-width="3"/>
-  <text x="614" y="187" font-size="22" fill="#0b5c56">cursor at 44 ns</text>
+  <rect x="540" y="156" width="100" height="48" rx="7" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="590" y="187" font-size="21" fill="#6a6a82" text-anchor="middle">400 ns</text>
+  <line x1="640" y1="146" x2="640" y2="214" stroke="#0f766e" stroke-width="3"/>
+  <text x="654" y="187" font-size="22" fill="#0b5c56">cursor at 440 ns</text>
 
   <!-- readout lane -->
   <text x="326" y="262" font-size="22" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].readout</text>
@@ -35,7 +35,7 @@
   <text x="1054" y="261" font-size="22" fill="#0b5c56">cursor at 2000 ns</text>
 
   <!-- the overlap that is the bug, marked over both lanes -->
-  <rect x="340" y="148" width="260" height="138" rx="8" fill="#e0913a" fill-opacity="0.26"
+  <rect x="340" y="148" width="300" height="138" rx="8" fill="#e0913a" fill-opacity="0.26"
         stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
 
   <text x="72" y="306" font-size="22" font-weight="700" fill="#b45309">you measure the pulse, not the state</text>
@@ -46,24 +46,24 @@
 
   <!-- drive lane -->
   <text x="326" y="456" font-size="22" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].drive</text>
-  <line x1="340" y1="448" x2="600" y2="448" stroke="#d8d8e4" stroke-width="2"/>
+  <line x1="340" y1="448" x2="640" y2="448" stroke="#d8d8e4" stroke-width="2"/>
   <rect x="340" y="424" width="200" height="48" rx="7" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
   <text x="440" y="455" font-size="22" fill="#1c1c2e" text-anchor="middle">play pi &#183; 40 ns</text>
-  <rect x="540" y="424" width="60" height="48" rx="7" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
-  <text x="570" y="455" font-size="21" fill="#6a6a82" text-anchor="middle">4 ns</text>
+  <rect x="540" y="424" width="100" height="48" rx="7" fill="#f5f5fa" stroke="#6a6a82" stroke-width="2"/>
+  <text x="590" y="455" font-size="21" fill="#6a6a82" text-anchor="middle">400 ns</text>
 
   <!-- readout lane, held back to the barrier -->
   <text x="326" y="530" font-size="22" fill="#1c1c2e" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">q[0].readout</text>
-  <line x1="340" y1="522" x2="1300" y2="522" stroke="#d8d8e4" stroke-width="2"/>
-  <rect x="340" y="498" width="260" height="48" rx="7" fill="#eef4f3" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="470" y="529" font-size="21" fill="#6a6a82" text-anchor="middle">held by the barrier</text>
-  <rect x="600" y="498" width="700" height="48" rx="7" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
-  <text x="950" y="529" font-size="22" fill="#1c1c2e" text-anchor="middle">measure &#183; 2000 ns</text>
-  <line x1="1300" y1="488" x2="1300" y2="556" stroke="#0f766e" stroke-width="3"/>
-  <text x="1314" y="529" font-size="22" fill="#0b5c56">cursor at 2044 ns</text>
+  <line x1="340" y1="522" x2="1340" y2="522" stroke="#d8d8e4" stroke-width="2"/>
+  <rect x="340" y="498" width="300" height="48" rx="7" fill="#eef4f3" stroke="#6a6a82" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="490" y="529" font-size="21" fill="#6a6a82" text-anchor="middle">held by the barrier</text>
+  <rect x="640" y="498" width="700" height="48" rx="7" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <text x="970" y="529" font-size="22" fill="#1c1c2e" text-anchor="middle">measure &#183; 2000 ns</text>
+  <line x1="1340" y1="488" x2="1340" y2="556" stroke="#0f766e" stroke-width="3"/>
+  <text x="1354" y="529" font-size="22" fill="#0b5c56">cursor at 2440 ns</text>
 
   <!-- the barrier itself -->
-  <line x1="600" y1="412" x2="600" y2="570" stroke="#0f766e" stroke-width="3" stroke-dasharray="8 6"/>
-  <circle cx="600" cy="412" r="7" fill="#0f766e"/>
-  <text x="616" y="406" font-size="22" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sync</text>
+  <line x1="640" y1="412" x2="640" y2="570" stroke="#0f766e" stroke-width="3" stroke-dasharray="8 6"/>
+  <circle cx="640" cy="412" r="7" fill="#0f766e"/>
+  <text x="656" y="406" font-size="22" font-weight="700" fill="#0f766e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">sync</text>
 </svg>
